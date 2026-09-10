@@ -5,7 +5,7 @@ window.AI_CARRY_SNAPSHOT = {
   "meta": {
     "schema_version": "1.1",
     "generated_at": "2026-08-23T17:25:16.267Z",
-    "product_version": "2.0.9",
+    "product_version": "2.0.10",
     "state": "instance",
     "freshness_seconds": 86400,
     "source_digest": "github-pages-synthetic-demo-v5",
