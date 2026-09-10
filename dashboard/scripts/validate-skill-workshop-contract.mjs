@@ -10,6 +10,7 @@ import { recommendForSkillWorkshop } from "../src/lib/skill-workshop.ts";
 const assert = (condition, message) => { if (!condition) throw new Error(`Skill workshop contract failed: ${message}`); };
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const root = mkdtempSync(join(tmpdir(), "ai-carry-skill-workshop-"));
+let passed = false;
 const source = (ref) => readFileSync(resolve(repository, ...ref.split("/")), "utf8");
 const write = (base, ref, content) => {
   const target = resolve(base, ...ref.split("/"));
@@ -18,27 +19,10 @@ const write = (base, ref, content) => {
 };
 
 try {
-  // One concise semantic check protects the user journey without freezing all UI copy.
-  const guide = source("core/guides/skill-workshop-guide.md");
-  for (const fragment of [
-    "普通学习、保存 SOP、使用能力或看板推荐不会自动触发转换",
-    "使用工坊内置创作核心",
-    "自动脱敏、通用化和参数化只作用于这份副本",
-    "不安装、更新或依赖外部 Skill Creator",
-    "普通 Skill 不建立批量基线、评分 Agent 或统计评测",
-    "旧版“已生成但未分享”条目必须能够无损继续",
-    "同一稳定 `skill_id` 且版本更高时",
-    "空模板 requirements map 在这里懒初始化",
-    "不能让一个 Skill 的问题拖死 AI Carry",
-  ]) assert(guide.includes(fragment), `guide lost the behavior: ${fragment}`);
-
+  // Copy and tooltip appearance need a targeted UI review when changed, not
+  // frozen prose or a magic z-index in the package-behavior test.
   const ui = source("dashboard/src/components/dashboard/SkillWorkshop.tsx");
-  for (const label of ["Agent 推荐整理的 Skill", "我的 Skill", "已安装 Skill", "接入 Skill"]) {
-    assert(ui.includes(label), `desktop workshop lost the ${label} lane`);
-  }
   assert(ui.includes("ExportedSkillDetailDialog") && ui.includes("buildSkillExportAction"), "generated Skills lost detail or copy-to-Agent action");
-  assert(ui.includes("自动处理副本与隐私") && ui.includes("在隔离副本中完成检查与生成"), "generation still reads like manual user sanitization");
-  assert(source("dashboard/src/index.css").includes("z-index: 2147483000"), "status help can be hidden behind the workshop");
 
   const actions = source("core/maps/dashboard-actions.toml");
   for (const id of ["skill.create-from-asset", "skill.continue-export", "skill.install-shared"]) {
@@ -135,7 +119,11 @@ try {
   } });
   assert(unstableResult.decision === "isolated" && unstableResult.issues.some((item) => item.code === "directory-read-failed"), "nested read fault escaped package isolation");
 
-  console.log("Skill workshop journey passed the built-in lean creator contract, standard and legacy identity reading, single-package conflict isolation, ZIP/folder delivery, and local package fault isolation without running scripts.");
+  passed = true;
+  console.log("Skill workshop journey passed recommendations, standard and legacy identity reading, single-package conflict isolation, ZIP/folder delivery, and local package fault isolation without running scripts. UI copy and tooltip appearance are not covered by this check.");
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  if (passed) {
+    try { rmSync(root, { recursive: true, force: false }); }
+    catch { console.warn(`Skill workshop checks passed; temporary cleanup incomplete at ${root}`); }
+  } else console.error(`Skill workshop failure scene preserved at ${root}`);
 }

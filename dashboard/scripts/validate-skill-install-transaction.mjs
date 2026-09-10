@@ -5,6 +5,7 @@ import { confirmSkillInstall, prepareSkillInstall } from "./skill-install-cli.mj
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Skill install transaction failed: ${message}`); };
 const root = mkdtempSync(resolve(tmpdir(), "ai-carry-skill-install-"));
+let complete = false;
 const write = (base, ref, source) => {
   const path = resolve(base, ...ref.split("/"));
   mkdirSync(dirname(path), { recursive: true });
@@ -41,7 +42,15 @@ try {
 
   // 2. One user reply atomically installs and registers the exact package. The
   // script remains inert and the formal map points only to the host-local copy.
-  const installed = confirmSkillInstall(root, prepared.confirmationRef, "安装", { syncSnapshot: snapshotStub });
+  for (const [reply, choice] of [["先检查一下", ""], ["如果不影响旧内容才可以", ""], ["不安装", "install"], ["安装", "upgrade"]]) {
+    let rejected = false;
+    try { confirmSkillInstall(root, prepared.confirmationRef, reply, { choice, syncSnapshot: snapshotStub }); }
+    catch { rejected = true; }
+    assert(rejected && readFileSync(resolve(root, "instance/skills/requirements.toml")).equals(requirementsBefore)
+      && !existsSync(resolve(root, ".assistant-local/skills/shared-checklist")),
+    "ambiguous, conditional or conflicting confirmation wrote a Skill");
+  }
+  const installed = confirmSkillInstall(root, prepared.confirmationRef, "可以，就按这个方案接入我的助手吧", { choice: "install", syncSnapshot: snapshotStub });
   const requirementsAfter = readFileSync(resolve(root, "instance/skills/requirements.toml"), "utf8");
   assert(installed.decision === "skill-install-complete" && installed.requirementsRegistered
     && existsSync(resolve(root, ".assistant-local/skills/shared-checklist/SKILL.md"))
@@ -81,7 +90,7 @@ try {
     && upgradePrepared.userPreview.includes("如果同意，请回复“升级”")
     && readFileSync(resolve(root, "instance/skills/requirements.toml"), "utf8") === requirementsWithUnknown,
   "a valid same-Skill newer package did not produce an accurate non-writing upgrade preview");
-  const upgraded = confirmSkillInstall(root, upgradePrepared.confirmationRef, "升级", { syncSnapshot: snapshotStub });
+  const upgraded = confirmSkillInstall(root, upgradePrepared.confirmationRef, "同意，更新到你刚刚检查过的新版", { choice: "upgrade", syncSnapshot: snapshotStub });
   const requirementsUpgraded = readFileSync(resolve(root, "instance/skills/requirements.toml"), "utf8");
   const upgradedSkillBytes = readFileSync(resolve(root, ".assistant-local/skills/shared-checklist/SKILL.md"));
   assert(upgraded.decision === "skill-upgrade-complete" && upgraded.previousVersion === "1.0.0" && upgraded.version === "1.1.0"
@@ -140,7 +149,9 @@ try {
     && existsSync(resolve(root, ".assistant-local/skills/shared-checklist/SKILL.md")),
   "an injected local failure was not contained and rolled back without harming the existing Skill");
 
-  console.log("Skill install transaction passed seven high-information cases: legacy install, standard-metadata upgrade, idempotence, conflict isolation, and rollback without package execution.");
+  complete = true;
+  console.log("Skill install transaction passed natural host-confirmed install/upgrade, unresolved-reply no-write, idempotence, conflict isolation and rollback without package execution.");
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  if (complete) rmSync(root, { recursive: true, force: true });
+  else console.error(`Skill installation failure evidence kept at ${root}`);
 }

@@ -370,6 +370,7 @@ export function evaluateTaskCloseout(input) {
   const ready = uniqueIssues.length === 0;
   return Object.freeze({
     decision: ready ? "task-closeout-ready" : "task-closeout-repair-required",
+    validationScope: "receipt-completeness-only-not-application-or-task-success",
     executable: false,
     businessDeliveryAllowed: true,
     closeoutOnly: true,

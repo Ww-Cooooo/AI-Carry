@@ -4,23 +4,18 @@ import { fileURLToPath } from "node:url";
 import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const vectors = JSON.parse(readFileSync(resolve(root, "core/schemas/secret-boundary-test-vectors.json"), "utf8"));
 const assert = (condition, message) => { if (!condition) throw new Error(`Secret boundary vector failed: ${message}`); };
 
-assert(vectors.schema_version === 1 && Array.isArray(vectors.blocked) && Array.isArray(vectors.allowed), "vector document shape");
-for (const vector of vectors.blocked) {
-  const result = locateHighConfidenceSecretCandidates(vector.parts.join(""));
-  assert(result.blocked && result.findings.some((finding) => finding.category === vector.category), `missed ${vector.category}`);
+function validateVectors() {
+  const vectors = JSON.parse(readFileSync(resolve(root, "core/schemas/secret-boundary-test-vectors.json"), "utf8"));
+  assert(vectors.schema_version === 1 && Array.isArray(vectors.blocked) && Array.isArray(vectors.allowed), "vector document shape");
+  for (const vector of vectors.blocked) {
+    const result = locateHighConfidenceSecretCandidates(vector.parts.join(""));
+    assert(result.blocked && result.findings.some((finding) => finding.category === vector.category), `missed ${vector.category}`);
+  }
+  for (const value of vectors.allowed) assert(!locateHighConfidenceSecretCandidates(value).blocked, `false positive: ${value}`);
+  return vectors;
 }
-for (const value of vectors.allowed) assert(!locateHighConfidenceSecretCandidates(value).blocked, `false positive: ${value}`);
-
-const argumentsGiven = process.argv.slice(2);
-assert(
-  argumentsGiven.length === 0
-    || (argumentsGiven.length === 2 && argumentsGiven[0] === "--scan-root")
-    || (argumentsGiven.length === 4 && argumentsGiven[0] === "--scan-root" && argumentsGiven[2] === "--private-root"),
-  "usage: validate-secret-content-boundary.mjs [--scan-root <public-candidate> [--private-root <private-source>]]",
-);
 
 function publicCandidateFiles(scanRoot) {
   const files = [];
@@ -57,7 +52,8 @@ function approvedBinary(relativePath) {
 }
 
 function addPrivacyFinding(findings, category, path, line) {
-  if (findings.length < 32) findings.push(Object.freeze({ category, path, line }));
+  const safePath = locateHighConfidenceSecretCandidates(path).blocked ? "[redacted-secret-bearing-path]" : path;
+  if (findings.length < 32) findings.push(Object.freeze({ category, path: safePath, line }));
 }
 
 function normalizedLocalPath(value) {
@@ -77,16 +73,19 @@ function containsPrivateDevicePath(line, prefixes) {
   return prefixes.some((prefix) => normalized.includes(prefix));
 }
 
-function scanPublicCandidate(scanRoot, privateRoot) {
+// Paths retain their product-relative names (Pages assets use dashboard/dist/).
+// The same detector protects the install tree, Pages and individual Release Notes.
+export function scanPublicFiles(files, privateRoot = root) {
   const findings = [];
-  const files = publicCandidateFiles(scanRoot);
   const privatePrefixes = privateDevicePrefixes(privateRoot);
-  for (const [relativePath, absolute] of files) {
-    const bytes = readFileSync(absolute);
+  let scannedFiles = 0;
+  for (const [relativePath, bytes] of files) {
+    scannedFiles += 1;
     const pathSecretResult = locateHighConfidenceSecretCandidates(relativePath);
     for (const finding of pathSecretResult.findings) addPrivacyFinding(findings, finding.category, "[redacted-secret-bearing-path]", 0);
     const secretResult = locateHighConfidenceSecretCandidates(bytes.toString("latin1"));
-    for (const finding of secretResult.findings) addPrivacyFinding(findings, finding.category, relativePath, finding.line);
+    const safePath = pathSecretResult.blocked ? "[redacted-secret-bearing-path]" : relativePath;
+    for (const finding of secretResult.findings) addPrivacyFinding(findings, finding.category, safePath, finding.line);
 
     let text;
     try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
@@ -100,6 +99,9 @@ function scanPublicCandidate(scanRoot, privateRoot) {
       || relativePath === "THIRD_PARTY_NOTICES.md";
     const generatedDashboardBundle = relativePath === "dashboard/dist/index.html" || relativePath === "dashboard/dist/index.en.html";
     for (const [index, line] of text.split(/\r?\n/u).entries()) {
+      if (/Ww-Cooooo\/(?:AI|Agent)-Carry-Dev|maintainer\.instance-workbench\.|\.assistant-local\/instance-workbench\//iu.test(line)) {
+        addPrivacyFinding(findings, "private-development-marker", safePath, index + 1);
+      }
       if (!licenseContext) {
         emailPattern.lastIndex = 0;
         for (const match of line.matchAll(emailPattern)) {
@@ -129,28 +131,42 @@ function scanPublicCandidate(scanRoot, privateRoot) {
       }
     }
   }
-  return Object.freeze({ scannedFiles: files.length, findings: Object.freeze(findings) });
+  return Object.freeze({ scannedFiles, findings: Object.freeze(findings) });
 }
 
-if (argumentsGiven.length === 0) {
-  console.log(`Secret boundary passed ${vectors.blocked.length} blocked and ${vectors.allowed.length} allowed shared vectors.`);
-} else {
-  const requestedRoot = resolve(argumentsGiven[1]);
-  const metadata = lstatSync(requestedRoot);
-  assert(metadata.isDirectory() && !metadata.isSymbolicLink(), "scan root must be a physical directory");
-  const scanRoot = realpathSync(requestedRoot);
-  const requestedPrivateRoot = resolve(argumentsGiven[3] ?? root);
-  const privateRootMetadata = lstatSync(requestedPrivateRoot);
-  assert(privateRootMetadata.isDirectory() && !privateRootMetadata.isSymbolicLink(), "private root must be a physical directory");
-  const result = scanPublicCandidate(scanRoot, realpathSync(requestedPrivateRoot));
-  if (result.findings.length > 0) {
-    console.error(JSON.stringify({
-      decision: "public-candidate-sensitive-content-found",
-      scanned_files: result.scannedFiles,
-      findings: result.findings,
-    }, null, 2));
-    process.exitCode = 1;
+export function scanPublicCandidate(scanRoot, privateRoot = root) {
+  return scanPublicFiles(publicCandidateFiles(scanRoot).map(([ref, path]) => [ref, readFileSync(path)]), privateRoot);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const argumentsGiven = process.argv.slice(2);
+  assert(argumentsGiven.length === 0 || (["--scan-root", "--scan-file"].includes(argumentsGiven[0])
+    && (argumentsGiven.length === 2 || (argumentsGiven.length === 4 && argumentsGiven[2] === "--private-root"))),
+  "usage: validate-secret-content-boundary.mjs [--scan-root <candidate> | --scan-file <notes>] [--private-root <source>]");
+  const vectors = validateVectors();
+  if (argumentsGiven.length === 0) {
+    console.log(`Secret boundary passed ${vectors.blocked.length} blocked and ${vectors.allowed.length} allowed shared vectors.`);
   } else {
-    console.log(`Public candidate content boundary passed ${result.scannedFiles} files with no sensitive-content findings.`);
+    const requestedRoot = resolve(argumentsGiven[1]);
+    const metadata = lstatSync(requestedRoot);
+    const singleFile = argumentsGiven[0] === "--scan-file";
+    assert((singleFile ? metadata.isFile() : metadata.isDirectory()) && !metadata.isSymbolicLink(), "scan target must be physical");
+    const scanRoot = realpathSync(requestedRoot);
+    const requestedPrivateRoot = resolve(argumentsGiven[3] ?? root);
+    const privateRootMetadata = lstatSync(requestedPrivateRoot);
+    assert(privateRootMetadata.isDirectory() && !privateRootMetadata.isSymbolicLink(), "private root must be a physical directory");
+    const result = singleFile
+      ? scanPublicFiles([["release-notes.md", readFileSync(scanRoot)]], realpathSync(requestedPrivateRoot))
+      : scanPublicCandidate(scanRoot, realpathSync(requestedPrivateRoot));
+    if (result.findings.length > 0) {
+      console.error(JSON.stringify({
+        decision: "public-candidate-sensitive-content-found",
+        scanned_files: result.scannedFiles,
+        findings: result.findings,
+      }, null, 2));
+      process.exitCode = 1;
+    } else {
+      console.log(`Public candidate content boundary passed ${result.scannedFiles} files with no sensitive-content findings.`);
+    }
   }
 }

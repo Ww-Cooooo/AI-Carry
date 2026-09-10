@@ -50,7 +50,7 @@ Use a stable user-writable location, not a browser download cache, archive previ
 - An existing empty destination may be used after the Agent explains how it was checked.
 - A non-empty destination, Git repository, existing AI Carry/Agent Carry identity, or uncertain folder must not be overwritten, merged, or reset. Choose a new folder, or use the upgrade route for an existing instance.
 
-After copying, read back the root markers above and confirm that `instance/manifest.toml` is still a clean `template`. The public package already includes the offline Dashboard. A normal installation does not require Node.js, npm, a frontend build, a local server, or a CDN.
+After copying, read back the root markers above and confirm that `instance/manifest.toml` is still a clean `template`. Copying the template and opening the included offline Dashboard require no Node.js, npm, build, local server, or CDN. Formal creation and saving do require the Agent to run the bundled tools using Node.js already available on the computer or supplied by the host. Frontend development dependencies are not needed.
 
 For a user-provided ZIP, check bounded size and entry count, reject absolute or `..` paths and link escapes, and use an independently supplied archive digest when one exists. Do not create a new per-file hash bureaucracy for an ordinary installation.
 
@@ -65,6 +65,8 @@ The English entry targets `dashboard.en.html` in the installed root; the Chinese
 Verify that the entry exists, still targets this installation, opens without an error page, and shows the local empty AI Carry template. If policy prevents creating the visible entry, keep the usable installation, provide the exact `dashboard.en.html` path, and report limited completion. That is not a total installation failure.
 
 ## 5. Continue into first-time creation
+
+Check the runtime prerequisite in `core/guides/first-use-execution-gates.md` when entering creation; this does not authorize dependency installation. If Node.js or execution permission is unavailable, retain the user's choices and continue discussing the setup. Recommend continuing in a capable host, or configuring a runtime with the user's permission. Do not wait until the full interview is complete to reveal this prerequisite, or claim that an assistant has already been created.
 
 Do not end with a technical install report. Tell the user:
 

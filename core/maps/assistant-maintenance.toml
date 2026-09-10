@@ -57,11 +57,11 @@ confirmation = "before-claiming-an-existing-workspace-or-changing-its-ownership"
 
 [[routes]]
 id = "task-orchestration"
-summary = "由高等级模型规划、低等级模型执行，并通过密封任务包沟通。"
-triggers = ["Level 3规划", "交给Level 1执行", "跨Agent执行"]
+summary = "仅在确实需要跨 Agent 交接时传递最小任务包；当前 Agent 能完成就直接完成，模型等级不代替事实或授权。"
+triggers = ["跨Agent执行", "交给另一个 Agent", "独立子任务", "Level 3规划", "交给Level 1执行"]
 target = "core/protocols/TASK_ORCHESTRATION_SOP.md"
 state = "on-demand"
-minimum_level = 3
+minimum_level = 1
 confirmation = "execution-mode-choice"
 
 [[routes]]

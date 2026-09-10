@@ -1,0 +1,95 @@
+schema_version = 2
+release = "2.0.10"
+core = "2.0.10"
+license = "Apache-2.0"
+extension_api = "1.0"
+asset_schema = "1.3"
+dashboard_snapshot_schema = "1.1"
+dashboard_action_schema = "1.0"
+cross_session_signal_schema = "1.1"
+host_integration_schema = "1.0"
+private_asset_catalog_schema = "1.0"
+migration_kit_schema = "2.0"
+extension_manifest_schema = "1.0"
+instance_component_schema = "1.0"
+result_validation_evidence_schema = "1.0"
+startup_capsule_schema = "1.0"
+from_versions = ["1.4.8", "1.4.9", "2.0.0", "2.0.1", "2.0.2", "2.0.3", "2.0.4", "2.0.5", "2.0.6", "2.0.7", "2.0.8", "2.0.9"]
+required_preview_executor = "dashboard/scripts/ai-carry-upgrade-cli.mjs"
+required_preview_command = "prepare --source <current-instance-root> --target <verified-extracted-target-root>"
+required_preview_policy = "on an explicit update check verify the latest formal GitHub Release fixed lightweight tag exact tree target bytes and release manifest; moving public main does not invalidate the fixed Release; prepare is read-only and displays its returned userPreview"
+required_confirm_policy = "after the exact preview wait for the user's next independent upgrade or confirm-upgrade reply; confirm rechecks the same local source target instance release boundary and write set without repeating network access and rejects real drift"
+required_session_reentry_policy = "after the file switch refresh a pending snapshot then run only the returned sessionReentryCommand and one relevant non-destructive behavior; never run the dashboard development check suite in an installed instance"
+notes = "AI Carry 2.0.10 clarifies product-quality principles, connects saved task material to its existing continuation entry, fixes relative-path recall and local fault handling, and removes the dedicated personal writing-style learning and imitation feature."
+asset_changes = "Asset Schema remains 1.3. Generic memory habits capabilities SOPs experiences learning candidates and their recall remain available. Removing the dedicated writing-style feature never deletes existing user assets or changes their ownership."
+dashboard_changes = "Dashboard schemas and the established computer layout remain unchanged. Invalid individual entries are isolated and reported instead of clearing healthy content or claiming an empty list. No desktop-client preview is included."
+extension_changes = "Extension API Extension Manifest Schema and Instance Component Schema remain 1.0. Existing components professional workspaces device bindings private references and instance business code remain instance-owned."
+
+replace = ["README.md", "README.en.md", "INSTALL.md", "INSTALL.en.md", "START-HERE.txt", "START-HERE.en.txt", "AGENTS.md", "BOOTSTRAP.md", "CONTRIBUTING.md", "SECURITY.md", ".github/**", "assistant.toml", ".gitattributes", ".gitignore", "LICENSE", "core/**", "docs/**", "dashboard.html", "dashboard.en.html", "dashboard/**", "_data/**", "THIRD_PARTY_NOTICES.md"]
+replace_instance_guides = ["instance/profile/README.md", "instance/memory/README.md", "instance/capabilities/README.md", "instance/sops/README.md", "instance/experiences/README.md", "instance/evolution/README.md", "instance/todo/README.md", "instance/deferred/README.md", "instance/governance/README.md", "instance/signals/README.md", "instance/hosts/README.md", "instance/validations/README.md", "instance/components/README.md"]
+migrate = ["instance/manifest.toml", "instance/startup-capsule.toml"]
+preserve = ["workspace/**", "instance/components/**", "instance/maps/**", "instance/profile/**", "instance/governance/**", "instance/memory/**", "instance/capabilities/**", "instance/sops/**", "instance/experiences/**", "instance/evolution/**", "instance/todo/**", "instance/deferred/**", "instance/skills/**", "instance/signals/**", "instance/hosts/**", "instance/validations/**", ".assistant-private/**", ".assistant-local/**"]
+remove = []
+
+[classification]
+precedence = ["migration_rules", "replace_instance_guides", "migrate", "preserve", "replace", "remove"]
+overlap_policy = "first-matching-classification-wins-after-applicable-migration-rules; every selected path must resolve to exactly one effective action"
+guide_overlap_note = "Only the exact README files in replace_instance_guides are target-template guides; every sibling user file remains instance-owned."
+validation_overlap_note = "A clean template uses the target empty validation index; an existing instance keeps its index and records byte-for-byte."
+evolution_overlap_note = "A clean template uses the target empty candidate index; an existing instance keeps its index candidates and timestamps byte-for-byte."
+component_overlap_note = "A clean template uses the target registry; an existing instance keeps current or legacy component registry bodies bindings and unknown fields."
+skill_overlap_note = "instance/skills/** is instance-owned. Existing editable sources exports carriers requirements and installed Skills remain unchanged."
+governance_overlap_note = "instance/governance/** remains instance-owned. A recognized legacy source may still apply the existing bounded current-product phrase migration while preserving every other source byte and schedule."
+
+[target_selection]
+mode = "fixed-release-content-or-trusted-commit-allowlist"
+forbid_unlisted_files = true
+forbidden_segments = [".git", "node_modules", ".cache", ".vite", ".turbo", "coverage", "tmp", "temp", "maintainer-private", ".assistant-private", ".assistant-local"]
+allow_overrides_deny_for_exact_paths = [".assistant-local/.gitkeep", ".assistant-local/dashboard/.gitkeep", ".assistant-local/indexes/.gitkeep", ".assistant-local/skills/.gitkeep", ".assistant-local/task-handoffs/.gitkeep", ".assistant-local/upgrade-inbox/.gitkeep", ".assistant-private/.gitkeep", ".assistant-private/assets/.gitkeep", ".assistant-private/inbox/.gitkeep"]
+exact_override_policy = "only listed regular zero-byte placeholder files may override forbidden segments"
+broad_globs_are_copy_commands = false
+
+[instance_component_changes]
+schema = "1.0"
+registry = "instance/components/registry.toml"
+target_interfaces = ["ai-carry.instance-component@1", "agent-carry.instance-component@1"]
+migration_ids = ["principles-and-learning-continuity-2.0.10"]
+native_asset_policy = "reuse existing formal owners; do not duplicate memory capability SOP experience Skill or workspace bodies as components"
+professional_extension_policy = "reuse extension.toml and do not duplicate professional workspaces in the generic registry"
+unregistered_policy = "preserve and classify only when the related durable change or upgrade needs it"
+optional_incompatible_action = "disable-and-preserve"
+required_incompatible_action = "stop-switch-and-preserve"
+device_local_policy = "preserve on the same device and keep out of public or portable truth; inspect only the current tool's explicit bindings before copied-instance execution"
+ordinary_startup = "never enumerate components workspaces bindings or local tools"
+authorization = "reuse the current durable action authorization; add no compatibility-only confirmation"
+
+[[migration_rules]]
+id = "principles-and-learning-continuity-2.0.10"
+from_versions = ["1.4.8", "1.4.9", "2.0.0", "2.0.1", "2.0.2", "2.0.3", "2.0.4", "2.0.5", "2.0.6", "2.0.7", "2.0.8", "2.0.9"]
+when_all = ["source reports one recognized direct version and AI Carry or known legacy identity", "official v2.0.10 Release lightweight tag manifest and extracted tree agree", "the user authorizes this exact upgrade after the bound preview"]
+source = "bounded product preimages plus only the instance paths required to preserve identity rebuild startup derivatives and apply an already-supported bounded legacy migration when needed"
+destination = "the same stable instance root on AI Carry 2.0.10 with instance-owned local private future and unknown bytes preserved"
+operation_order = ["verify the fixed official v2.0.10 Release tag tree target bytes and manifest once during prepare", "bind the preview to source target instance release boundary and product write set", "after exact user confirmation recheck those local facts", "assemble and validate one isolated candidate", "preserve instance identity assets Skills components workspaces bindings private references future fields and unknown paths", "replace only mother-template-owned product files and adapt only content affected by the new template", "update the instance product version and rebuild the startup capsule", "switch changed product files transactionally and restore touched preimages once on a core failure", "refresh the byte-identical snapshot pair without rolling back a valid core switch for a snapshot-only fault", "run the returned session reentry and one relevant non-destructive behavior", "report actual changes preserved content limitations and the next step"]
+forbidden = ["rewriting user assets Skills workspaces private content or unknown paths for the repository rename or Overview layout", "requiring a mobile layout or treating a mobile-only issue as an upgrade failure", "treating a missing optional visual label WebGL renderer or rebuildable snapshot as a whole-assistant failure", "adding a second registry scanner state machine compatibility database or enterprise test matrix", "executing package scripts installing dependencies or launching instance tools during the file transaction", "reusing a preview after source target instance release boundary or write-set drift", "accepting caller-authored authority an unfixed branch archive or a tag without the matching official Release", "modifying a real installed instance during rehearsal"]
+unknown_or_ambiguous = "preserve unknown bytes and fields; if ownership privacy overwrite risk or a required capability remains genuinely ambiguous after bounded repair pause only the affected write or formal switch and explain one smallest next decision"
+idempotence = "a second run against the same installed 2.0.10 source verifies current product startup and snapshot closure and makes no user file asset Skill binding timestamp report or snapshot change"
+
+[verification]
+upgrade_preservation = "one representative prior-version instance keeps identity user assets Skills components workspaces local private future and unknown bytes while product files advance"
+local_fault_containment = "one invalid asset route snapshot item or rebuildable projection affects only its own scope; healthy data and ordinary tasks remain available"
+staging_recovery = "a failure before switch leaves the source untouched and a core-switch failure restores every touched product preimage once"
+second_run = "the same completed source produces no changes"
+public_boundary = "the public projection contains product and release materials but no maintainer state real instance local binding cache Skill carrier report private content mock data or secret"
+checks = ["version-and-release-pointers-aligned", "blank-template-remains-empty", "generic-habit-and-sop-save-recall-opt-out-and-preservation", "task-continuation-and-relative-path-boundaries", "representative-upgrade-preserves-instance-owned-bytes", "startup-and-snapshot-consistency", "invalid-dashboard-items-do-not-clear-healthy-content", "readme-and-release-notes-match", "private-material-excluded"]
+risk_policy = "run one focused release validation with actual learning and continuation coverage and representative upgrade preservation; build the changed delivery once and reuse unchanged evidence; no mobile matrix or whole-machine audit"
+
+[release_boundary]
+status = "published-release"
+release_ref = "v2.0.10"
+publication_authorized = true
+repository_operation_authorized = true
+instance_replacement_authorized = true
+future_publication_or_repository_operation_authorized = false
+authority_requires = ["official-latest-release-is-v2.0.10", "official-release-object-v2.0.10", "official-lightweight-tag-v2.0.10", "manifest-and-extracted-tree-match-the-fixed-tag", "user-explicitly-authorized-this-upgrade"]
+authority_scope = "this fixed release may replace an instance only after every external condition above exists; this local candidate alone authorizes no instance replacement or future repository action"
+maintainer_private_paths = ["AGENTS.override.md", ".assistant-private/**", ".assistant-local/**", "maintainer-private/**", "workspace/**"]

@@ -48,6 +48,15 @@ for (const location of ["/Volumes/PrivateDisk/project", "/data/private/file", "/
 for (const remoteUrl of ["https://example.com/etc/reference", "https://example.com/home/index.html"]) {
   assert(!containsForbiddenLocationReference(remoteUrl), `remote URL was mistaken for a local location: ${remoteUrl}`);
 }
+for (const relativeRef of ["./workspace/example/README.md", "../../workspace/example/README.md",
+  "[任务入口](../../workspace/example/README.md)", "[工作记录](../../工作资料/project/说明.md)",
+  "`../project/notes.md`", "[本地记录](../../.assistant-local/training/index.md)"]) {
+  assert(!containsForbiddenLocationReference(relativeRef), `dot-relative reference was mistaken for a device path: ${relativeRef}`);
+  for (const separator of ["\n", ";", "，"]) {
+    assert(containsForbiddenLocationReference(`${relativeRef}${separator}/workspace/private/report.md`),
+      "a relative link hid an independent absolute path");
+  }
+}
 for (const webRoute of ["/api/v1/users", "/docs/getting-started", "参考接口 /api/v2/items"]) {
   assert(!containsForbiddenLocationReference(webRoute), `web route was mistaken for a device path: ${webRoute}`);
 }

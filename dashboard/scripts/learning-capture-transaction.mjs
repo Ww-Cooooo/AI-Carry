@@ -823,15 +823,18 @@ function buildDirectKeepProjection(repositoryReal, checked, envelope, context) {
   const targetProof = prepareNewFormalTarget(repositoryReal, formalTarget, asset.kind);
   if (!verifyNewFormalTarget(repositoryReal, targetProof)) throw new Error("formal target is no longer available");
   const route = formalRouteProjection(asset, formalTarget);
-  if (Buffer.byteLength(JSON.stringify(route.route), "utf8") > 2048 || envelope.routeCount + 1 > 96
-    || envelope.bytes + route.byteLength > 32768) throw new Error("domain map needs bounded maintenance before keeping this content");
+  if (Buffer.byteLength(JSON.stringify(route.route), "utf8") > 2048 || envelope.routeCount + 1 > 128) {
+    throw new Error("domain map hard budget would be exceeded; keep this new content for targeted review, existing assets remain available");
+  }
   const domainMapRead = stableRead(repositoryReal, context.domainMapRef, limits.domainMap);
   const domainMapText = `${domainMapRead.text.replace(/\s*$/u, "")}${route.source}`;
   if (Buffer.byteLength(domainMapText, "utf8") > limits.domainMap) throw new Error("domain map hard budget would be exceeded");
+  const capacityNotice = envelope.routeCount + 1 >= 96 || Buffer.byteLength(domainMapText, "utf8") >= 32768
+    ? "检索目录已达到建议整理的容量，但未超过安全上限；本次仍可保存并召回，后续可按需整理，不必暂停当前工作。" : "";
   return Object.freeze({ eligible: true, requiredLevel, asset: Object.freeze({ ...asset }), normalizedPreview,
     formalTarget, targetProof, route, domainMapRef: context.domainMapRef, domainMapRead, domainMapText,
     writeSetPreview: Object.freeze([formalTarget, context.domainMapRef]),
-    retainedFutureActionGate: asset.confirmation, initialMaturity: maturityBearing ? "unvalidated" : "not-applicable" });
+    retainedFutureActionGate: asset.confirmation, initialMaturity: maturityBearing ? "unvalidated" : "not-applicable", capacityNotice });
 }
 
 function purgeMessageRefs(now) {
@@ -929,7 +932,7 @@ export function createLearningCaptureChoiceChallenge(repository, proposal, { lev
       directKeep = Object.freeze({ eligible: false, reason: error.message });
     }
     const keepConsequence = directKeep.eligible
-      ? "你确认后会把这份精确内容直接保存为正式资产并接入召回；看板随后单独刷新，只保存，不执行任何未来动作。"
+      ? `你确认后会把这份精确内容直接保存为正式资产并接入召回；看板随后单独刷新，只保存，不执行任何未来动作。${directKeep.capacityNotice}`
       : `当前不能安全直写（${directKeep.reason}）。选择后只会生成定向复核请求，不会假装已经保存。`;
     const challenge = deepFreeze({
       decision: "learning-capture-current-user-choice-required", executable: false,
@@ -1899,7 +1902,7 @@ function buildDirectKeepPlan(repositoryReal, trust) {
     preimages, steps, finalDigests, rollback, writeSet,
     readSet: [MANIFEST_REF, direct.domainMapRef, direct.formalTarget],
     hostExecutionRequired: true, formalPromotionRequest: null,
-    userGuidance: "这份精确内容已准备按一次确认正式保存。核心事务只写正式资产和直接召回路由，不执行任何未来动作；看板在保存后单独刷新。",
+    userGuidance: `这份精确内容已准备按一次确认正式保存。核心事务只写正式资产和直接召回路由，不执行任何未来动作；看板在保存后单独刷新。${direct.capacityNotice}`,
     requiredChecks: ["stage-all-exact-proposed-bytes", "reverify-all-preimage-digests", "commit-in-step-order",
       "read-back-all-final-digests", "rollback-core-write-set-on-any-failure", "verify-ordinary-language-recall-after-commit"],
   });

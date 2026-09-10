@@ -3,7 +3,7 @@
 // 数据来源：运行时读取 window.AI_CARRY_SNAPSHOT。
 // 它由 index.html 里的 <script src="./snapshot.js"> 注入。Agent 在正式状态变化
 // 或用户明确要求 Agent 重建时，按快照契约原子更新 dashboard/dist/snapshot.js。
-// 若没有该脚本（或读取失败），本模块回退到明确标识的空模板状态；
+// 若没有该脚本（或读取失败），本模块回退到明确标识的数据不可用状态；
 // mock 数据只允许存在于不随公开 main／安装包分发的临时测试夹具中，
 // 绝不能伪装成真实助手状态。
 // 组件层只消费本模块导出，不关心数据从哪来；新快照会原位投影到既有对象和数组，
@@ -15,8 +15,58 @@ import generatedDashboardActions from "../generated/dashboard-actions.json";
 
 function load(): Snap {
   const g = ((window as any).AI_CARRY_SNAPSHOT ?? (window as any).AGENT_CARRY_SNAPSHOT) as Snap | undefined;
-  if (g && g.meta && g.profile) return g;
+  if (isRecord(g) && isRecord(g.meta) && isRecord(g.profile)) return normalizeSnapshot(g);
   return fallbackSnapshot();
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && !!item.trim()) : [];
+}
+
+function countOr(value: unknown, fallback = 0): number {
+  return Number.isSafeInteger(value) && (value as number) >= 0 ? value as number : fallback;
+}
+
+/** 只适配显示结构，不改真源，也不把不完整条目伪装成已通过检查。 */
+function normalizeSnapshot(input: Snap): Snap {
+  const next = { ...input };
+  const affected = new Set<string>();
+  let isolated = 0;
+  const rows = (value: unknown, area: string) => {
+    if (value == null) return [];
+    if (!Array.isArray(value)) { affected.add(area); isolated += 1; return []; }
+    return value.filter((item) => {
+      if (isRecord(item)) return true;
+      affected.add(area); isolated += 1; return false;
+    });
+  };
+  for (const area of ["memories", "sops", "capabilities", "experiences", "evolution", "governance", "todo", "deferred", "changes"]) {
+    next[area] = rows(input[area], area);
+  }
+  const skillSource = isRecord(input.skills) ? input.skills : {};
+  if (input.skills != null && !isRecord(input.skills)) { affected.add("skills"); isolated += 1; }
+  next.skills = { ...skillSource, items: rows(skillSource.items, "skills"), exports: rows(skillSource.exports, "skills") };
+  if (affected.has("skills")) next.skills.count = next.skills.items.length;
+  next.meta = { ...input.meta };
+  for (const field of ["state", "schema_version", "product_version", "source_digest", "identity_ref", "generated_at"]) {
+    next.meta[field] = textOr(input.meta[field], "");
+  }
+  next.overview = { ...(isRecord(input.overview) ? input.overview : {}), domain: textOr(input.overview?.domain, "") };
+  next.advanced = { file_count: countOr(input.advanced?.file_count), entry_files: stringList(input.advanced?.entry_files) };
+  if (isolated) {
+    const previous = isRecord(input.health) ? input.health : {};
+    const count = countOr(previous.isolated_item_count) + isolated;
+    next.health = { ...previous, state: "degraded", isolated_item_count: count,
+      affected_areas: [...new Set([...stringList(previous.affected_areas), ...affected])],
+      source_data_preserved: true,
+      summary: `有 ${count} 项内容暂未进入看板，源文件仍原样保留，其他有效内容可以继续使用。`,
+      next_step: "让 Agent 只检查受影响类别并给出修复建议；修复前不需要停止其他无关工作。" };
+  }
+  return next;
 }
 
 /* 快照不可用时的安全空态。函数声明会提升，避免模块初始化 TDZ。 */
@@ -63,12 +113,18 @@ function fallbackSnapshot(): Snap {
 
 let S = load();
 
+export const isolatedContentMessage = "部分记录暂未显示，不能据此判断为空。请让 Agent 局部修复，其他工作仍可继续。";
+export function snapshotAreaDegraded(area: string): boolean {
+  const sourceArea = area === "memories" ? "memory" : area === "todos" ? "todo" : area;
+  return S.health?.state === "degraded" && stringList(S.health.affected_areas).some((item) => item === area || item === sourceArea);
+}
+
 export let meta = S.meta;
 export let overview = S.overview;
 
 function projectProfile(snapshot: Snap) {
-  const state = snapshot.overview?.state ?? snapshot.meta?.state ?? "—";
-  const guidanceMode = snapshot.profile?.guidance_mode ?? (state === "instance" ? "balanced" : "unselected");
+  const state = textOr(snapshot.overview?.state, textOr(snapshot.meta?.state, "—"));
+  const guidanceMode = textOr(snapshot.profile?.guidance_mode, state === "instance" ? "balanced" : "unselected");
   const rawLearningPolicy = snapshot.profile?.learning_policy;
   const learningPolicy = state === "template"
     ? "unselected"
@@ -80,24 +136,24 @@ function projectProfile(snapshot: Snap) {
     unselected: "尚未选择",
   };
   return {
-    displayName: snapshot.profile?.display_name ?? "未命名助手",
-    mission: snapshot.profile?.mission ?? "",
-    domainId: snapshot.profile?.domain_id ?? "",
+    displayName: textOr(snapshot.profile?.display_name, "未命名助手"),
+    mission: textOr(snapshot.profile?.mission, ""),
+    domainId: textOr(snapshot.profile?.domain_id, ""),
     guidanceMode,
     guidanceLabel: guidanceLabels[guidanceMode] ?? "尚未记录",
     learningPolicy,
     learningPolicyLabel: learningPolicy === "risk-tiered" ? "先询问，再按风险安排候选" : learningPolicy === "manual-only" ? "候选每一步都由你确认" : "创建助手时选择",
-    language: snapshot.profile?.language ?? "zh-CN",
-    model: snapshot.model?.name ?? "尚未确认",
-    modelLevel: snapshot.model?.level ?? null,
-    modelPlatform: snapshot.model?.platform ?? "—",
+    language: textOr(snapshot.profile?.language, "zh-CN"),
+    model: textOr(snapshot.model?.name, "尚未确认"),
+    modelLevel: countOr(snapshot.model?.level) || null,
+    modelPlatform: textOr(snapshot.model?.platform, "—"),
     confirmedAt: snapshot.model?.confirmed_at ? String(snapshot.model.confirmed_at).slice(0, 10) : "—",
-    modelStatus: snapshot.model?.status ?? "unconfirmed",
-    version: snapshot.meta?.product_version ?? "—",
+    modelStatus: textOr(snapshot.model?.status, "unconfirmed"),
+    version: textOr(snapshot.meta?.product_version, "—"),
     state,
-    startupChars: snapshot.overview?.startup_chars ?? 0,
-    startupBudget: snapshot.overview?.startup_budget ?? 0,
-    isReal: (window as any).AI_CARRY_IS_REAL === true || (window as any).AGENT_CARRY_IS_REAL === true,
+    startupChars: countOr(snapshot.overview?.startup_chars),
+    startupBudget: countOr(snapshot.overview?.startup_budget),
+    isReal: state !== "snapshot-unavailable" && ((window as any).AI_CARRY_IS_REAL === true || (window as any).AGENT_CARRY_IS_REAL === true),
   };
 }
 
@@ -106,14 +162,14 @@ function projectAssets(snapshot: Snap) {
     ? snapshot.todo.filter((item: any) => item?.visible !== false).length
     : (snapshot.assets?.todo ?? 0);
   return {
-    memory: snapshot.assets?.memory ?? 0,
-    sops: snapshot.assets?.sops ?? 0,
-    capabilities: snapshot.assets?.capabilities ?? 0,
-    experiences: snapshot.assets?.experiences ?? 0,
-    evolution: snapshot.assets?.evolution ?? 0,
-    todo: visibleTodoCount,
-    governance: snapshot.assets?.governance ?? 0,
-    skills: snapshot.assets?.skills ?? 0,
+    memory: countOr(snapshot.assets?.memory),
+    sops: countOr(snapshot.assets?.sops),
+    capabilities: countOr(snapshot.assets?.capabilities),
+    experiences: countOr(snapshot.assets?.experiences),
+    evolution: countOr(snapshot.assets?.evolution),
+    todo: countOr(visibleTodoCount),
+    governance: countOr(snapshot.assets?.governance),
+    skills: countOr(snapshot.assets?.skills),
   };
 }
 
@@ -192,7 +248,7 @@ export function getSnapshotStatus(refreshFailed = false): SnapshotStatus {
     };
   }
 
-  if (profile.state === "template") {
+  if (profile.state === "template" && S.health?.state !== "degraded") {
     return {
       key: "template",
       label: "等待第一次设置",
@@ -565,12 +621,13 @@ export function assetUsagePresentation(
 }
 
 const missingSummary = (kind: string) => `说明缺失：请让 Agent 补齐这条${kind}的用途说明，并重建看板数据。`;
-const textOr = (value: unknown, fallback: string) =>
-  typeof value === "string" && value.trim() ? value.trim() : fallback;
+function textOr(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
 
 /** 成熟度只描述证据，不吸收生命周期或授权状态；使用门禁由独立字段决定。 */
 function assetReliability(item: any): string {
-  return item?.reliability ?? item?.maturity ?? "unvalidated";
+  return textOr(item?.reliability, textOr(item?.maturity, "unvalidated"));
 }
 
 const projectableFormalAssets = (items: unknown): any[] => Array.isArray(items)
@@ -605,8 +662,8 @@ const projectSops = (snapshot: Snap): AssetItem[] => projectableFormalAssets(sna
   approvedByUser: typeof s.approved_by_user === "boolean" ? s.approved_by_user : null,
   riskTier: textOr(s.risk_tier, ""),
   reliability: assetReliability(s),
-  say: s.triggers?.[0] ?? s.summary ?? "",
-  triggers: s.triggers ?? [],
+  say: textOr(stringList(s.triggers)[0], textOr(s.summary, "")),
+  triggers: stringList(s.triggers),
 }));
 
 const projectCapabilities = (snapshot: Snap): AssetItem[] => projectableFormalAssets(snapshot.capabilities).map((c: any) => ({
@@ -619,8 +676,8 @@ const projectCapabilities = (snapshot: Snap): AssetItem[] => projectableFormalAs
   approvedByUser: typeof c.approved_by_user === "boolean" ? c.approved_by_user : null,
   riskTier: textOr(c.risk_tier, ""),
   reliability: assetReliability(c),
-  say: c.triggers?.[0] ?? c.summary ?? "",
-  triggers: c.triggers ?? [],
+  say: textOr(stringList(c.triggers)[0], textOr(c.summary, "")),
+  triggers: stringList(c.triggers),
 }));
 
 const projectExperiences = (snapshot: Snap): AssetItem[] => projectableFormalAssets(snapshot.experiences).map((e: any) => ({
@@ -634,8 +691,8 @@ const projectExperiences = (snapshot: Snap): AssetItem[] => projectableFormalAss
   approvedByUser: typeof e.approved_by_user === "boolean" ? e.approved_by_user : null,
   riskTier: textOr(e.risk_tier, ""),
   reliability: assetReliability(e),
-  say: e.triggers?.[0] ?? e.summary ?? "",
-  triggers: Array.isArray(e.triggers) ? e.triggers : [],
+  say: textOr(stringList(e.triggers)[0], textOr(e.summary, "")),
+  triggers: stringList(e.triggers),
 }));
 export interface EvolutionItem extends ContentItem {
   status: string;
@@ -665,7 +722,7 @@ function evolutionNextStep(status: unknown): string {
 
 const projectEvolution = (snapshot: Snap): EvolutionItem[] => (snapshot.evolution ?? []).map((e: any) => {
   const targetKind = textOr(e.target_kind, "unknown");
-  const status = e.status ?? "待确认";
+  const status = textOr(e.status, "待确认");
   return {
     id: textOr(e.id, ""),
     title: textOr(e.title, "未命名学习建议"),
@@ -692,8 +749,8 @@ const projectGovernance = (snapshot: Snap): GovernanceItem[] => (snapshot.govern
   return {
     id: textOr(g.id, ""),
     title: textOr(g.title, "未命名长期改进项目"),
-    frequency: g.frequency ?? "—",
-    status: g.status ?? "待显式启动",
+    frequency: textOr(g.frequency, "—"),
+    status: textOr(g.status, "待显式启动"),
     summary: textOr(g.summary, missingSummary("长期改进项目")),
     purpose: textOr(g.purpose, ""),
     steps: Array.isArray(g.steps) ? g.steps.filter((s: unknown) => typeof s === "string" && s.trim()) : [],
@@ -704,15 +761,15 @@ const projectTodo = (snapshot: Snap): TodoItem[] => (snapshot.todo ?? []).map((t
   id: textOr(t.id, ""),
   title: textOr(t.title, "未命名待办"),
   summary: textOr(t.summary, missingSummary("待办")),
-  status: t.status ?? "pending",
+  status: textOr(t.status, "pending"),
   visible: t.visible !== false,
 }));
 const projectDeferred = (snapshot: Snap): Array<{ summary: string; level: number; remind: string }> => (snapshot.deferred ?? []).map(
-  (d: any) => ({ summary: d.summary, level: d.level, remind: d.remind })
+  (d: any) => ({ summary: textOr(d.summary, "说明待补充"), level: countOr(d.level), remind: textOr(d.remind, "") })
 );
 const projectChanges = (snapshot: Snap): Array<{ date: string; summary: string }> => (snapshot.changes ?? []).map((c: any) => ({
-  date: c.date,
-  summary: c.summary,
+  date: textOr(c.date, ""),
+  summary: textOr(c.summary, "说明待补充"),
 }));
 export interface InstalledSkillItem extends ContentItem {
   triggers: string[];
@@ -779,24 +836,34 @@ function replaceArray<T>(target: T[], next: T[]) {
 
 /** Apply a newly loaded snapshot without reloading the page or resetting UI state. */
 export function applyDashboardSnapshot(next: Snap): boolean {
-  if (!next || !next.meta || !next.profile) return false;
-  S = next;
-  meta = next.meta;
-  overview = next.overview;
-  Object.assign(profile, projectProfile(next));
-  Object.assign(assets, projectAssets(next));
+  if (!isRecord(next) || !isRecord(next.meta) || !isRecord(next.profile)) return false;
+  // 先完成全部投影；任何尚未处理的错误都不会留下新身份＋旧列表的半刷新。
+  const normalized = normalizeSnapshot(next);
+  const prepared = {
+    profile: projectProfile(normalized), assets: projectAssets(normalized),
+    memories: projectMemories(normalized), sops: projectSops(normalized),
+    capabilities: projectCapabilities(normalized), experiences: projectExperiences(normalized),
+    evolution: projectEvolution(normalized), governance: projectGovernance(normalized),
+    todo: projectTodo(normalized), deferred: projectDeferred(normalized),
+    changes: projectChanges(normalized), skills: projectSkills(normalized),
+  };
+  S = normalized;
+  meta = normalized.meta;
+  overview = normalized.overview;
+  Object.assign(profile, prepared.profile);
+  Object.assign(assets, prepared.assets);
   assetTotal = Object.values(assets).reduce((sum, n) => sum + n, 0);
-  replaceArray(memories, projectMemories(next));
-  replaceArray(sops, projectSops(next));
-  replaceArray(capabilities, projectCapabilities(next));
-  replaceArray(experiences, projectExperiences(next));
-  replaceArray(evolution, projectEvolution(next));
-  replaceArray(governance, projectGovernance(next));
-  replaceArray(todo, projectTodo(next));
-  replaceArray(deferred, projectDeferred(next));
-  replaceArray(changes, projectChanges(next));
-  skills = projectSkills(next);
-  advanced = next.advanced ?? { file_count: 0, entry_files: [] };
+  replaceArray(memories, prepared.memories);
+  replaceArray(sops, prepared.sops);
+  replaceArray(capabilities, prepared.capabilities);
+  replaceArray(experiences, prepared.experiences);
+  replaceArray(evolution, prepared.evolution);
+  replaceArray(governance, prepared.governance);
+  replaceArray(todo, prepared.todo);
+  replaceArray(deferred, prepared.deferred);
+  replaceArray(changes, prepared.changes);
+  skills = prepared.skills;
+  advanced = normalized.advanced;
   return true;
 }
 

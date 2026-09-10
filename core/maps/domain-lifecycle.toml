@@ -39,8 +39,8 @@ confirmation = "none-the-protocol-prepares-the-real-choice"
 
 [[routes]]
 id = "task-closeout-guidance"
-summary = "复杂任务、压缩续接、实际使用长期内容、出现学习价值或交付用户可见文件时，在发送最终回复前用本地非致命检查闭合回执、文件去向和总体下一步；只修收尾，不重跑业务任务。"
-triggers = ["复杂任务准备交付", "上下文压缩后准备交付", "续接任务准备收尾", "实际使用长期内容后交付", "出现学习价值后交付", "用户可见文件交付", "检查最终回复收尾"]
+summary = "保存或更新后续任务资料时按 USER_GUIDANCE 4.1 接通现有入口；复杂任务交付时再检查回执、文件去向和总体下一步。收尾文字检查不能证明资料可达或 Agent 续做正确。"
+triggers = ["保存以后继续使用的任务资料", "更新持续任务资料", "复杂任务准备交付", "上下文压缩后准备交付", "续接任务准备收尾", "实际使用长期内容后交付", "出现学习价值后交付", "用户可见文件交付", "检查最终回复收尾"]
 target = "core/protocols/USER_GUIDANCE.md"
 state = "on-demand-before-complex-task-closeout"
 minimum_level = 1

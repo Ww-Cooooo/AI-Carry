@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { selectCandidateShortlist, validateCandidateIndex, validateCandidateRevisionTransition } from "./candidate-index-contract.mjs";
-import { normalizeRetrievalRequest, rankRetrievalEntries } from "./bounded-retrieval.mjs";
+import { normalizeRetrievalRequest, projectRecallUse, rankRetrievalEntries } from "./bounded-retrieval.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const read = (path) => readFileSync(resolve(repository, path), "utf8").replaceAll("\r\n", "\n");
@@ -43,6 +43,29 @@ const recallCases = [
 ];
 for (const [candidates, broadOnly, expected] of recallCases) assert(recallPlan(candidates, broadOnly) === expected, `recall case ${candidates.length}/${broadOnly} failed`);
 assert(recallPlan(["a"], false, true) === "load-explicit-route", "an explicit stable selection must not be confirmed twice");
+
+// Reproduce generic user wording crowding a concrete autonomous-work candidate
+// out of the top three. No added aliases and no body or action authorization.
+for (const [query, workSignals, relevant] of [
+  ["开始下一项工作", ["发布候选", "私密到公开"], { id: "release", title: "发布目标核对", triggers: ["发布候选"], scope: ["私密到公开"] }],
+  ["接着处理", ["课堂讲稿", "准备向学生解释概念"], { id: "teaching", title: "用学生熟悉的例子解释概念", triggers: ["课堂讲稿"], scope: ["向学生解释概念"] }],
+]) {
+  const entries = [1, 2, 3, 4].map((n) => ({ id: `generic-${n}`, title: `普通任务${n}`, triggers: [query] }));
+  entries.push(relevant);
+  for (const limit of [3, 128]) {
+    const results = rankRetrievalEntries(entries, normalizeRetrievalRequest(query, [], workSignals), { limit });
+    assert(results.slice(0, 3).some(({ entry }) => entry.id === relevant.id), "specific current work was crowded out by generic user text");
+    assert(new Set(results.map(({ entry }) => entry.id)).size === results.length, "work candidate was duplicated");
+    assert(results.every((item) => !Object.hasOwn(item, "body")), "candidate diversification opened a body");
+  }
+}
+for (const kind of ["memory", "experience", "sop", "capability", "skill"]) {
+  const readOnly = projectRecallUse({ id: `asset.${kind}`, kind, title: "已保存的做法" }, "asset-body-loaded");
+  assert(readOnly.userReportRequired === false && readOnly.userReportContract === "report-actual-application-only-not-body-loading",
+    "body loading was reported as actual use");
+  assert(readOnly.applicationGuidance.includes("concrete choice") && readOnly.applicationGuidance.includes("outcome fails"),
+    "loaded content lost the application and outcome handoff");
+}
 
 const retrievalEntries = [
   { id: "a", title: "学习通成绩整理", summary: "学习平台成绩", triggers: ["帮我整理学习通成绩"], aliases: [], scope: ["学习通成绩"], conditions: [], excludes: [], state: "provisional" },
@@ -372,7 +395,7 @@ for (const required of ["记录状态", "使用授权", "成熟度", "detail?.it
 }
 
 const viewsSource = read("dashboard/src/components/dashboard/Views.tsx");
-for (const required of ["item.scopeSummary", "...(item.triggers ?? [])", "item.approvedByUser", "正常说任务就会命中", "搜索标题、常用说法或适用范围"]) {
+for (const required of ["item.scopeSummary", "...(item.triggers ?? [])", "item.approvedByUser", 'item.subtype === "habit"', "renderAssetCards(habitItems"]) {
   assert(viewsSource.includes(required), `dashboard habit discovery or recall affordance is missing: ${required}`);
 }
 

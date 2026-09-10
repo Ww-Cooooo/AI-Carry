@@ -68,10 +68,14 @@ export function projectRecallUse(selected, state, evidence = selected?.retrieval
       ...(evidence.workSignalMatch ? ["work-context"] : []),
       ...(evidence.hintOnlyMatch ? ["bounded-intent-hint"] : []),
     ]),
-    userReportRequired: state === "asset-body-loaded",
+    // Reading is observable here; application and its outcome are not.
+    userReportRequired: false,
     userReportContract: state === "asset-body-loaded"
-      ? "standalone-brief-card-fixed-brain-heading-name-actual-asset-kind-and-title-explain-current-trigger-and-practical-effect-without-internals-before-final-user-action-guidance"
+      ? "report-actual-application-only-not-body-loading"
       : "standalone-brief-no-long-term-asset-used-or-recall-degraded",
+    ...(state === "asset-body-loaded" ? {
+      applicationGuidance: "Reading is not use or proof of success. Compare the asset with the current goal, scope and contrary evidence; turn the relevant part into a concrete choice before acting. Report actual use briefly under 🧠, not a planned use. Check the result against the user's goal, not retrieval/build success. If the outcome fails, report it and refine the original lesson within existing write authority; do not repeat the same attempt or claim the lesson is proven. No extra form, global gate or automatic action authorization is required.",
+    } : {}),
   });
 }
 
@@ -108,13 +112,18 @@ export function rankRetrievalEntries(entries, request, { limit = 3, lifecyclePri
   const ranked = [];
   for (const entry of entries) {
     const excludes = Array.isArray(entry.excludes) ? entry.excludes : [];
-    // Only the user's own wording may trigger an exclusion. Model/host hints
-    // can widen a shortlist but cannot hide a user-grounded match.
+    // User exclusions can remove a match. Verified work-context exclusions
+    // prevent reuse, but keep metadata visible for diagnosis or correction.
+    // Intent rewrites alone must never suppress a user-grounded match.
     const excluded = Boolean(userNormalized) && excludes.some((phrase) => {
       const normalized = normalizeMatchText(phrase);
       return normalized.length >= 2 && userNormalized.includes(normalized);
     });
     if (excluded) continue;
+    const workContextExcluded = excludes.some((phrase) => {
+      const normalized = normalizeMatchText(phrase);
+      return normalized.length >= 2 && workSignals.some((signal) => normalizeMatchText(signal).includes(normalized));
+    });
     const triggerPhrases = [...(entry.triggers ?? []), ...(entry.aliases ?? [])].filter(Boolean);
     const topicPhrases = [entry.topic_key].filter(Boolean);
     const subjectPhrases = [entry.subject_key].filter(Boolean);
@@ -177,10 +186,10 @@ export function rankRetrievalEntries(entries, request, { limit = 3, lifecyclePri
     const allConditionsInformative = conditionPhrases.length === automaticConditionPhrases.length;
     const conditionsSatisfied = conditionScores.every((score) => score >= 0.45);
     const workConditionsSatisfied = workConditionScores.every((score) => score >= 0.45);
-    const userAutomaticScopeEvidence = !reuseStopOrCorrectionRequested && hasInformativeTrigger && groundingDeclared
+    const userAutomaticScopeEvidence = !workContextExcluded && !reuseStopOrCorrectionRequested && hasInformativeTrigger && groundingDeclared
       && allDeclaredGroundingInformative && allConditionsInformative && conditionsSatisfied
       && triggerScore >= 0.72 && scopeScore >= 0.45 && querySignalLength >= minimumAutomaticPhraseLength;
-    const workAutomaticScopeEvidence = !reuseStopOrCorrectionRequested && hasInformativeTrigger && groundingDeclared
+    const workAutomaticScopeEvidence = !workContextExcluded && !reuseStopOrCorrectionRequested && hasInformativeTrigger && groundingDeclared
       && allDeclaredGroundingInformative && allConditionsInformative && workConditionsSatisfied
       && workTriggerScore >= 0.72 && workScopeScore >= 0.45 && workSignalLength >= minimumAutomaticPhraseLength;
     const automaticScopeEvidence = userAutomaticScopeEvidence || workAutomaticScopeEvidence;
@@ -190,9 +199,10 @@ export function rankRetrievalEntries(entries, request, { limit = 3, lifecyclePri
       triggerScore, scopeScore, workTriggerScore, workScopeScore, automaticScopeEvidence,
       automaticEvidenceSource: userAutomaticScopeEvidence && workAutomaticScopeEvidence ? "user-language-and-work-context"
         : userAutomaticScopeEvidence ? "user-language" : workAutomaticScopeEvidence ? "work-context" : "none",
-      reuseStopOrCorrectionRequested,
+      reuseStopOrCorrectionRequested, workContextExcluded,
       topicScore, subjectScore, declaredScopeScore, conditionsSatisfied, workConditionsSatisfied,
       automaticBlockedReason: reuseStopOrCorrectionRequested ? "user-negation-stop-or-correction"
+        : workContextExcluded ? "work-context-excluded"
         : !hasInformativeTrigger || !groundingDeclared || !allDeclaredGroundingInformative || !allConditionsInformative ? "trigger-or-scope-too-generic"
           : !conditionsSatisfied && !workConditionsSatisfied ? "required-condition-not-established"
           : automaticScopeEvidence ? "" : "positive-evidence-insufficient",
@@ -211,5 +221,16 @@ export function rankRetrievalEntries(entries, request, { limit = 3, lifecyclePri
     if (Math.abs(coverageDelta) > 0.08) return coverageDelta;
     return right.lifecycle - left.lifecycle || semanticDelta || right.hintScore - left.hintScore || left.entry.id.localeCompare(right.entry.id);
   });
+  // Keep a strong current-work candidate visible even when generic user words
+  // fill the shortlist. This is candidate diversity, NOT permission to apply it.
+  // Arrange the first three even for adapters that request extra metadata rows.
+  const visibleLimit = Math.min(limit, 3);
+  const workCandidate = ranked.filter((item) => item.workScore >= 0.24 && !item.evidence.workContextExcluded)
+    .sort((a, b) => b.workSignalCoverageScore - a.workSignalCoverageScore || b.workScore - a.workScore)[0];
+  const workIndex = ranked.indexOf(workCandidate);
+  if (visibleLimit > 1 && workIndex >= visibleLimit) {
+    ranked.splice(workIndex, 1);
+    ranked.splice(visibleLimit - 1, 0, workCandidate);
+  }
   return Object.freeze(ranked.slice(0, limit).map(({ entry, score, lifecycle, evidence }) => Object.freeze({ entry, score, lifecycle, evidence })));
 }

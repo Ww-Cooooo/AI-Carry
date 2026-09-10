@@ -29,7 +29,7 @@ const unsafeText = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u;
 const digestPattern = /^sha256:[a-f0-9]{64}$/u;
 const confirmationPattern = /^(capture\.[a-f0-9]{32})~([a-f0-9]{36})$/u;
 const knownRequestFields = new Set([
-  "kind", "title", "summary", "triggers", "aliases", "scope", "conditions", "excludes",
+  "kind", "subtype", "title", "summary", "triggers", "aliases", "scope", "conditions", "excludes",
   "steps", "failure_handling", "completion_checks", "notes", "risk_tier",
 ]);
 const kindAliases = new Map([
@@ -115,6 +115,13 @@ function normalizeRequest(raw) {
   }
   const kind = kindAliases.get(String(raw.kind ?? "").trim().toLocaleLowerCase("zh-CN"));
   if (!kind) throw new Error("kind 只支持 SOP、能力、记忆或普通任务经验");
+  let subtype = "";
+  if (kind === "memory") {
+    subtype = raw.subtype === undefined ? "general" : cleanText(raw.subtype, 16).toLowerCase();
+    if (!["general", "habit"].includes(subtype)) throw new Error("memory 的 subtype 只支持 general 或 habit");
+  } else if (raw.subtype !== undefined) {
+    throw new Error("只有 memory 可以在简洁入口中指定 subtype");
+  }
   const title = cleanText(raw.title, 80);
   const summary = cleanText(raw.summary, 240);
   const triggers = cleanList(raw.triggers, { field: "triggers", maximumItems: 8, maximumChars: 80, required: true });
@@ -139,25 +146,31 @@ function normalizeRequest(raw) {
     throw new Error("这套做法包含中高影响动作或风险仍不清楚，需要定向复核；当前简洁入口不会把它误标成低风险");
   }
   const ignoredFields = Object.keys(raw).filter((field) => !knownRequestFields.has(field)).sort();
-  return Object.freeze({ kind, title, summary, triggers, aliases, scope, conditions, excludes,
+  return Object.freeze({ kind, subtype, title, summary, triggers, aliases, scope, conditions, excludes,
     steps, failureHandling, completionChecks, notes, riskTier, ignoredFields });
 }
 
 function buildFormalProposal(request) {
+  const habit = request.kind === "memory" && request.subtype === "habit";
   const semanticCore = {
     kind: request.kind, title: request.title, summary: request.summary, triggers: request.triggers,
     aliases: request.aliases, scope: request.scope, conditions: request.conditions, excludes: request.excludes,
     steps: request.steps, failureHandling: request.failureHandling,
     completionChecks: request.completionChecks, notes: request.notes,
   };
+  // Keep existing general-memory and non-memory IDs stable. Only the newly
+  // supported habit variant needs subtype in its semantic identity.
+  if (request.kind === "memory" && request.subtype === "habit") semanticCore.subtype = request.subtype;
   const semanticDigest = sha256(canonical(semanticCore));
   const token = semanticDigest.slice("sha256:".length, "sha256:".length + 24);
   const id = `${request.kind}.learned.${token}`;
-  const subtype = request.kind === "memory" ? "general" : request.kind === "experience" ? "task" : "";
+  const subtype = request.kind === "memory" ? request.subtype : request.kind === "experience" ? "task" : "";
+  const habitSubject = request.scope.find((item) => [...item].length <= 80) ?? request.triggers[0];
   const asset = {
     id, kind: request.kind, subtype, status: "active", title: request.title, summary: request.summary,
     triggers: request.triggers, scope: request.scope, excludes: request.excludes, lifecycle: "recurring",
-    expected_next_use: "", topic_key: `learned-${request.kind}`, subject_key: `${request.kind}.${token}`,
+    expected_next_use: "", topic_key: habit ? request.triggers[0] : `learned-${request.kind}`,
+    subject_key: habit ? habitSubject : `${request.kind}.${token}`,
     aliases: request.aliases, conditions: request.conditions, body_sections: [], related_asset_ids: [],
     source_refs: [], private_refs: [], supersedes: [], minimum_level: 1,
     confirmation: "risk-dependent-before-action", approval_state: "explicit",
@@ -179,7 +192,10 @@ function buildFormalProposal(request) {
   const frontmatter = order.filter((field) => Object.hasOwn(asset, field)).map((field) => `${field} = ${toml(asset[field])}`).join("\n");
   const list = (items) => items.map((item, index) => `${index + 1}. ${item}`).join("\n");
   const optionalNotes = request.notes.length ? `\n\n# 补充说明\n\n${request.notes.map((item) => `- ${item}`).join("\n")}` : "";
-  const body = `# 目的与适用边界\n\n${request.summary}\n\n适用于：\n${request.scope.map((item) => `- ${item}`).join("\n")}\n\n不用于：\n${request.excludes.map((item) => `- ${item}`).join("\n")}\n\n# 执行步骤\n\n${list(request.steps)}\n\n# 失败处理\n\n${request.failureHandling.map((item) => `- ${item}`).join("\n")}\n\n# 完成检查\n\n${request.completionChecks.map((item) => `- ${item}`).join("\n")}${optionalNotes}\n`;
+  const correction = habit
+    ? "\n\n# 纠正与停止\n\n用户当前明确要求始终优先。用户可以随时用自然语言纠正、暂停或停止沿用这项习惯。"
+    : "";
+  const body = `# ${habit ? "当前有效习惯与边界" : "目的与适用边界"}\n\n${request.summary}\n\n适用于：\n${request.scope.map((item) => `- ${item}`).join("\n")}\n\n不用于：\n${request.excludes.map((item) => `- ${item}`).join("\n")}\n\n# ${habit ? "以后怎样采用" : "执行步骤"}\n\n${list(request.steps)}\n\n# ${habit ? "不适用或出现冲突时" : "失败处理"}\n\n${request.failureHandling.map((item) => `- ${item}`).join("\n")}\n\n# ${habit ? "怎样判断采用正确" : "完成检查"}\n\n${request.completionChecks.map((item) => `- ${item}`).join("\n")}${correction}${optionalNotes}\n`;
   const formalPreview = `+++\n${frontmatter}\n+++\n${body}`;
   const proposal = Object.freeze({
     title: request.title, summary: request.summary, triggers: request.triggers, aliases: request.aliases,
@@ -189,6 +205,13 @@ function buildFormalProposal(request) {
     proposed_risk_tier: "low", minimum_level: 1, formal_preview: formalPreview,
   });
   return Object.freeze({ proposal, asset: Object.freeze(asset), formalPreview, semanticDigest });
+}
+
+function contentLabel(request) {
+  if (request.kind === "memory") return request.subtype === "habit" ? "习惯" : "记忆";
+  if (request.kind === "capability") return "能力";
+  if (request.kind === "experience") return "经验";
+  return "做法";
 }
 
 function buildObservation(requestRead) {
@@ -202,16 +225,19 @@ function buildObservation(requestRead) {
 
 function displayPreview(request) {
   const section = (label, items) => `${label}：\n${items.map((item) => `- ${item}`).join("\n")}`;
+  const habit = request.kind === "memory" && request.subtype === "habit";
   return [
-    `我准备把“${request.title}”保存为一套以后可按需使用的${request.kind === "sop" ? "做法" : "内容"}。`,
+    `我准备把“${request.title}”保存为一项以后可按需使用的${contentLabel(request)}。`,
     `用途：${request.summary}`,
     section("会在这些情况想到它", request.triggers),
     section("适用范围", request.scope),
     section("不适用范围", request.excludes),
-    section("具体步骤", request.steps),
-    section("出错时", request.failureHandling),
-    section("怎样算完成", request.completionChecks),
-    "初始状态：只表示你同意保存，仍是“尚未验证”；不会伪造成功次数，也不会自动执行里面描述的未来动作。",
+    section(habit ? "以后怎样采用" : "具体步骤", request.steps),
+    section(habit ? "不适用或出现冲突时" : "出错时", request.failureHandling),
+    section(habit ? "怎样判断采用正确" : "怎样算完成", request.completionChecks),
+    habit
+      ? "采用规则：只有你确认后才会生效；当前要求始终优先，你可以随时纠正、暂停或停止沿用。"
+      : "初始状态：只表示你同意保存，仍是“尚未验证”；不会伪造成功次数，也不会自动执行里面描述的未来动作。",
     "你可以回复“留下”“先观察”“以后提醒”或“不保存”。",
   ].join("\n\n");
 }
@@ -264,6 +290,8 @@ function persistentRecord(repositoryReal, challengeId) {
   return value;
 }
 
+// Verify the saved route is reachable, not that a host understood an unseen
+// paraphrase or applied the learning successfully in a real task.
 function verifyOrdinaryRecall(repositoryReal, request, assetId) {
   const queryText = request.aliases[0] ?? request.triggers[0] ?? request.title;
   const result = queryFormalAssetShortlist(repositoryReal, {
@@ -287,6 +315,7 @@ function refreshDashboardSnapshot(repositoryReal) {
 function prepare(repositoryReal, requestRead) {
   const request = normalizeRequest(requestRead.value);
   const formal = buildFormalProposal(request);
+  const label = contentLabel(request);
   const existing = existingState(repositoryReal, formal);
   if (existing) {
     if (!existing.exact) return Object.freeze({
@@ -298,7 +327,7 @@ function prepare(repositoryReal, requestRead) {
     return Object.freeze({
       decision: "learning-save-already-current", executable: false, updated: false,
       assetId: existing.id, target: existing.target,
-      userSummary: "这套做法已经完整保存，本次没有重复写入、增加计数或刷新时间。",
+      userSummary: `这项${label}已经完整保存，本次没有重复写入、增加计数或刷新时间。`,
       nextStep: "可以继续当前任务；以后出现相近说法时，AI Carry 会从正式路线按需召回它。",
     });
   }
@@ -311,17 +340,18 @@ function prepare(repositoryReal, requestRead) {
     decision: "learning-save-choice-required", executable: false,
     confirmationRef,
     assetId: formal.asset.id, assetKind: formal.asset.kind, ignoredRequestFields: request.ignoredFields,
-    userPreview: displayPreview(request),
+    userPreview: `${displayPreview(request)}\n\n选择“留下”后：${result.preview.options.find((option) => option.id === "keep").consequence}`,
     ...(result.userReport ? { userReport: result.userReport } : {}),
-    userInstruction: "先用一句自然语言说明 userReport（如有），再把 userPreview 单独展示给用户并等待回复；不要替用户选择，也不要让用户填写 ID、时间、哈希、TOML 或成熟度字段。用户回复后，把原话交给 --user-reply，产品会同时识别选择并保存这次确认回执。",
-    confirmCommand: `node dashboard/scripts/learning-save-cli.mjs confirm --root ${JSON.stringify(repositoryReal)} --request-file ${JSON.stringify(requestRead.absolute)} --confirmation-ref ${JSON.stringify(confirmationRef)} --user-reply ${JSON.stringify("<用户刚才的原话>")}`,
-    nextStep: "用户回复后，直接执行 confirmCommand，并把占位内容替换成用户刚才的原话；无需另猜 --choice 或重复填写 --message。",
+    userInstruction: "展示 userReport（如有）和 userPreview。用户可以自然回复；Agent 根据当前预览把明确意思归为 keep、observe、remind 或 discard，通过 --choice 传入，同时用 --user-reply 保留原话。不要替用户选择；回复有歧义或未解决条件时只问清该点，不让用户填写内部字段。原话与选择是宿主判断，不是程序验证过的语义。",
+    confirmCommand: `node dashboard/scripts/learning-save-cli.mjs confirm --root ${JSON.stringify(repositoryReal)} --request-file ${JSON.stringify(requestRead.absolute)} --confirmation-ref ${JSON.stringify(confirmationRef)} --choice <keep|observe|remind|discard> --user-reply ${JSON.stringify("<用户刚才的原话>")}`,
+    nextStep: "用户明确同意当前预览后，Agent 传入对应选择和原话；已经明确的意思不必再要求用户复述固定口令。",
   });
 }
 
 function confirm(repositoryReal, requestRead, options) {
   const request = normalizeRequest(requestRead.value);
   const formal = buildFormalProposal(request);
+  const label = contentLabel(request);
   const observation = buildObservation(requestRead);
   const confirmation = parseConfirmationRef(options.confirmationRef);
   const record = persistentRecord(repositoryReal, confirmation.challengeId);
@@ -332,9 +362,13 @@ function confirm(repositoryReal, requestRead, options) {
     ["discard", "discard"], ["不保存", "discard"],
   ]);
   const userReply = String(options.userReply ?? "").trim();
-  const choiceSource = userReply || options.choice;
-  const choice = choiceAliases.get(String(choiceSource ?? "").trim().toLocaleLowerCase("zh-CN"));
-  if (!choice) throw new Error("choice 只支持留下、先观察、以后提醒或不保存");
+  const literalChoice = choiceAliases.get(userReply.toLocaleLowerCase("zh-CN"));
+  const hostChoice = choiceAliases.get(String(options.choice ?? "").trim().toLocaleLowerCase("zh-CN"));
+  if ((options.choice && !hostChoice) || (literalChoice && hostChoice && literalChoice !== hostChoice)) {
+    throw new Error("选择无效或与用户原话冲突；只澄清当前这项学习，不执行保存");
+  }
+  const choice = hostChoice || literalChoice;
+  if (!choice) throw new Error("请 Agent 结合当前预览理解用户原话，用 --choice 传入 keep、observe、remind 或 discard；有歧义或未解决条件时先澄清，不猜测同意");
   const message = cleanText(userReply || options.message, 240);
   const now = new Date().toISOString();
   const receipt = {
@@ -419,7 +453,7 @@ function confirm(repositoryReal, requestRead, options) {
     updated: !executed.idempotent, assetId, target, initialMaturity: planned.plan?.initialMaturity ?? "unvalidated",
     recallVerified: true, snapshotState: snapshot.state, validationClaimed: false, futureActionsExecuted: false,
     operationalReceiptRemoved: true,
-    userSummary: "这套做法已经保存并能被日常语言召回；只是看板还没刷新，普通任务可以继续。",
+    userSummary: `这项${label}已经保存并能被日常语言召回；只是看板还没刷新，普通任务可以继续。`,
     nextStep: `方便时只重试看板刷新：node dashboard/scripts/sync-snapshot.mjs ${JSON.stringify(repositoryReal)}`,
   });
   return Object.freeze({
@@ -429,14 +463,19 @@ function confirm(repositoryReal, requestRead, options) {
     executable: false, updated: !executed.idempotent, assetId, target,
     initialMaturity: direct ? planned.plan?.initialMaturity ?? "unvalidated" : "not-formal-yet",
     recallVerified, snapshotState: snapshot.state,
+    recallVerificationScope: direct ? "registered-route-discovery-not-host-semantic-acceptance" : "not-applicable",
     validationClaimed: false, futureActionsExecuted: false, operationalReceiptRemoved: true,
     userSummary: direct
-      ? "这套做法已经正式保存、回读并接入日常语言召回；它仍是尚未验证，不会冒充一次成功。"
+      ? request.kind === "memory" || request.kind === "experience"
+        ? `这项${label}已经正式保存、回读并接入日常语言召回；保存不会扩大它的适用范围，也不代表执行过未来任务。`
+        : `这项${label}已经正式保存、回读并接入日常语言召回；它仍是尚未验证，不会冒充一次成功。`
       : planChoice === "keep" ? "这项内容已经作为定向复核交接保存；它还不是可直接使用的正式资产。"
         : planChoice === "remind" ? "这项内容已作为观察候选保存，并按你给出的时间安排复核提醒。"
           : "这项内容已作为可撤销的观察候选保存；它还不会被当成正式规则使用。",
     nextStep: direct
-      ? "继续当前任务；下一次真正用到这套做法时，再按实际结果更新验证状态。"
+      ? request.kind === "memory"
+        ? `继续当前任务；下一次真正用到这项${label}时，再按实际效果纠正内容或范围。`
+        : `继续当前任务；下一次真正用到这项${label}时，再按实际结果更新验证状态。`
       : planChoice === "keep" ? "让合适的 Agent 只复核这项内容的风险和范围；内容不变时不需要再次确认是否留下。"
         : planChoice === "remind" ? "继续当前任务；到期时再决定是否验证、正式保存或停止观察。"
           : "继续当前任务；以后在新的真实任务中再次命中时，再根据实际结果决定是否正式保存。",
@@ -463,8 +502,9 @@ function help() {
     commands: Object.freeze([
       "example",
       "prepare --root <AI Carry 根目录> --request-file <简短 JSON>",
-      "confirm --root <AI Carry 根目录> --request-file <同一 JSON> --confirmation-ref <预览返回值> --user-reply <用户原话>",
+      "confirm --root <AI Carry 根目录> --request-file <同一 JSON> --confirmation-ref <预览返回值> --choice <keep|observe|remind|discard> --user-reply <用户原话>",
     ]),
+    habitRequest: "保存用户确认的习惯时使用 kind=memory、subtype=habit；其他类型不填写 subtype。",
     compatibility: "旧参数 --request、--confirm-ref、--choice 和 --message 仍可使用。",
   });
 }

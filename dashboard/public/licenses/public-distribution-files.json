@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "recordType": "ai-carry-public-distribution-files",
-  "fileCount": 356,
+  "fileCount": 359,
   "paths": [
     ".assistant-local/.gitkeep",
     ".assistant-local/dashboard/.gitkeep",
@@ -146,6 +146,7 @@
     "core/upgrade/release-manifest-1.4.9.toml",
     "core/upgrade/release-manifest-2.0.0.toml",
     "core/upgrade/release-manifest-2.0.1.toml",
+    "core/upgrade/release-manifest-2.0.10.toml",
     "core/upgrade/release-manifest-2.0.2.toml",
     "core/upgrade/release-manifest-2.0.3.toml",
     "core/upgrade/release-manifest-2.0.4.toml",
@@ -177,6 +178,7 @@
     "core/upgrade/upgrade-2.0.6-to-2.0.7.md",
     "core/upgrade/upgrade-2.0.7-to-2.0.8.md",
     "core/upgrade/upgrade-2.0.8-to-2.0.9.md",
+    "core/upgrade/upgrade-2.0.9-to-2.0.10.md",
     "dashboard.en.html",
     "dashboard.html",
     "dashboard/README.md",
@@ -257,6 +259,7 @@
     "dashboard/scripts/validate-brand-residuals.mjs",
     "dashboard/scripts/validate-change-quality-contract.mjs",
     "dashboard/scripts/validate-cross-session-signal-transaction.mjs",
+    "dashboard/scripts/validate-dashboard-data.mjs",
     "dashboard/scripts/validate-first-run-contract.mjs",
     "dashboard/scripts/validate-formal-template-snapshots.mjs",
     "dashboard/scripts/validate-instance-component-contract.mjs",

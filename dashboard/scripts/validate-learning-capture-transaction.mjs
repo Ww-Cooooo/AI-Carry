@@ -960,7 +960,7 @@ function testKeepWritesExactFormalRouteAndSnapshots() {
   expect(recalledBody.decision === "load-bounded-body" && recalledBody.body.includes("在相近真实任务中先用普通语言提示")
     && recalledBody.recallUse?.state === "asset-body-loaded"
     && recalledBody.recallUse?.assetKind === "memory"
-    && recalledBody.recallUse?.userReportContract === "standalone-brief-card-fixed-brain-heading-name-actual-asset-kind-and-title-explain-current-trigger-and-practical-effect-without-internals-before-final-user-action-guidance",
+    && recalledBody.recallUse?.userReportContract === "report-actual-application-only-not-body-loading",
   "saved direct formal asset did not close the body-load and transparent-use receipt path");
   expect(readFileSync(join(root, "dashboard/public/snapshot.js"), "utf8")
     === readFileSync(join(root, "dashboard/dist/snapshot.js"), "utf8"),

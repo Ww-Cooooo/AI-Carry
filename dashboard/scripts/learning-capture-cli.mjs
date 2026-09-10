@@ -80,7 +80,7 @@ function run() {
       userSummary: "这次学习尚未写入；你误入了底层维护接口，普通对话和其他能力仍可继续。",
       ordinaryEntry: "dashboard/scripts/learning-save-cli.mjs",
       exampleCommand: "node dashboard/scripts/learning-save-cli.mjs example",
-      nextStep: "改用 learning-save-cli 的简短请求入口；只填写标题、用途、触发、范围、步骤、失败处理和完成检查，不要手写 ID、路径、TOML、时间、哈希、成熟度或事务回执。",
+      nextStep: "改用 learning-save-cli 的简短请求入口；只填写标题、用途、触发、范围、步骤、失败处理和完成检查。保存用户习惯时另加 subtype=habit，其他类型不填 subtype；不要手写 ID、路径、TOML、时间、哈希、成熟度或事务回执。",
     });
   }
   if (command === "cleanup") return cleanupExpiredPersistentLearningCaptureChallenges(repositoryReal);

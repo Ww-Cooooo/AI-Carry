@@ -108,7 +108,8 @@ assert(await exists(sourceComponentInventory), 'Adapted source-component invento
 const inventory = JSON.parse(await readFile(productionInventory, 'utf8'))
 assert(Array.isArray(inventory.packages) && inventory.packages.length > 0, 'Production dependency inventory is empty.')
 const directPackages = new Set(inventory.packages.filter((entry) => entry.direct).map((entry) => entry.name))
-for (const required of ['react', 'react-dom', 'three', 'motion', 'radix-ui', 'tailwindcss', 'lucide-react']) {
+const packageManifest = JSON.parse(await readFile(resolve(dashboardRoot, 'package.json'), 'utf8'))
+for (const required of Object.keys(packageManifest.dependencies ?? {})) {
   assert(directPackages.has(required), `Direct runtime dependency is absent from notices: ${required}`)
 }
 

@@ -87,6 +87,8 @@ const correctedDraft = [
   "请同时确认这些视频只留本机，还是也纳入以后迁移。",
 ].join("\n");
 const corrected = evaluateTaskCloseout(incidentFacts(correctedDraft));
+assert(corrected.validationScope === "receipt-completeness-only-not-application-or-task-success",
+  "complete receipts were presented as proof of correct application or task success");
 assert(corrected.decision === "task-closeout-ready" && corrected.missingSections.length === 0,
   "the corrected incident closeout did not pass");
 

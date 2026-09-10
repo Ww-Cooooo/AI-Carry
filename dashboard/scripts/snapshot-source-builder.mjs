@@ -70,7 +70,6 @@ function isolatableArea(ref) {
 function recordOperationalIssue(issues, { area, code, sourceRef }) {
   const key = `${area}\u0000${sourceRef}`;
   if (issues.some((item) => item.key === key)) return;
-  if (issues.length >= 64) fail("operational isolation exceeds the 64-item bound");
   issues.push(Object.freeze({ key, area, code, sourceRef }));
 }
 
@@ -365,20 +364,24 @@ function projectSkillExports(repository, instanceId, { mode = "strict", required
     const source = readStructured(repository, ref, 128 * 1024);
     if (locateHighConfidenceSecretCandidates(source).blocked || containsForbiddenLocationReference(source)) fail("skill export index contains unsafe content");
     const parsed = parseArrayTableDocument(source, "exports", "skill export index");
-    const generatedAt = Date.parse(parsed.root.generated_at ?? "");
     if (parsed.root.schema_version !== 1 || parsed.root.index_id !== "skill-exports" || parsed.root.instance_id !== instanceId
-      || parsed.entries.length > 128 || parsed.root.export_count !== parsed.entries.length
-      || !Number.isFinite(generatedAt) || !/[zZ]|[+-]\d{2}:\d{2}$/u.test(parsed.root.generated_at ?? "")) fail("skill export index identity, count, or timestamp is invalid");
-    const ids = new Set();
-    return parsed.entries.map((item) => {
-      if (!stableAssetId.test(item.id ?? "") || ids.has(item.id) || !clean(item.title, 160) || !clean(item.summary, 500)
+      || parsed.entries.length > 128) fail("skill export index identity or size is invalid");
+    // Counts are derived below. Informational dates are not projected, so an
+    // absent date does not hide an otherwise usable export or invent a date.
+    const counts = new Map();
+    for (const item of parsed.entries) counts.set(item.id, (counts.get(item.id) ?? 0) + 1);
+    const items = [];
+    for (const item of parsed.entries) {
+      if (!stableAssetId.test(item.id ?? "") || counts.get(item.id) !== 1 || !clean(item.title, 160) || !clean(item.summary, 500)
         || !stableAssetId.test(item.source_asset_id ?? "") || !["sop", "capability"].includes(item.source_kind)
         || !["draft", "ready", "review"].includes(item.state)
-        || item.entry !== `instance/skills/exports/${item.id}/SKILL.md`
-        || !Number.isFinite(Date.parse(item.generated_at ?? "")) || !/[zZ]|[+-]\d{2}:\d{2}$/u.test(item.generated_at ?? "")) fail("skill export entry is invalid");
-      ids.add(item.id);
-      return { id: item.id, title: item.title, summary: item.summary, state: item.state, ...projectSkillDelivery(repository, item) };
-    }).sort((left, right) => compareOrdinal(left.id, right.id));
+        || item.entry !== `instance/skills/exports/${item.id}/SKILL.md`) {
+        isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-export-entry-invalid", "skill export entry is invalid");
+        continue;
+      }
+      items.push({ id: item.id, title: item.title, summary: item.summary, state: item.state, ...projectSkillDelivery(repository, item) });
+    }
+    return items.sort((left, right) => compareOrdinal(left.id, right.id));
   } catch (error) {
     isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-export-index-invalid", error.message);
     return [];
@@ -394,17 +397,22 @@ function projectSkills(repository, instanceId, { mode = "strict", requiredSource
     if (locateHighConfidenceSecretCandidates(source).blocked || containsForbiddenLocationReference(source)) fail("skill requirements contain unsafe content");
     const parsed = parseArrayTableDocument(source, "skills", "skill requirements");
     if (parsed.root.schema_version !== 1 || parsed.root.instance_id !== instanceId || parsed.entries.length > 256) fail("skill requirements identity or count is invalid");
-    const ids = new Set();
-    items = parsed.entries.map((item) => {
-      if (!stableAssetId.test(item.id ?? "") || ids.has(item.id) || !clean(item.summary, 240) || !["available", "review", "unavailable"].includes(item.state)
+    const counts = new Map();
+    for (const item of parsed.entries) counts.set(item.id, (counts.get(item.id) ?? 0) + 1);
+    for (const item of parsed.entries) {
+      if (!stableAssetId.test(item.id ?? "") || counts.get(item.id) !== 1 || !clean(item.summary, 240) || !["available", "review", "unavailable"].includes(item.state)
         || (Object.hasOwn(item, "title") && !clean(item.title, 160))
         || (Object.hasOwn(item, "platform") && !clean(item.platform, 80, true))
-        || (Object.hasOwn(item, "triggers") && (!Array.isArray(item.triggers) || item.triggers.length > 8 || item.triggers.some((trigger) => !clean(trigger, 80))))) fail("skill requirement entry is invalid");
-      ids.add(item.id);
-      return { id: item.id, title: item.title ?? titleFromSkillId(item.id), summary: item.summary,
-        triggers: Array.isArray(item.triggers) ? item.triggers : [], platform: item.platform ?? "", state: item.state };
-    }).sort((left, right) => compareOrdinal(left.id, right.id));
-    status = parsed.root.status ?? (items.length ? "已登记，按任务需要加载" : "尚未登记 Skill");
+        || (Object.hasOwn(item, "triggers") && (!Array.isArray(item.triggers) || item.triggers.length > 8 || item.triggers.some((trigger) => !clean(trigger, 80))))) {
+        isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-entry-invalid", "skill requirement entry is invalid");
+        continue;
+      }
+      items.push({ id: item.id, title: item.title ?? titleFromSkillId(item.id), summary: item.summary,
+        triggers: Array.isArray(item.triggers) ? item.triggers : [], platform: item.platform ?? "", state: item.state });
+    }
+    items.sort((left, right) => compareOrdinal(left.id, right.id));
+    status = items.length < parsed.entries.length ? "部分 Skill 登记暂时隔离，其他条目仍可使用"
+      : parsed.root.status ?? (items.length ? "已登记，按任务需要加载" : "尚未登记 Skill");
   } catch (error) {
     isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-index-invalid", error.message);
     status = "部分 Skill 登记暂时隔离，其他功能仍可使用";
@@ -433,7 +441,8 @@ function buildProjectionHealth(issues) {
 }
 
 function publicDiagnostics(issues) {
-  return Object.freeze(issues.map(({ area, code }) => Object.freeze({ area, code })));
+  // 限制诊断明细的输出，不限制可以隔离的坏项数；health 保留完整数量和类别。
+  return Object.freeze(issues.slice(0, 64).map(({ area, code }) => Object.freeze({ area, code })));
 }
 
 export function buildSnapshotCandidate(repository, {

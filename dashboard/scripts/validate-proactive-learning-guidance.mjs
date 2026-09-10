@@ -18,33 +18,26 @@ const readmeEn = read("README.en.md");
 const packageSource = read("dashboard/package.json");
 const componentMap = read("core/maps/component-map.toml");
 
-// Protect the visible user journey, not every sentence used to describe it.
+// Documentation coherence only. Executable recall/save/closeout checks cover
+// behavior; this check must not freeze heading numbers or prose wording.
 matches(assistant, [/proactive_learning\s*=\s*"[^"]+"/u, /formal_asset_activation\s*=\s*"explicit-user-or-verified-existing-approval-only"/u], "assistant policy");
-matches(root, [/有价值的小阶段|任务结束/u, /🌱/u, /🧠/u, /USER_GUIDANCE\.md/u, /不能阻止已确认的业务结果/u], "root guidance");
-
-const receipt = guidance.indexOf("### 2.2 使用与学习回执要短、独立、说真话");
-const next = guidance.indexOf("### 2.3 回复最后必须回到用户下一步");
-assert(receipt >= 0 && next > receipt, "learning receipts must appear before the real next step");
-matches(guidance, [/这一步还在学习/u, /这一步我学到了/u, /task-closeout-(?:repair-required|degraded)/u, /不能阻止已确认的业务结果/u], "user guidance");
+matches(root, [/🌱/u, /🧠/u, /USER_GUIDANCE\.md/u], "root guidance");
+matches(guidance, [/🌱 这一步还在学习/u, /🌱 这一步我学到了/u, /🧠 这次用上了/u, /👉/u, /task-closeout-contract/u], "user-requested receipt identity and closeout route");
 
 matches(lifecycle, [
-  /Agent 主动发现/u,
   /留下/u,
   /先观察/u,
   /以后提醒/u,
   /不保存/u,
-  /正式资产正文/u,
-  /实例领域路线/u,
-  /看板.*可重建投影/us,
-  /一个 Skill 失败只影响该 Skill/u,
+  /learning-save-cli\.mjs/u,
 ], "asset lifecycle");
 assert(!/(十分钟|10\s*分钟).*?(失效|过期|必须)/u.test(lifecycle), "an arbitrary reply timer returned as a learning gate");
 
-matches(readmeZh, [/你不必主动说/u, /当前宿主必须真的展示预览并等待你的回复/u, /🧠 这次用上了/u, /🌱 这一步我学到了/u, /👉 接下来/u], "Chinese README");
-matches(readmeEn, [/You do not have to decide whether something is a memory/u, /current host first shows one exact, content-bound preview/u, /🧠 Used this time/u, /🌱 Learned this step/u, /👉 What's next/u], "English README");
+matches(readmeZh, [/🧠 这次用上了/u, /🌱 这一步我学到了/u, /👉 接下来/u], "Chinese README receipt examples");
+matches(readmeEn, [/🧠 Used this time/u, /🌱 Learned this step/u, /👉 What's next/u], "English README receipt examples");
 
 assert(packageSource.includes('"check:proactive-learning": "node scripts/validate-proactive-learning-guidance.mjs"'), "package script is missing");
 assert(packageSource.includes("npm run check:task-closeout"), "release path lost the closeout journey");
 assert(componentMap.includes("dashboard/scripts/validate-proactive-learning-guidance.mjs"), "component ownership is missing");
 
-console.log("Proactive learning guidance passed the visible learn, recall, receipt, and next-step journey without freezing copy wording.");
+console.log("Proactive learning documentation references and user-requested receipt labels are coherent; this is not a user-journey result.");

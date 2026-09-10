@@ -10,6 +10,7 @@ import { createSkillDelivery } from "./skill-package.mjs";
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Snapshot source builder contract failed: ${message}`); };
 const root = mkdtempSync(join(tmpdir(), "ai-carry-snapshot-builder-"));
+let complete = false;
 const write = (ref, source) => { const path = resolve(root, ...ref.split("/")); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, source, "utf8"); };
 const manifest = (mission = "帮助用户整理学习平台成绩。") => `schema_version = 1
 instance_id = "ac-snapshot-fixture"
@@ -296,6 +297,7 @@ confirmation = "none"
 
   const exportIndexPath = resolve(root, "instance/skills/exports/index.toml");
   const exportIndexBytes = readFileSync(exportIndexPath);
+  const exportIndexSource = exportIndexBytes.toString("utf8");
   const exportSourcePath = resolve(root, "instance/skills/exports/grade-summary-share/SKILL.md");
   const exportSourceBytes = readFileSync(exportSourcePath);
   const delivery = createSkillDelivery(resolve(root, "instance/skills/exports/grade-summary-share"), {
@@ -331,6 +333,27 @@ delivery_generated_at = "2026-08-24T04:30:00+08:00"
   const restoredDelivery = buildSnapshotCandidate(root, { existingSource: first.source, now: new Date("2026-08-24T05:03:00+08:00") });
   assert(!restoredDelivery.updated && restoredDelivery.source === first.source, "delivery projection fixture did not restore its exact legacy source state");
 
+  const compatibleExports = exportIndexSource.replace(/^generated_at = .*$/gmu, 'generated_at = ""')
+    .replace("export_count = 1", "export_count = 99");
+  writeFileSync(exportIndexPath, compatibleExports);
+  const undatedExports = buildSnapshotCandidate(root, { mode: "operational" });
+  assert(undatedExports.snapshot.skills.exports.length === 1
+    && readFileSync(exportIndexPath, "utf8") === compatibleExports,
+  "unused timestamps or stale counts hid a usable export or caused an implicit write");
+  const mixedExports = `${compatibleExports}\n[[exports]]\nid = "broken-export"\nstate = "unknown"\n`;
+  writeFileSync(exportIndexPath, mixedExports);
+  const partiallyAvailableExports = buildSnapshotCandidate(root, { mode: "operational" });
+  assert(partiallyAvailableExports.snapshot.skills.exports.length === 1
+    && partiallyAvailableExports.snapshot.skills.exports[0].id === "grade-summary-share"
+    && partiallyAvailableExports.diagnostics.some((item) => item.code === "skill-export-entry-invalid")
+    && readFileSync(exportIndexPath, "utf8") === mixedExports,
+  "one invalid export hid a valid sibling, was not reported, or rewrote source bytes");
+  let requiredExportBlocked = false;
+  try { buildSnapshotCandidate(root, { mode: "operational", requiredSourceRefs: ["instance/skills/exports/index.toml"] }); }
+  catch { requiredExportBlocked = true; }
+  assert(requiredExportBlocked, "a transaction's required export source bypassed validation");
+  writeFileSync(exportIndexPath, exportIndexSource);
+
   const skillRequirementsPath = resolve(root, "instance/skills/requirements.toml");
   const skillRequirementsBytes = readFileSync(skillRequirementsPath);
   write("instance/skills/requirements.toml", `${skillRequirementsBytes.toString("utf8")}
@@ -341,6 +364,12 @@ summary = "用于验证重复 ID 只隔离 Skill 区域。"
 triggers = ["重复测试"]
 platform = "fixture"
 state = "review"
+
+[[skills]]
+id = "skill.independent"
+title = "独立有效 Skill"
+summary = "另一个条目重复不应隐藏我。"
+state = "available"
 `);
   const duplicateSkillBytes = readFileSync(skillRequirementsPath);
   let strictDuplicateSkillBlocked = false;
@@ -351,11 +380,11 @@ state = "review"
     now: new Date("2026-08-24T05:05:00+08:00"), mode: "operational" });
   validateSnapshotSemantics(operationalSkills.snapshot, "operational duplicate-Skill fixture");
   assert(operationalSkills.snapshot.assets.sops === 1 && operationalSkills.snapshot.sops[0]?.id === "sop.grade-summary"
-    && operationalSkills.snapshot.assets.skills === 0 && operationalSkills.snapshot.skills.count === 0
-    && operationalSkills.snapshot.skills.items?.length === 0
-    && operationalSkills.diagnostics.some((item) => item.area === "skills" && item.code === "skill-index-invalid")
+    && operationalSkills.snapshot.assets.skills === 1 && operationalSkills.snapshot.skills.count === 1
+    && operationalSkills.snapshot.skills.items?.[0]?.id === "skill.independent"
+    && operationalSkills.diagnostics.some((item) => item.area === "skills" && item.code === "skill-entry-invalid")
     && operationalSkills.snapshot.health?.state === "degraded",
-  "operational snapshot did not isolate duplicate installed Skill IDs while preserving unrelated assets");
+  "operational snapshot did not isolate both duplicate IDs while preserving the valid sibling and other assets");
   assert(readFileSync(skillRequirementsPath).equals(duplicateSkillBytes),
     "operational duplicate-Skill isolation changed the source bytes");
   writeFileSync(skillRequirementsPath, skillRequirementsBytes);
@@ -399,9 +428,23 @@ unexpected_field = "must-survive-byte-for-byte"
     "an invalid current target was isolated instead of being denied with zero source writes");
   rmSync(resolve(root, brokenTodoRef), { force: true });
 
+  // 输出上限不是故障上限：超过 64 个坏项也保留健康内容和全部真源。
+  const manyBadRefs = Array.from({ length: 65 }, (_, index) => `instance/todo/broken-${index}.md`);
+  for (const ref of manyBadRefs) write(ref, brokenTodoSource);
+  const manyBad = buildSnapshotCandidate(root, { mode: "operational" });
+  assert(manyBad.snapshot.health?.isolated_item_count === 65 && manyBad.diagnostics.length === 64
+    && manyBad.snapshot.sops.length > 0 && manyBad.snapshot.skills.items.length > 0,
+  "diagnostic output limit stopped healthy content or misreported the isolated total");
+  for (const ref of manyBadRefs) {
+    assert(readFileSync(resolve(root, ref), "utf8") === brokenTodoSource, "diagnostic aggregation modified source content");
+    rmSync(resolve(root, ref));
+  }
+
   const formalRef = "instance/sops/grade-summary.md";
   const formalBytes = readFileSync(resolve(root, formalRef));
-  write(formalRef, readFileSync(resolve(root, formalRef), "utf8").replace("updated_at = \"\"", "unexpected_field = \"preserve-formal\"\nupdated_at = \"\""));
+  // Loss of authorization is a real isolation boundary. An unknown harmless
+  // field is covered by the compatible-reader journey, not treated as damage.
+  write(formalRef, readFileSync(resolve(root, formalRef), "utf8").replace("approved_by_user = true", "approved_by_user = false"));
   const corruptedFormalBytes = readFileSync(resolve(root, formalRef));
   const candidateRef = "instance/evolution/unindexed-broken.md";
   write(candidateRef, "not candidate frontmatter; preserve exactly\n");
@@ -470,7 +513,9 @@ unexpected_field = "must-survive-byte-for-byte"
   assert(locationBlocked, "an absolute local location hidden in the instance source set was accepted");
   rmSync(resolve(root, "instance/profile/local-note.md"), { force: true });
 
-  console.log("Snapshot source builder passed strict source truth, missing Skill carrier stale degradation, duplicate-Skill area isolation, operational unrelated-item isolation, current-target denial, bounded health, idempotence, forged-digest rejection, and whole-instance safety checks.");
+  complete = true;
+  console.log("Snapshot source builder passed mixed valid/invalid Skill lists, count/date tolerance, strict source boundaries, stale delivery, local isolation and unchanged source bytes.");
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  if (complete) rmSync(root, { recursive: true, force: true });
+  else console.error(`Snapshot failure evidence kept at ${root}`);
 }

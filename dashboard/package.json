@@ -1,7 +1,7 @@
 {
   "name": "ai-carry-dashboard",
   "private": true,
-  "version": "2.0.9",
+  "version": "2.0.10",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "check:startup-capsule": "node scripts/validate-startup-capsule-contract.mjs && node scripts/validate-startup-capsule-sync.mjs",
     "check:secret-boundary": "node scripts/validate-secret-content-boundary.mjs",
     "check:snapshot-source": "node scripts/validate-snapshot-source-builder.mjs",
+    "check:dashboard-data": "node scripts/validate-dashboard-data.mjs",
     "check:skill-workshop": "node scripts/validate-skill-workshop-contract.mjs",
     "check:skill-install": "node scripts/validate-skill-install-transaction.mjs",
     "check:problem-report": "node scripts/validate-problem-report-contract.mjs",
@@ -53,8 +54,8 @@
     "check:snapshot-sync": "node scripts/validate-snapshot-sync-transaction.mjs",
     "check:journeys": "npm run check:first-run && npm run check:learning-capture && npm run check:skill-install",
     "check:lifelines": "npm run check:journeys",
-    "check:release": "npm run check:journeys && npm run check:proactive-learning && npm run check:skill-workshop && npm run check:upgrade-cli && npm run check:task-closeout && npm run check:problem-report && npm run check:product-identity && npm run check:startup-budget && npm run check:release-authority && npm run check:secret-boundary && npm run check:licenses && npm run check:compliance",
-    "build": "npm run check:actions && npm run check:journeys && tsc -b && vite build && node scripts/make-offline.mjs && npm run check:territory:dist && npm run check:offline",
+    "check:release": "npm run check:journeys && npm run check:dashboard-data && npm run check:proactive-learning && npm run check:skill-workshop && npm run check:upgrade-cli && npm run check:task-closeout && npm run check:problem-report && npm run check:product-identity && npm run check:startup-budget && npm run check:release-authority && npm run check:secret-boundary && npm run check:licenses && npm run check:compliance",
+    "build": "npm run check:actions && tsc -b && vite build && node scripts/make-offline.mjs && npm run check:territory:dist && npm run check:offline",
     "analyze": "vite build --mode analyze",
     "preview": "vite preview"
   },

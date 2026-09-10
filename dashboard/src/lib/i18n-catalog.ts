@@ -3,6 +3,9 @@
  * never turns this UI layer into a general-purpose translator for user assets.
  */
 export const ENGLISH_TEXT: Record<string, string> = {
+  "部分内容暂未显示": "Some content is temporarily unavailable",
+  "待办暂未完整显示": "Some to-dos are temporarily unavailable",
+  "部分记录暂未显示，不能据此判断为空。请让 Agent 局部修复，其他工作仍可继续。": "Some records are unavailable, not necessarily empty. Ask the Agent to repair only the affected records; other work can continue.",
   "按钮只生成请求": "Buttons only create requests",
   "按任务读取": "Loaded by task",
   "按需读取说明": "About on-demand loading",

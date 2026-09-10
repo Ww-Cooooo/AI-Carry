@@ -11,6 +11,10 @@ const posixDeviceRoot = /\/(?:home|Users|etc|var|tmp|opt|root|mnt|media|Volumes|
 const posixAbsoluteFile = /(?:^|[\s"'`([{：:])\/(?!\/)(?:[A-Za-z0-9._~+@%=-]+\/)*[A-Za-z0-9._~+@%=-]+\.[A-Za-z0-9_-]{1,16}(?=$|[\s"'`)\]}，。！？；;,!?])/gu;
 const tildeHome = /~\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~+@%=-]+)*/u;
 const forbiddenKeys = new Set(["path", "target", "source_ref", "repository"]);
+// A device-root-looking segment inside an explicit ./ or ../ reference is
+// still relative text. This does not authorize following it: the file reader
+// continues to enforce the resolved root, links and the caller's read scope.
+const dotRelativePrefix = /(?:^|[\s"'`([{<：:])\.\.?(?:\/[^/\\\s<>"'`(){}\[\]：:;,，；。!?！？]+)*$/u;
 
 export function containsForbiddenLocationReference(value) {
   if (typeof value !== "string") return false;
@@ -26,7 +30,9 @@ export function containsForbiddenLocationReference(value) {
   protocolRelativeShare.lastIndex = 0;
   for (const _match of inspected.matchAll(protocolRelativeShare)) return true;
   posixDeviceRoot.lastIndex = 0;
-  for (const _match of inspected.matchAll(posixDeviceRoot)) return true;
+  for (const match of inspected.matchAll(posixDeviceRoot)) {
+    if (!dotRelativePrefix.test(inspected.slice(0, match.index))) return true;
+  }
   posixAbsoluteFile.lastIndex = 0;
   for (const _match of inspected.matchAll(posixAbsoluteFile)) return true;
   return false;

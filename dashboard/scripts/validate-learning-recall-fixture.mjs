@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import * as assetContract from "./asset-route-contract.mjs";
 import { auditCandidateSourceClosure, inspectCandidateForReview, inspectCandidateSource, loadCandidateIndex } from "./candidate-index-contract.mjs";
 
@@ -9,6 +10,7 @@ const { auditFormalSourceClosure, inspectAssetForReview, inspectAssetMetadata, i
   inspectShortlistedFormalAsset, inspectTaskFamilyRoute, loadTrustedDomainEnvelope, queryFormalAssetShortlist } = assetContract;
 const assert = (condition, message) => { if (!condition) throw new Error(`Learning/recall disk fixture failed: ${message}`); };
 const root = mkdtempSync(join(tmpdir(), "ai-carry-learning-fixture-"));
+let complete = false;
 const q = (value) => JSON.stringify(value);
 const write = (ref, content) => {
   const target = resolve(root, ...ref.split("/"));
@@ -285,9 +287,15 @@ try {
     && proactiveHabitBody.recallUse?.state === "asset-body-loaded"
     && proactiveHabitBody.recallUse?.assetKind === "memory"
     && proactiveHabitBody.recallUse?.triggerSources.includes("work-context")
-    && proactiveHabitBody.recallUse?.userReportRequired === true
-    && proactiveHabitBody.recallUse?.userReportContract === "standalone-brief-card-fixed-brain-heading-name-actual-asset-kind-and-title-explain-current-trigger-and-practical-effect-without-internals-before-final-user-action-guidance",
+    && proactiveHabitBody.recallUse?.userReportRequired === false
+    && proactiveHabitBody.recallUse?.userReportContract === "report-actual-application-only-not-body-loading",
     "a proactive habit selection did not read the exact verified body");
+  const higherRiskHabit = { ...habit, confirmation: "risk-dependent-before-action" };
+  write(habit.target, assetDocument(higherRiskHabit, "# 需按动作风险确认", { risk_tier: "medium" }));
+  loaded = installMap([higherRiskHabit]);
+  const guardedHabit = inspectAssetMetadata(root, loaded.envelope, habit.id);
+  assert(guardedHabit.selectionMode === "confirm-fuzzy-before-body" && guardedHabit.requiresUserConfirmation,
+    "a higher-risk habit received the low-risk automatic reuse exemption");
   const policyHabit = route({ ...habit, id: "memory.habit.policy", title: "未获明确授权的习惯", target: "instance/memory/habit-policy.md" });
   write(policyHabit.target, assetDocument(policyHabit, "不应加载", { approval_state: "policy-authorized", activation_basis: "low-risk-evidence-policy", approved_by_user: false }));
   loaded = installMap([policyHabit]);
@@ -303,6 +311,51 @@ try {
   const family = route({ id: "task-family.grade", asset_kind: "task-family", title: "成绩任务入口", target: "instance/profile/approved-profile.md", state: "on-demand" });
   loaded = installMap([family]);
   assert(inspectTaskFamilyRoute(root, loaded.envelope, family.id).decision === "load-bounded-task-family", "registered task-family entry failed");
+
+  // Exercise the actual stdin/stdout boundary, not just its internal reader.
+  // This prelinked fixture tests navigation ONLY: it does not test an Agent
+  // creating links during save or choosing the right next task after recall.
+  // All documents are synthetic; no real instance or private corpus is copied.
+  const scripts = resolve(root, "dashboard/scripts");
+  mkdirSync(scripts, { recursive: true });
+  for (const name of readdirSync(new URL(".", import.meta.url)).filter((name) => name.endsWith(".mjs"))) {
+    copyFileSync(new URL(name, import.meta.url), resolve(scripts, name));
+  }
+  const runCli = (input) => {
+    const result = spawnSync(process.execPath, [resolve(scripts, "query-assets.mjs")],
+      { input: JSON.stringify(input), encoding: "utf8", windowsHide: true, maxBuffer: 256 * 1024 });
+    return { status: result.status, output: JSON.parse(result.stdout) };
+  };
+  const profile = "# 当前任务\n[工作索引](../../workspace/example/index.md)\n";
+  const index = "# 当前进度\n- 已接受且已完成：[练习 A](./accepted.md)\n- 已撤回：[练习 B](./withdrawn.md)\n- 下一步：练习 C，比较不同条件，不重复 A。\n";
+  write(family.target, profile);
+  write("workspace/example/index.md", index);
+  write("workspace/example/accepted.md", "# 练习 A\n用户已接受，保留原稿。\n");
+  write("workspace/example/withdrawn.md", "# 练习 B\n重复了 A，用户要求撤回，不是当前版本。\n");
+  const request = { operation: "query", queryText: "上次那种成绩汇总" };
+  const shortlist = runCli(request);
+  assert(shortlist.status === 0 && shortlist.output.formal.candidates.some((item) => item.id === family.id),
+    "natural task request could not find its navigation entry");
+  const resumed = runCli({ ...request, operation: "query-read", selectedId: family.id });
+  assert(resumed.status === 0 && resumed.output.decision === "load-bounded-task-family" && resumed.output.body === profile,
+    "the final CLI rejected a task entry containing a relative workspace link");
+  const ref = resumed.output.body.match(/\]\(([^)]+)\)/u)?.[1];
+  const indexPath = resolve(dirname(resolve(root, family.target)), ref ?? "");
+  assert(relative(root, indexPath) === ["workspace", "example", "index.md"].join(sep), "entry did not resolve inside the fixture");
+  assert(readFileSync(indexPath, "utf8") === index, "continuation lost accepted, withdrawn or next-step context");
+  for (const child of ["accepted.md", "withdrawn.md"]) {
+    assert(readFileSync(resolve(dirname(indexPath), child), "utf8").includes(child === "accepted.md" ? "保留原稿" : "不是当前版本"),
+      "current index did not reach the relevant task document");
+  }
+  assert(resumed.output.recallUse.userReportRequired === false && resumed.output.executable === false,
+    "a successful navigation read claimed actual use or execution permission");
+  write(family.target, profile + "\n/workspace/private/report.md\n");
+  assert(runCli({ ...request, operation: "query-read", selectedId: family.id }).output.reason === "unsafe-output",
+    "a relative link allowed an independent absolute location through the final CLI");
+  write(family.target, profile);
+  assert(runCli({ ...request, operation: "query-read", selectedId: family.id }).status === 0,
+    "repairing the one profile did not recover navigation");
+  loaded = installMap([family]);
 
   const candidate = {
     id: "evolution.grade-column-order", title: "观察成绩列顺序偏好", summary: "观察用户是否持续沿用同一成绩列顺序。",
@@ -367,7 +420,9 @@ try {
 
   const evidence = createHash("sha256").update(readFileSync(resolve(root, "instance/evolution/index.toml"))).digest("hex");
   assert(/^[a-f0-9]{64}$/.test(evidence), "fixture evidence digest was not produced");
-  console.log("Learning/recall disk fixture passed trusted-entry, UTF-8 body, confirmation migration, habit, candidate receipt, stale-context, and no-location-leak checks.");
+  complete = true;
+  console.log("Learning/recall disk fixture passed trusted-entry, UTF-8 body, confirmation migration, risk-scoped habit reuse, candidate receipt, stale-context, and no-location-leak checks.");
 } finally {
-  rmSync(root, { recursive: true, force: true });
+  if (complete) rmSync(root, { recursive: true, force: true });
+  else console.error(`Recall failure evidence kept at ${root}`);
 }

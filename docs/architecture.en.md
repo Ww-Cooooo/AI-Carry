@@ -2,6 +2,8 @@
 
 AI Carry is a local, file-based long-term asset and growth layer used beside a host Agent. It is not a background service and it does not replace the host or model.
 
+Version-specific sections below record historical decisions, not cumulative requirements. Current changes follow `COMPONENT_CHANGE.md`, upgrades follow `core/upgrade/UPGRADE-CONTRACT.md`, and session continuation follows `UPGRADE_SESSION_ACTIVATION.md`: preserve untouched instance content in place and continue in the same conversation where possible. Do not require full resource adoption or a new task for every upgrade.
+
 ## Participants
 
 - **User:** states goals and approves important long-term decisions.

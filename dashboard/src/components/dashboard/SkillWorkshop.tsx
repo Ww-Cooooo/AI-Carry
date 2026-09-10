@@ -16,6 +16,8 @@ import {
   buildInstalledSkillRepairAction,
   capabilities,
   getGlobalActions,
+  isolatedContentMessage,
+  snapshotAreaDegraded,
   profile,
   skills,
   sops,
@@ -386,7 +388,7 @@ export function SkillWorkshop({ onCopy }: { onCopy: CopyRequest }) {
                     </li>
                   );
                 })}</ul>
-              ) : <p>还没有自己的 Skill。选择一个已验证的方法后即可开始整理。</p>}
+              ) : <p>{snapshotAreaDegraded("skills") ? isolatedContentMessage : "还没有自己的 Skill。选择一个已验证的方法后即可开始整理。"}</p>}
             </div>
           </aside>
         ) : null}
@@ -405,7 +407,7 @@ export function SkillWorkshop({ onCopy }: { onCopy: CopyRequest }) {
                     <span className="skill-ledger-row__status"><StatusBadge value={item.state} helpText={INSTALLED_SKILL_HELP[item.state]} /></span>
                   </li>
                 ))}</ul>
-              ) : <p>{skills.status || "还没有登记已安装 Skill。"}</p>}
+              ) : <p>{snapshotAreaDegraded("skills") ? isolatedContentMessage : skills.status || "还没有登记已安装 Skill。"}</p>}
             </div>
           </aside>
         ) : null}

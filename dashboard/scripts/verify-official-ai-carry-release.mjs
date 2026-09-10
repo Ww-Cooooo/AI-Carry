@@ -5,13 +5,13 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const TARGET_VERSION = "2.0.9";
+const TARGET_VERSION = "2.0.10";
 const REPOSITORY = "Ww-Cooooo/AI-Carry";
 const API_ROOT = `https://api.github.com/repos/${REPOSITORY}`;
 const MAX_FILES = 8192;
 const MAX_BYTES = 1024 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
-const AUTHORITY_FINGERPRINT_SCHEMA = 1;
+export const AUTHORITY_FINGERPRINT_SCHEMA = 2;
 export const OFFICIAL_RELEASE_REQUEST_BUDGET = 6;
 
 function fail(message) { throw new Error(`Official AI Carry release verification failed: ${message}`); }
@@ -64,7 +64,7 @@ async function apiJson(path, label, fetchImpl = globalThis.fetch) {
   const response = await fetchImpl(`${API_ROOT}${path}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      "User-Agent": "AI-Carry-release-verifier/2.0.9",
+      "User-Agent": "AI-Carry-release-verifier/2.0.10",
       "X-GitHub-Api-Version": "2022-11-28",
     },
     redirect: "error",
@@ -103,7 +103,6 @@ function stableAuthorityFacts(record) {
     draft: record.draft,
     prerelease: record.prerelease,
     commit_sha: record.commit_sha,
-    main_commit_sha: record.main_commit_sha,
     git_tree_sha: record.git_tree_sha,
     target_tree_sha256: record.target_tree_sha256,
     release_manifest_sha256: record.release_manifest_sha256,
@@ -133,10 +132,7 @@ export async function verifyOfficialAiCarryRelease({ target: targetArgument, req
     fail("latest formal Release does not equal the fixed versioned Release");
   }
   const commitSha = await resolveTagCommit(boundedRequestJson);
-  const mainObject = (await boundedRequestJson("/git/ref/heads/main", "public main reference")).object;
-  if (mainObject?.type !== "commit" || mainObject.sha !== commitSha) {
-    fail("public main does not point to the fixed latest Release commit");
-  }
+  // A moving development branch does not invalidate an immutable published release.
   const commit = await boundedRequestJson(`/git/commits/${commitSha}`, "tag commit");
   if (commit.sha !== commitSha || !/^[a-f0-9]{40}$/u.test(commit.tree?.sha ?? "")) fail("tag commit tree is unavailable");
   const tree = await boundedRequestJson(`/git/trees/${commit.tree.sha}?recursive=1`, "recursive tag tree");
@@ -166,7 +162,6 @@ export async function verifyOfficialAiCarryRelease({ target: targetArgument, req
     draft: false,
     prerelease: false,
     commit_sha: commitSha,
-    main_commit_sha: mainObject.sha,
     git_tree_sha: commit.tree.sha,
     target_tree_sha256: `sha256:${local.fingerprint}`,
     release_manifest_sha256: releaseManifestSha256,

@@ -406,8 +406,9 @@ export function prepareSkillInstall(rootPath, sourcePath, { platform = "current-
     scripts: inspection.scripts, issues: inspection.issues, target: assessment.desired.entry,
     originalSourcePreserved: true, isolatedInspection: inspection.isolationRoot ?? "",
     userPreview: userPreview(source, inspection, assessment),
-    confirmCommand: `node dashboard/scripts/skill-install-cli.mjs confirm --root ${q(root)} --confirmation-ref ${q(confirmationRef)} --user-reply ${q("<用户刚才的原话>")}`,
-    nextStep: `把 userPreview 单独展示给用户；用户回复“${operation === "upgrade" ? "升级" : "安装"}”后执行 confirmCommand，把占位内容换成用户原话，不要再让用户填写路径、摘要或目标。`,
+    confirmCommand: `node dashboard/scripts/skill-install-cli.mjs confirm --root ${q(root)} --confirmation-ref ${q(confirmationRef)} --choice ${operation} --user-reply ${q("<用户刚才的原话>")}`,
+    confirmationGuidance: "用户可以自然回复。Agent 只在用户明确同意当前预览、没有歧义或未解决条件时传入 --choice 和原话；拒绝、附带新条件或要求改动时不执行，先处理该点。程序核对预览与写入边界，不代替 Agent 判断语义。",
+    nextStep: "展示预览，用户明确同意后执行 confirmCommand 并保留原话；有歧义或未解决条件时先澄清，不要求复述固定口令，也不让用户填写内部字段。",
   });
 }
 
@@ -440,6 +441,7 @@ function verifyInstalled(root, state, record) {
 }
 
 export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
+  choice = "",
   syncSnapshot = defaultSnapshotSync,
   testFaultAfterTargetCommit = false,
 } = {}) {
@@ -451,9 +453,14 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
   const accepted = record.operation === "upgrade"
     ? new Set(["升级", "确认升级", "开始升级", "upgrade", "confirm"])
     : new Set(["安装", "确认安装", "开始安装", "install", "confirm"]);
-  if (!accepted.has(String(userReply ?? "").trim().toLocaleLowerCase("zh-CN"))) {
-    throw new Error(`这次只接受用户明确回复“${record.operation === "upgrade" ? "升级" : "安装"}”；其他回答不会写入 Skill`);
+  const reply = String(userReply ?? "").trim();
+  const literal = reply.toLocaleLowerCase("zh-CN");
+  if (!reply || (choice && choice !== record.operation)
+    || ["不安装", "不升级", "取消", "拒绝", "no", "cancel"].includes(literal)
+    || (record.operation === "upgrade" ? ["安装", "install"] : ["升级", "upgrade"]).includes(literal)) {
+    throw new Error("选择与当前预览或用户原话冲突；这项 Skill 保持原样");
   }
+  if (!choice && !accepted.has(literal)) throw new Error("请 Agent 根据当前预览理解用户原话；仅明确同意且没有未解决条件时传入 --choice install 或 upgrade，不能猜测同意");
   const state = loadInstanceState(root);
   if (state.instanceId !== record.instance_id) throw new Error("实例身份已经变化；这次安装预览已失效");
   const recheckPath = resolve(paths.runtime, `${record.challenge_id}.recheck-${randomBytes(4).toString("hex")}`);
@@ -605,7 +612,7 @@ function help() {
     purpose: "只读检查一个本地 Skill 文件夹或 ZIP，展示一次准确预览，确认后原子复制、回读并登记。",
     commands: Object.freeze([
       "prepare --root <AI Carry 实例根目录> --source <本地文件夹或 ZIP>",
-      "confirm --root <同一实例根目录> --confirmation-ref <预览返回值> --user-reply <用户原话>",
+      "confirm --root <同一实例根目录> --confirmation-ref <预览返回值> --choice <install|upgrade> --user-reply <用户原话>",
     ]),
     boundaries: "不会执行包内脚本、安装依赖、联网、登录、改权限或覆盖同名 Skill。",
   });
@@ -622,7 +629,7 @@ function run() {
     return prepareSkillInstall(root, source, { platform: argument("--platform") || "current-host" });
   }
   if (command === "confirm") return confirmSkillInstall(root,
-    firstArgument("--confirmation-ref", "--confirm-ref"), argument("--user-reply"));
+    firstArgument("--confirmation-ref", "--confirm-ref"), argument("--user-reply"), { choice: argument("--choice") });
   throw new Error("只支持 prepare 或 confirm；使用 --help 查看用法");
 }
 

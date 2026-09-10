@@ -459,9 +459,10 @@ function evidenceRegistryForAsset(repository, context, asset) {
   return needsEvidence ? loadResultValidationEvidence(repository, context) : null;
 }
 
-function routeAssetProjectionMatches(route, asset) {
-  if (!route || route.id !== asset.id || route.asset_kind !== asset.kind || route.state !== asset.status || route.title !== asset.title) return false;
-  for (const field of projectionFields) {
+function routeAssetProjectionMatches(route, asset, { operational = false } = {}) {
+  if (!route || route.id !== asset.id || route.asset_kind !== asset.kind || route.state !== asset.status
+    || (!operational && route.title !== asset.title)) return false;
+  for (const field of projectionFields.filter((field) => !operational || field !== "summary")) {
     const fallback = listFields.has(field) ? [] : "";
     if (JSON.stringify(route[field] ?? fallback) !== JSON.stringify(asset[field] ?? fallback)) return false;
   }
@@ -555,9 +556,9 @@ const proposedFormalFields = new Set([
   "validation_refs", "host_experience_refs", "portable_core_ref", "host_profile_refs", "environment_scope", "validity_signals",
 ]);
 
-function formalSourceHasExactSafeFrontmatter(asset) {
+function formalSourceHasExactSafeFrontmatter(asset, { operational = false } = {}) {
   if (!(asset && typeof asset === "object" && !Array.isArray(asset)
-    && Object.keys(asset).every((field) => proposedFormalFields.has(field) && !["__proto__", "prototype", "constructor"].includes(field))
+    && Object.keys(asset).every((field) => (operational || proposedFormalFields.has(field)) && !["__proto__", "prototype", "constructor"].includes(field))
     && !locateHighConfidenceSecretCandidates(JSON.stringify(asset)).blocked
     && !containsForbiddenStructuredLocation(asset))) return false;
   const subtype = subtypeCompatibility(asset);
@@ -565,7 +566,7 @@ function formalSourceHasExactSafeFrontmatter(asset) {
   const requiredCommon = ["id", "kind", "status", "title", "summary", "triggers", "scope", "excludes", "lifecycle", "expected_next_use",
     "topic_key", "subject_key", "aliases", "conditions", "source_refs", "private_refs", "supersedes", "minimum_level", "confirmation",
     "approval_state", "activation_basis", "risk_tier", "approved_by_user", "updated_at"];
-  if (requiredCommon.some((field) => !Object.hasOwn(asset, field)) || !stableAssetId.test(asset.id ?? "")
+  if (requiredCommon.some((field) => !(operational && field === "updated_at") && !Object.hasOwn(asset, field)) || !stableAssetId.test(asset.id ?? "")
     || !["memory", "capability", "sop", "experience"].includes(asset.kind) || !formalStates.has(asset.status) || !subtype.valid
     || !clean(asset.title, 80, false) || !clean(asset.summary, 240, false) || !cleanList(asset.triggers, 8, 80) || asset.triggers.length === 0
     || !cleanList(asset.scope, 8, 120) || !cleanList(asset.excludes, 6, 120) || !clean(asset.lifecycle, 40, false)
@@ -577,7 +578,8 @@ function formalSourceHasExactSafeFrontmatter(asset) {
     || (asset.body_sections ?? []).some((selector) => !stableSectionSelector.test(selector))
     || ![1, 2, 3].includes(asset.minimum_level) || !stableAssetId.test(asset.confirmation ?? "")
     || !["explicit", "policy-authorized", "pending"].includes(asset.approval_state) || !stableAssetId.test(asset.activation_basis ?? "")
-    || !["low", "medium", "high"].includes(asset.risk_tier) || typeof asset.approved_by_user !== "boolean" || !zonedOrEmpty(asset.updated_at)) return false;
+    || !["low", "medium", "high"].includes(asset.risk_tier) || typeof asset.approved_by_user !== "boolean"
+    || !(operational ? asset.updated_at === undefined || clean(asset.updated_at, 64) : zonedOrEmpty(asset.updated_at))) return false;
   const hostExecution = asset.kind === "experience" && asset.subtype === "host-execution";
   const maturityBearing = ["capability", "sop"].includes(asset.kind) || hostExecution;
   if (maturityBearing) {
@@ -1107,10 +1109,11 @@ export function auditFormalSourceClosure(repository) {
 // Explicit snapshot-maintenance projection. It runs the full source closure
 // first, then emits only low-sensitivity metadata; ordinary startup and task
 // routing never call this function.
-function projectFormalSnapshotRoute(repository, route, routeIndex, evidenceRegistry) {
-  const read = readFormalAsset(repository, route);
+function projectFormalSnapshotRoute(repository, route, routeIndex, evidenceRegistry, { operational = false } = {}) {
+  const read = readFormalAsset(repository, route, 128 * 1024, { operational });
   const asset = read.asset;
-  if (!routeAssetProjectionMatches(route, asset)) fail(`snapshot route/source drift at ${route.id}`);
+  if (!routeAssetProjectionMatches(route, asset, { operational })) fail(`snapshot route/source drift at ${route.id}`);
+  if (["active", "provisional"].includes(asset.status) && !validAuthorization(asset)) fail(`snapshot source authorization is invalid at ${route.id}`);
   const execution = formalExecutionMetadata(asset, routeIndex, route.id, evidenceRegistry);
   if (!execution || execution.ignoredInvalidHostExperienceRefCount > 0) fail(`snapshot maturity or reference metadata is invalid at ${route.id}`);
     const approvalState = ["explicit", "policy-authorized", "pending"].includes(asset.approval_state) ? asset.approval_state : "pending";
@@ -1188,7 +1191,8 @@ export function projectFormalAssetsForOperationalSnapshot(repository, {
   const routeIndex = new Map(trust.maintenanceRoutes.map((entry) => [entry.id, entry]));
   const projectedById = new Map(); const invalidIds = new Set();
   for (const route of routes) {
-    try { projectedById.set(route.id, projectFormalSnapshotRoute(repository, route, routeIndex, evidenceRegistry)); }
+    try { projectedById.set(route.id, projectFormalSnapshotRoute(repository, route, routeIndex, evidenceRegistry,
+      { operational: !requiredSourceRefs.has(route.target) })); }
     catch (error) {
       if (requiredSourceRefs.has(route.target)) throw error;
       invalidIds.add(route.id); onIssue({ area: formalSnapshotArea(route.asset_kind), sourceRef: route.target, code: "formal-source-invalid" });
@@ -1270,12 +1274,12 @@ function trustedRoute(repository, envelope, routeId, allowedStates) {
   return route ? { route, trust } : null;
 }
 
-function readFormalAsset(repository, route, maxBytes = 128 * 1024) {
+function readFormalAsset(repository, route, maxBytes = 128 * 1024, { operational = false } = {}) {
   resolvePhysicalAssetTarget(repository, route.target, route.asset_kind);
   const read = readPhysicalRelativeFile(repository, route.target, `asset ${route.id}`, [".md"], maxBytes);
   const parsed = parseMarkdownFrontmatterHead(read.text, route.id);
   const body = read.text.replaceAll("\r\n", "\n").slice(parsed.bodyOffset);
-  if (!formalSourceHasExactSafeFrontmatter(parsed.values)
+  if (!formalSourceHasExactSafeFrontmatter(parsed.values, { operational })
     || locateHighConfidenceSecretCandidates(body).blocked
     || containsForbiddenLocationReference(body) || !formalBodySectionsValid(parsed.values, body)) fail(`asset ${route.id} contains unknown, secret-bearing, non-portable, or section-drifted content`);
   return Object.freeze({ ...read, asset: parsed.values, body });
@@ -1372,9 +1376,11 @@ export function inspectAssetMetadata(repository, envelope, routeId) {
   let asset;
   try { asset = parseMarkdownFrontmatterHead(headRead.head, route.id).values; }
   catch { return { decision: "deny-frontmatter", executable: false, fileBytes }; }
-  if (!formalSourceHasExactSafeFrontmatter(asset)) return { decision: "deny-frontmatter-contract", executable: false, fileBytes };
-  if (route.id !== asset.id || route.asset_kind !== asset.kind || route.title !== asset.title) return { decision: "deny-identity", executable: false, fileBytes };
-  for (const field of projectionFields) {
+  if (!formalSourceHasExactSafeFrontmatter(asset, { operational: true })) return { decision: "deny-frontmatter-contract", executable: false, fileBytes };
+  if (route.id !== asset.id || route.asset_kind !== asset.kind) return { decision: "deny-identity", executable: false, fileBytes };
+  // Titles and summaries describe an asset; they do not grant scope or actions.
+  // Keep source text authoritative without rewriting the stored map on read.
+  for (const field of projectionFields.filter((field) => field !== "summary")) {
     const fallback = listFields.has(field) ? [] : "";
     if (JSON.stringify(route[field] ?? fallback) !== JSON.stringify(asset[field] ?? fallback)) return { decision: "deny-retrieval-drift", executable: false, fileBytes, field };
   }
@@ -1389,15 +1395,16 @@ export function inspectAssetMetadata(repository, envelope, routeId) {
   if (!execution.valid) return { decision: "deny-confirmation-gate", executable: false, fileBytes, reason: execution.reason };
   if (!envelopeFresh(trust)) return { decision: "deny-stale-envelope", executable: false, fileBytes };
   const subtype = subtypeCompatibility(asset);
-  const confirmedHabit = asset.kind === "memory" && asset.subtype === "habit";
+  const confirmedHabit = asset.kind === "memory" && asset.subtype === "habit"
+    && asset.risk_tier === "low" && !execution.requiresReadConfirmation;
   return Object.freeze({
     decision: "metadata-verified",
     executable: false,
     id: route.id,
     kind: route.asset_kind,
     subtype: subtype.subtype,
-    title: route.title,
-    summary: route.summary,
+    title: asset.title,
+    summary: asset.summary,
     topicKey: route.topic_key ?? "",
     subjectKey: route.subject_key ?? "",
     triggers: Object.freeze([...(route.triggers ?? [])]),
@@ -1410,7 +1417,9 @@ export function inspectAssetMetadata(repository, envelope, routeId) {
     selectionMode: confirmedHabit
       ? (route.state === "active" ? "automatic-confirmed-habit-if-scope-clear" : "automatic-confirmed-habit-within-confirmed-scope")
       : "confirm-fuzzy-before-body",
-    metadataMigrationRequired: subtype.migrationRequired || !Object.hasOwn(route, "subtype") && ["memory", "experience"].includes(asset.kind)
+    metadataMigrationRequired: Object.keys(asset).some((field) => !proposedFormalFields.has(field)) || !zonedOrEmpty(asset.updated_at)
+      || route.title !== asset.title || route.summary !== asset.summary
+      || subtype.migrationRequired || !Object.hasOwn(route, "subtype") && ["memory", "experience"].includes(asset.kind)
       || trust.routeConfirmationMigrations.get(route.id) === true || execution.confirmationMigrationRequired || executionMetadata.metadataMigrationRequired,
     relatedAssetIds: Object.freeze([...(route.related_asset_ids ?? [])]),
     relatedLoadPolicy: "separate-validated-read-only-no-recursion",
@@ -1446,8 +1455,12 @@ export function queryFormalAssetShortlist(repository, { queryText = "", intentHi
     }
     const metadata = inspectAssetMetadata(repository, envelope, entry.id);
     if (metadata.decision === "metadata-verified") {
-      const selectionMode = metadata.selectionMode.startsWith("automatic-confirmed-habit") && !evidence.automaticScopeEvidence
-        ? "confirm-fuzzy-before-body" : metadata.selectionMode;
+      const selectionMode = metadata.selectionMode.startsWith("automatic-confirmed-habit")
+        ? evidence.reuseStopOrCorrectionRequested || evidence.workContextExcluded
+          ? "do-not-apply-in-current-context"
+          : evidence.automaticScopeEvidence ? metadata.selectionMode
+            : evidence.directUserMatch || evidence.workSignalMatch ? "assess-confirmed-habit-scope" : "confirm-fuzzy-before-body"
+        : metadata.selectionMode;
       candidates.push(Object.freeze({ ...metadata, selectionMode, retrievalEvidence: Object.freeze({
         triggerMatchStrong: evidence.triggerScore >= 0.72,
         workTriggerMatchStrong: evidence.workTriggerScore >= 0.72,
@@ -1455,6 +1468,7 @@ export function queryFormalAssetShortlist(repository, { queryText = "", intentHi
         workScopeOrObjectMatch: evidence.workScopeScore >= 0.45,
         automaticScopeEvidence: evidence.automaticScopeEvidence,
         automaticEvidenceSource: evidence.automaticEvidenceSource,
+        automaticBlockedReason: evidence.automaticBlockedReason,
         directUserMatch: evidence.directUserMatch,
         workSignalMatch: evidence.workSignalMatch,
         hintOnlyMatch: evidence.hintOnlyMatch,
@@ -1515,10 +1529,10 @@ function inspectAssetRouteInternal(repository, envelope, routeId, { requestedSel
   const fileBytes = statSync(path).size;
   if (fileBytes > 128 * 1024) return { decision: "deny-body-size", executable: false, fileBytes };
   let read;
-  try { read = readFormalAsset(repository, route); } catch { return { decision: "deny-read-race-or-frontmatter", executable: false, fileBytes }; }
+  try { read = readFormalAsset(repository, route, 128 * 1024, { operational: true }); } catch { return { decision: "deny-read-race-or-frontmatter", executable: false, fileBytes }; }
   const asset = read.asset;
-  if (route.id !== asset.id || route.asset_kind !== asset.kind || route.title !== asset.title) return { decision: "deny-identity", executable: false, fileBytes };
-  for (const field of projectionFields) {
+  if (route.id !== asset.id || route.asset_kind !== asset.kind) return { decision: "deny-identity", executable: false, fileBytes };
+  for (const field of projectionFields.filter((field) => field !== "summary")) {
     const fallback = listFields.has(field) ? [] : "";
     if (JSON.stringify(route[field] ?? fallback) !== JSON.stringify(asset[field] ?? fallback)) return { decision: "deny-retrieval-drift", executable: false, fileBytes, field };
   }
@@ -1534,7 +1548,8 @@ function inspectAssetRouteInternal(repository, envelope, routeId, { requestedSel
   const subtype = subtypeCompatibility(asset);
   if (!envelopeFresh(trust)) return { decision: "deny-stale-envelope", executable: false, fileBytes };
   const body = read.body;
-  const metadataMigrationRequired = subtype.migrationRequired || trust.routeConfirmationMigrations.get(route.id) === true || execution.confirmationMigrationRequired || executionMetadata.metadataMigrationRequired;
+  const metadataMigrationRequired = metadataPreflight.metadataMigrationRequired || subtype.migrationRequired
+    || trust.routeConfirmationMigrations.get(route.id) === true || execution.confirmationMigrationRequired || executionMetadata.metadataMigrationRequired;
   const relatedAssetIds = Object.freeze([...(route.related_asset_ids ?? [])]);
   if (fileBytes <= 32 * 1024) {
     const secrets = locateHighConfidenceSecretCandidates(body);

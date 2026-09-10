@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectStartupCapsule } from "./startup-capsule-contract.mjs";
 
-const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const rootOption = process.argv.indexOf("--root");
+const repository = rootOption < 0 ? resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
+  : resolve(process.argv[rootOption + 1]);
+const forPublication = process.argv.includes("--for-publication");
 const read = (ref) => readFileSync(resolve(repository, ...ref.split("/")), "utf8").replaceAll("\r\n", "\n");
 const expect = (condition, message) => { if (!condition) throw new Error(`Release authority validation failed: ${message}`); };
 
@@ -77,6 +80,8 @@ expect(Array.isArray(overrides) && overrides.every((ref) => /^\.assistant-(?:loc
 const boundary = section(manifest, "release_boundary");
 const status = stringValue(boundary, "status");
 expect(["local-unreleased-candidate", "published-release"].includes(status), "release boundary status is invalid");
+expect(!forPublication || status === "published-release",
+  "final public candidate still declares a local unreleased boundary; instances cannot install it");
 expect(stringValue(boundary, "release_ref") === `v${version}`, "release boundary does not name the current fixed tag");
 expect(booleanValue(boundary, "future_publication_or_repository_operation_authorized") === false,
   "the current release incorrectly authorizes future publication actions");
@@ -101,10 +106,11 @@ expect(packageSource.version === version, "Dashboard package version differs fro
 expect(packageSource.scripts?.upgrade === "node scripts/ai-carry-upgrade-cli.mjs"
   && packageSource.scripts?.["check:release"]?.includes("check:release-authority")
   && packageSource.scripts?.["check:release"]?.includes("check:compliance")
-  && packageSource.scripts?.build?.includes("check:journeys")
+  && packageSource.scripts?.["check:release"]?.includes("check:journeys")
+  && !packageSource.scripts?.build?.includes("check:journeys")
   && !packageSource.scripts?.build?.includes("check:release-authority"),
-"build and release checks are not separated into product lifelines and publication-only boundaries");
+"ordinary compilation and once-per-release journey checks are not separated");
 expect(inspectStartupCapsule(repository).decision === "startup-capsule-valid",
   "checked-in blank-template startup capsule is not synchronized with current truth");
 
-console.log(`AI Carry ${version} current release boundary passed without replaying historical release text.`);
+console.log(`AI Carry ${version} ${forPublication ? "final public candidate" : "local development"} release boundary passed. This check does not authorize publishing.`);

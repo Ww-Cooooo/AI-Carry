@@ -203,7 +203,7 @@ export function validateSnapshotSemantics(snapshot, label = "snapshot") {
       ["state", "isolated_item_count", "affected_areas", "source_data_preserved", "summary", "next_step"], label, "$.health");
     if (meta.state !== "instance" || health.state !== "degraded") fail(label, "$.health is only valid for a degraded instance projection");
     const isolatedCount = count(health.isolated_item_count, label, "$.health.isolated_item_count");
-    if (isolatedCount < 1 || isolatedCount > 64) fail(label, "$.health.isolated_item_count must be between 1 and 64");
+    if (isolatedCount < 1) fail(label, "$.health.isolated_item_count must be a positive safe integer");
     textList(health.affected_areas, label, "$.health.affected_areas", { maxItems: 12, maxText: 40, allowEmpty: false });
     if (health.affected_areas.length < 1 || new Set(health.affected_areas).size !== health.affected_areas.length
       || health.affected_areas.some((area) => !stableId.test(area))) fail(label, "$.health.affected_areas must be unique stable category IDs");

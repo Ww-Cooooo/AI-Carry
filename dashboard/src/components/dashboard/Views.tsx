@@ -62,6 +62,8 @@ import {
   experiences,
   getGlobalActions,
   getSnapshotStatus,
+  isolatedContentMessage,
+  snapshotAreaDegraded,
   governance,
   assetMaturityStatusToken,
   assetUsagePresentation,
@@ -167,12 +169,12 @@ export function HomeView({
     ? "让你的 AI 助手，越用越懂你"
     : pending.length
       ? pending[0].title
-      : "今天没有需要继续的待办";
+      : snapshotAreaDegraded("todo") ? "待办暂未完整显示" : "今天没有需要继续的待办";
   const intro = isTemplate
     ? "记住你的习惯，沉淀你的方法。换模型、换 Agent、换电脑，也能继续。"
     : pending.length
       ? pending[0].summary || "从这项待办继续。"
-      : "直接告诉 Agent 今天想做什么，需要的内容会按任务读取。";
+      : snapshotAreaDegraded("todo") ? isolatedContentMessage : "直接告诉 Agent 今天想做什么，需要的内容会按任务读取。";
 
   return (
     <div className="page-stack home-view home-view--essential">
@@ -190,9 +192,9 @@ export function HomeView({
                 <strong>越用越懂你</strong>
               </h1>
             ) : (
-              <h1 id="home-title"><SourceText>{headline}</SourceText></h1>
+              <h1 id="home-title">{pending.length ? <SourceText>{headline}</SourceText> : headline}</h1>
             )}
-            {isTemplate ? <p>{intro}</p> : <SourceText as="p">{intro}</SourceText>}
+            {isTemplate || !pending.length ? <p>{intro}</p> : <SourceText as="p">{intro}</SourceText>}
           </div>
 
           {isTemplate ? (
@@ -431,8 +433,8 @@ export function LibraryView({
       ) : (
         <EmptyState
           icon={category.icon}
-          title={query ? "没有找到相关内容" : LIBRARY_EMPTY[kind].title}
-          description={query ? "换一个更短的关键词，或者清除搜索查看全部内容。" : LIBRARY_EMPTY[kind].description}
+          title={snapshotAreaDegraded(kind) ? "部分内容暂未显示" : query ? "没有找到相关内容" : LIBRARY_EMPTY[kind].title}
+          description={snapshotAreaDegraded(kind) ? isolatedContentMessage : query ? "换一个更短的关键词，或者清除搜索查看全部内容。" : LIBRARY_EMPTY[kind].description}
           action={profile.state === "template" && instantiate ? (
             <Button className="primary-cta" onClick={() => onNavigate({ page: "home" })}>回到总览创建助手</Button>
           ) : undefined}
@@ -551,7 +553,7 @@ export function GrowthView({
           })}
         </section>
       ) : (
-        <EmptyState icon={category.icon} title={`暂无${category.label}`} description={copy.empty} />
+        <EmptyState icon={category.icon} title={snapshotAreaDegraded(kind) ? "部分内容暂未显示" : `暂无${category.label}`} description={snapshotAreaDegraded(kind) ? isolatedContentMessage : copy.empty} />
       )}
 
     </div>

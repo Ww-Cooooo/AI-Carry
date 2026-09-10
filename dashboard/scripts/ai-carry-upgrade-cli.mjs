@@ -26,6 +26,7 @@ import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
 import { inspectStartupCapsule } from "./startup-capsule-contract.mjs";
 import { syncStartupCapsule } from "./sync-startup-capsule.mjs";
 import {
+  AUTHORITY_FINGERPRINT_SCHEMA,
   OFFICIAL_RELEASE_REQUEST_BUDGET,
   officialAuthorityFingerprint,
 } from "./verify-official-ai-carry-release.mjs";
@@ -793,7 +794,6 @@ function validateOfficialReleaseLive(target, targetTree, releaseRef) {
     || record.repository !== "Ww-Cooooo/AI-Carry"
     || record.release_ref !== `v${TARGET_VERSION}`
     || !/^[a-f0-9]{40}$/u.test(record.commit_sha ?? "")
-    || record.main_commit_sha !== record.commit_sha
     || !/^[a-f0-9]{40}$/u.test(record.git_tree_sha ?? "")
     || !/^[1-9][0-9]*$/u.test(String(record.release_id ?? ""))
     || record.latest_release_id !== record.release_id
@@ -804,10 +804,11 @@ function validateOfficialReleaseLive(target, targetTree, releaseRef) {
     || record.target_file_count !== targetTree.fileCount
     || record.network_used !== true
     || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(record.verified_at ?? "")
-    || record.authority_fingerprint_schema !== 1
+    || record.authority_fingerprint_schema !== AUTHORITY_FINGERPRINT_SCHEMA
     || record.authority_fingerprint !== authorityFingerprint
-    || record.request_count !== OFFICIAL_RELEASE_REQUEST_BUDGET
-    || record.request_budget !== OFFICIAL_RELEASE_REQUEST_BUDGET) {
+    || !Number.isSafeInteger(record.request_count) || record.request_count < 1
+    || !Number.isSafeInteger(record.request_budget) || record.request_budget > OFFICIAL_RELEASE_REQUEST_BUDGET
+    || record.request_count > record.request_budget) {
     fail("live official Release result is incomplete or does not bind this exact target tree");
   }
   const digest = `sha256:${sha256(Buffer.from(JSON.stringify(record), "utf8"))}`;
@@ -818,7 +819,6 @@ function validateOfficialReleaseLive(target, targetTree, releaseRef) {
     releaseId: String(record.release_id),
     latestReleaseId: String(record.latest_release_id),
     commitSha: record.commit_sha,
-    mainCommitSha: record.main_commit_sha,
     gitTreeSha: record.git_tree_sha,
     releaseUrl: record.release_url,
     verifiedAt: record.verified_at,
