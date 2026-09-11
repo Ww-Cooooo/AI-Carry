@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 from pathlib import Path
 
@@ -50,6 +52,50 @@ CONTRACT = {
 
 
 class PrivateDataMigrationTests(unittest.TestCase):
+    def test_completed_import_cleanup_failure_does_not_block_use_or_retry(self) -> None:
+        spec = importlib.util.spec_from_file_location("migration_cleanup_fixture", SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        base = Path(tempfile.mkdtemp(prefix="ai-carry-import-cleanup-"))
+        passed = False
+        try:
+            source, target, output = base / "source", base / "target", base / "output"
+            self.make_instance(source)
+            self.make_instance(target)
+            restored = target / ".assistant-private/assets/private.profile.example.md"
+            restored.unlink()
+            exported = module.export_package(source, output, POLICY_REL)
+            package = Path(exported["package_path"])
+            before = (source / ".assistant-private/assets/private.profile.example.md").read_bytes()
+
+            def interrupted_cleanup(path):
+                # Simulate a partial recursive cleanup, not just a failure
+                # before deletion: its journal is already gone.
+                (Path(path) / "transaction.json").unlink(missing_ok=True)
+                raise PermissionError("synthetic cleanup failure")
+
+            with mock.patch.object(module.shutil, "rmtree", side_effect=interrupted_cleanup):
+                result = module.import_package(package, target, policy_path=POLICY_REL)
+                self.assertEqual(result["status"], "validated")
+                self.assertEqual(result["transaction_artifacts_remaining"], 1)
+                self.assertTrue(result["cleanup_warnings"])
+                self.assertEqual(restored.read_bytes(), before)
+                again = module.import_package(package, target, policy_path=POLICY_REL)
+                self.assertEqual(again["written"], 0)
+                self.assertEqual(again["transaction_artifacts_remaining"], 1)
+                self.assertEqual(restored.read_bytes(), before)
+            final = module.import_package(package, target, policy_path=POLICY_REL)
+            self.assertEqual(final["written"], 0)
+            self.assertEqual(final["transaction_artifacts_remaining"], 0)
+            self.assertEqual(restored.read_bytes(), before)
+            passed = True
+        finally:
+            if passed:
+                shutil.rmtree(base)
+            else:
+                print(f"Import cleanup failure evidence kept at {base}", file=sys.stderr)
+
     def make_instance(self, root: Path) -> None:
         (root / "instance" / "profile").mkdir(parents=True)
         (root / ".assistant-private" / "assets").mkdir(parents=True)

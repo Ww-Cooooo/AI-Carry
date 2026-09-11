@@ -1,4 +1,5 @@
 import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
@@ -14,6 +15,7 @@ function validateVectors() {
     assert(result.blocked && result.findings.some((finding) => finding.category === vector.category), `missed ${vector.category}`);
   }
   for (const value of vectors.allowed) assert(!locateHighConfidenceSecretCandidates(value).blocked, `false positive: ${value}`);
+  validateReviewedImageVectors(vectors);
   return vectors;
 }
 
@@ -46,9 +48,51 @@ const bundledFontNames = new Set([
   "NotoSansSC-Variable.woff2", "SpaceGrotesk-Variable.woff2",
 ]);
 
-function approvedBinary(relativePath) {
+const projectAssetInventory = "docs/assets/project-assets.json";
+const reviewedImagePath = /^docs\/readme-assets\/dashboard-empty\.(?:en|zh)\.png$/u;
+const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function reviewedImages(files, findings) {
+  const inventory = files.find(([ref]) => ref === projectAssetInventory);
+  if (!inventory) return [];
+  try {
+    const data = JSON.parse(inventory[1].toString("utf8"));
+    if (data.schemaVersion !== 1 || !Array.isArray(data.assets)) throw new Error("invalid inventory");
+    return data.assets.filter((asset) => asset && reviewedImagePath.test(asset.path ?? "")
+      && asset.license === "Apache-2.0" && typeof asset.origin === "string" && asset.origin.trim());
+  } catch {
+    addPrivacyFinding(findings, "invalid-project-asset-inventory", projectAssetInventory, 0);
+    return [];
+  }
+}
+
+function approvedBinary(relativePath, bytes, images) {
   const match = relativePath.match(/^dashboard\/(?:dist|public)\/fonts\/([^/]+)$/u);
-  return match !== null && bundledFontNames.has(match[1]);
+  if (match !== null && bundledFontNames.has(match[1])) return true;
+  if (!reviewedImagePath.test(relativePath) || !bytes.subarray(0, 8).equals(pngSignature)) return false;
+  const records = images.filter((asset) => asset.path === relativePath);
+  return records.length === 1 && records[0].sha256 === createHash("sha256").update(bytes).digest("hex");
+}
+
+function validateReviewedImageVectors(vectors) {
+  // In-memory boundary examples, not a visual/privacy audit of arbitrary images.
+  const path = "docs/readme-assets/dashboard-empty.zh.png";
+  const bytes = Buffer.concat([pngSignature, Buffer.from("synthetic reviewed image")]);
+  const entry = { path, sha256: createHash("sha256").update(bytes).digest("hex"), origin: "Synthetic boundary fixture", license: "Apache-2.0" };
+  const inventory = Buffer.from(JSON.stringify({ schemaVersion: 1, assets: [entry] }));
+  const clean = [[path, bytes], [projectAssetInventory, inventory]];
+  assert(scanPublicFiles(clean).findings.length === 0, "reviewed image was rejected");
+  for (const [name, files] of [
+    ["unregistered", [[path, bytes]]],
+    ["changed bytes", [[path, Buffer.concat([bytes, Buffer.from("changed")])], clean[1]]],
+    ["unknown binary", [["docs/readme-assets/unknown.png", bytes], clean[1]]],
+    ["invalid inventory", [[path, bytes], [projectAssetInventory, Buffer.from("{")]]],
+  ]) assert(scanPublicFiles(files).findings.length > 0, `image boundary accepted ${name}`);
+  const blockedSample = vectors.blocked[0].parts.join("");
+  const secretBytes = Buffer.concat([bytes, Buffer.from(blockedSample)]);
+  const secretInventory = Buffer.from(JSON.stringify({ schemaVersion: 1, assets: [{ ...entry, sha256: createHash("sha256").update(secretBytes).digest("hex") }] }));
+  assert(scanPublicFiles([[path, secretBytes], [projectAssetInventory, secretInventory]]).findings.some((finding) => finding.category !== "unexpected-binary"),
+    "image registration bypassed the shared secret detector");
 }
 
 function addPrivacyFinding(findings, category, path, line) {
@@ -77,6 +121,10 @@ function containsPrivateDevicePath(line, prefixes) {
 // The same detector protects the install tree, Pages and individual Release Notes.
 export function scanPublicFiles(files, privateRoot = root) {
   const findings = [];
+  // The release preparer first binds every candidate file, including this existing
+  // inventory, to the fixed source. Registration is not permission to publish or
+  // proof of image privacy: changed image content still requires human review.
+  const images = reviewedImages(files, findings);
   const privatePrefixes = privateDevicePrefixes(privateRoot);
   let scannedFiles = 0;
   for (const [relativePath, bytes] of files) {
@@ -90,7 +138,7 @@ export function scanPublicFiles(files, privateRoot = root) {
     let text;
     try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
     catch {
-      if (!approvedBinary(relativePath)) addPrivacyFinding(findings, "unexpected-binary", relativePath, 0);
+      if (!approvedBinary(relativePath, bytes, images)) addPrivacyFinding(findings, "unexpected-binary", relativePath, 0);
       continue;
     }
     const licenseContext = /(^|\/)licenses?\//iu.test(relativePath)

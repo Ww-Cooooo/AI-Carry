@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { strict as assert } from 'node:assert'
+import { parseSectionedToml } from './asset-route-contract.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(here, '..', '..')
@@ -12,6 +14,21 @@ async function read(path) {
 function requireFragments(text, label, fragments) {
   for (const fragment of fragments) {
     if (!text.includes(fragment)) throw new Error(`${label} is missing localization contract fragment: ${fragment}`)
+  }
+}
+
+// Editorial headings may change. Language, install and download destinations
+// must still lead to the intended product, not an old version or missing page.
+function requireReadmeEntries(text, label, { counterpart, guide, versionPrefix }, version, source) {
+  const links = new Set([...text.matchAll(/\]\(<?([^\s)>]+)>?\)/gu)].map(match => match[1]))
+  for (const target of [counterpart, source.releases, source.versioned_archive_template.replace('{tag}', `v${version}`)]) {
+    if (!links.has(target)) throw new Error(`${label} is missing required destination: ${target}`)
+  }
+  if (!text.includes(`${source.repository}/blob/main/${guide}`)) {
+    throw new Error(`${label} is missing the official ${guide} installation request`)
+  }
+  if (!new RegExp(`${versionPrefix}\\s*\`${version.replaceAll('.', '\\.')}\``, 'u').test(text)) {
+    throw new Error(`${label} version differs from assistant.toml (${version})`)
   }
 }
 
@@ -36,62 +53,24 @@ const [readmeZh, readmeEn, installEn, startEn, entryZh, entryEn, i18n, catalog, 
   read('dashboard/src/components/dashboard/SkillWorkshop.tsx'),
 ])
 
-requireFragments(readmeZh, 'Chinese README', [
-  '[English](README.en.md)',
-  '当前版本：`2.0.9`',
-  '点击展开：2.0.9 改变了什么',
-  '点击展开：2.0.8 改变了什么',
-  '点击展开：2.0.7 改变了什么',
-  '点击展开：2.0.6 修复了什么',
-  '点击展开：2.0.5 改变了什么',
-  '点击展开：2.0.4 修复了什么',
-  '点击展开：2.0.3 主要改了什么',
-  '点击展开：2.0.2 修复了什么',
-  '点击展开：2.0.1 修复了什么',
-  '点击展开：2.0.0 主要改了什么',
-  '稳定身份和三段版本',
-  '最早觉得不对',
-  '固定到 `v2.0.9` 标签',
-  '只暂停当前组件',
-  '🧠 这次用上了',
-  '🌱 这一步我学到了',
-  '👉 接下来',
-  'Skill 工坊：把方法分享出去，或接入别人分享的方法',
-  '按钮只复制请求',
-  '只暂停这一项 Skill',
-  'GitHub Releases',
-])
-requireFragments(readmeEn, 'English README', [
-  '[简体中文](README.md)',
-  'Current version: `2.0.9`',
-  'What changed in 2.0.9',
-  'What changed in 2.0.8',
-  'What changed in 2.0.7',
-  'What 2.0.6 fixes',
-  'What changed in 2.0.5',
-  'What 2.0.4 fixes',
-  'What changed in 2.0.3',
-  'What 2.0.2 fixes',
-  'What 2.0.1 fixes',
-  'What changed in 2.0.0',
-  'stable identity and semantic version',
-  'which first message or action felt wrong',
-  'pinned to the `v2.0.9` tag',
-  'limits only that component',
-  '🧠 Used this time',
-  '🌱 Learned this step',
-  "👉 What's next",
-  'Skill Workshop: share your method or receive somebody else\'s',
-  'The button only copies a request',
-  'other Skills and the assistant remain usable',
-  'GitHub Releases',
-  'AI changes quickly. Agents come and go.',
-  'Try the dashboard',
-  'INSTALL.en.md',
-  'dashboard.en.html',
-  'New to Agents',
-  'GitHub private repository',
-])
+const version = parseSectionedToml(await read('assistant.toml'), 'assistant.toml')[''].product_version
+const officialSource = parseSectionedToml(await read('core/upgrade/official-source.toml'), 'official-source.toml')['']
+assert.match(version, /^\d+\.\d+\.\d+$/u)
+const zhEntry = { counterpart: 'README.en.md', guide: 'INSTALL.md', versionPrefix: '当前版本：' }
+const enEntry = { counterpart: 'README.md', guide: 'INSTALL.en.md', versionPrefix: 'Current version:' }
+requireReadmeEntries(readmeZh, 'Chinese README', zhEntry, version, officialSource)
+requireReadmeEntries(readmeEn, 'English README', enEntry, version, officialSource)
+
+// A rewrite without old headings is valid; broken entrypoints are not.
+const archive = officialSource.versioned_archive_template.replace('{tag}', `v${version}`)
+const sample = `# A new introduction\n[中文](${enEntry.counterpart}) [ZIP](${archive}) [Changes](${officialSource.releases})\n${officialSource.repository}/blob/main/INSTALL.en.md\nCurrent version: \`${version}\``
+assert.doesNotThrow(() => requireReadmeEntries(sample, 'fixture', enEntry, version, officialSource))
+for (const [before, after, error] of [
+  [archive, archive.replace(`v${version}`, 'v0.0.0'), /required destination/u],
+  ['(README.md)', '(missing-readme.md)', /required destination/u],
+  ['blob/main/INSTALL.en.md', 'blob/main/wrong-install.md', /installation request/u],
+  [`Current version: \`${version}\``, 'Current version: `0.0.0`', /version differs/u],
+]) assert.throws(() => requireReadmeEntries(sample.replace(before, after), 'fixture', enEntry, version, officialSource), error)
 requireFragments(installEn, 'English installer', [
   'dashboard.en.html',
   'first-use-execution-gates.md',

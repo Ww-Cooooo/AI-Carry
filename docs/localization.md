@@ -40,6 +40,8 @@ The complete formal owner is [`core/protocols/TERRITORY_TERMINOLOGY.md`](../core
 
 ## Release checks
 
+README localization checks protect the language switch, official installation request, versioned download and release-history link. The version comes from `assistant.toml` and destinations from `core/upgrade/official-source.toml`; historical headings and marketing sentences are not frozen. Capability accuracy still needs a review of the actual changes, not a list of required phrases. Receipt labels requested by users remain covered by the existing proactive-learning check.
+
 A public candidate must verify:
 
 - Chinese entry defaults to `zh-Hans` and English entry defaults to `en`;

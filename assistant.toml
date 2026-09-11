@@ -1,8 +1,8 @@
 schema_version = 1
 product_id = "ai-carry"
 product_name = "AI Carry"
-product_version = "2.0.10"
-core_version = "2.0.10"
+product_version = "2.0.11"
+core_version = "2.0.11"
 license = "Apache-2.0"
 purpose = "Carry user-owned, policy-governed memory, preferences, capabilities, SOPs and evolution across AI agents."
 portable_truth = ["markdown", "toml"]
@@ -143,7 +143,7 @@ policy_change_requires_user_approval = true
 [maintenance]
 component_registry = "core/maps/component-map.toml"
 ownership = "core/ownership.toml"
-release_manifest = "core/upgrade/release-manifest-2.0.10.toml"
+release_manifest = "core/upgrade/release-manifest-2.0.11.toml"
 official_update_source = "core/upgrade/official-source.toml"
 durable_change_protocol = "core/protocols/COMPONENT_CHANGE.md"
 durable_change_load_policy = "only-after-a-formal-add-modify-delete-rename-move-migrate-upgrade-or-publish-intent; never-for-read-only-or-ordinary-use"

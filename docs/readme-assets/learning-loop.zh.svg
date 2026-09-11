@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="254" viewBox="0 0 1120 254" role="img" aria-labelledby="title desc">
+<title id="title">真正的积累，是下次能用上</title>
+<desc id="desc">Agent 从真实工作发现值得保留的方法，经用户选择后保存在本地，下次遇到相关任务时再按需读取。线上的动点只用于说明关系，并不表示后台自动执行。</desc>
+<style>
+text{font-family:"Segoe UI","Microsoft YaHei","Noto Sans SC",sans-serif}
+.dot{animation:travel 10s ease-in-out 2;animation-delay:1s}
+@keyframes travel{0%,10%{transform:translateX(0);opacity:0}15%{opacity:1}85%{transform:translateX(860px);opacity:1}100%{transform:translateX(860px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.dot{animation:none;opacity:0}}
+</style>
+<rect width="1120" height="254" rx="16" fill="#f6f3eb"/>
+<text x="30" y="36" font-size="12" font-weight="700" letter-spacing="2" fill="#556771">WORK → LEARN → REUSE</text>
+<path d="M124 135H990" stroke="#c5cebf" stroke-width="2"/>
+<path d="m226 129 7 6-7 6m220-12 7 6-7 6m220-12 7 6-7 6m220-12 7 6-7 6" fill="none" stroke="#567266" stroke-width="2"/>
+<circle class="dot" cx="124" cy="135" r="4" fill="#6ca34c" opacity="0"/>
+<g fill="#fff" stroke="#d9dfd4"><rect x="30" y="70" width="180" height="123" rx="12"/><rect x="250" y="70" width="180" height="123" rx="12"/><rect x="690" y="70" width="180" height="123" rx="12"/><rect x="910" y="70" width="180" height="123" rx="12"/></g>
+<rect x="470" y="70" width="180" height="123" rx="12" fill="#10252f"/>
+<g font-size="12" letter-spacing="1.2" fill="#74867d"><text x="48" y="96">01 / DO</text><text x="268" y="96">02 / NOTICE</text><text x="708" y="96">04 / KEEP</text><text x="928" y="96">05 / RECALL</text></g>
+<text x="488" y="96" font-size="12" letter-spacing="1.2" fill="#b1ef80">03 / YOU DECIDE</text>
+<g font-size="22" font-weight="700" fill="#18332f"><text x="48" y="134">先做真实任务</text><text x="268" y="134">发现好方法</text><text x="708" y="134">存进本地文件</text><text x="928" y="134">下次按需用上</text></g>
+<text x="488" y="134" font-size="22" font-weight="700" fill="#fff8ed">由你选择保留</text>
+<g font-size="13" fill="#5a6a67"><text x="48" y="164">从你的工作出发</text><text x="268" y="164">不是每句话都要记</text><text x="708" y="164">内容可查看、可纠正</text><text x="928" y="164">相关时读，不全部塞入</text></g>
+<text x="488" y="164" font-size="13" fill="#c3d1ce">留下 / 观察 / 提醒 / 不存</text>
+<text x="30" y="228" font-size="13" fill="#52655b">当前 Agent 负责执行；换 Agent 后，继续读取同一份 AI Carry 积累。</text>
+<text x="1090" y="228" text-anchor="end" font-size="11" fill="#819184">流程示意 · 非后台服务</text>
+</svg>

@@ -5,7 +5,7 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const TARGET_VERSION = "2.0.10";
+const TARGET_VERSION = "2.0.11";
 const REPOSITORY = "Ww-Cooooo/AI-Carry";
 const API_ROOT = `https://api.github.com/repos/${REPOSITORY}`;
 const MAX_FILES = 8192;
@@ -64,7 +64,7 @@ async function apiJson(path, label, fetchImpl = globalThis.fetch) {
   const response = await fetchImpl(`${API_ROOT}${path}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      "User-Agent": "AI-Carry-release-verifier/2.0.10",
+      "User-Agent": "AI-Carry-release-verifier/2.0.11",
       "X-GitHub-Api-Version": "2022-11-28",
     },
     redirect: "error",

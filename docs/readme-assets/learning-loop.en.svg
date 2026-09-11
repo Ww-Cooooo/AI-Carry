@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="254" viewBox="0 0 1120 254" role="img" aria-labelledby="title desc">
+<title id="title">Useful learning is recalled in later work</title>
+<desc id="desc">The Agent notices useful methods in real work. The user chooses what to keep locally, and later work recalls relevant files. The animated dot illustrates the relationship, not background execution.</desc>
+<style>
+text{font-family:"Segoe UI","Microsoft YaHei","Noto Sans SC",sans-serif}
+.dot{animation:travel 10s ease-in-out 2;animation-delay:1s}
+@keyframes travel{0%,10%{transform:translateX(0);opacity:0}15%{opacity:1}85%{transform:translateX(860px);opacity:1}100%{transform:translateX(860px);opacity:0}}
+@media(prefers-reduced-motion:reduce){.dot{animation:none;opacity:0}}
+</style>
+<rect width="1120" height="254" rx="16" fill="#f6f3eb"/>
+<text x="30" y="36" font-size="12" font-weight="700" letter-spacing="2" fill="#556771">WORK → LEARN → REUSE</text>
+<path d="M124 135H990" stroke="#c5cebf" stroke-width="2"/>
+<path d="m226 129 7 6-7 6m220-12 7 6-7 6m220-12 7 6-7 6m220-12 7 6-7 6" fill="none" stroke="#567266" stroke-width="2"/>
+<circle class="dot" cx="124" cy="135" r="4" fill="#6ca34c" opacity="0"/>
+<g fill="#fff" stroke="#d9dfd4"><rect x="30" y="70" width="180" height="123" rx="12"/><rect x="250" y="70" width="180" height="123" rx="12"/><rect x="690" y="70" width="180" height="123" rx="12"/><rect x="910" y="70" width="180" height="123" rx="12"/></g>
+<rect x="470" y="70" width="180" height="123" rx="12" fill="#10252f"/>
+<g font-size="12" letter-spacing="1.2" fill="#74867d"><text x="48" y="96">01 / DO</text><text x="268" y="96">02 / NOTICE</text><text x="708" y="96">04 / KEEP</text><text x="928" y="96">05 / RECALL</text></g>
+<text x="488" y="96" font-size="12" letter-spacing="1.2" fill="#b1ef80">03 / YOU DECIDE</text>
+<g font-size="18" font-weight="700" fill="#18332f"><text x="48" y="134">Do real work</text><text x="268" y="134">Notice a method</text><text x="708" y="134">Keep local files</text><text x="928" y="134">Recall as needed</text></g>
+<text x="488" y="134" font-size="18" font-weight="700" fill="#fff8ed">You choose</text>
+<g font-size="11" fill="#5a6a67"><text x="48" y="164">Start with your task</text><text x="268" y="164">Not every chat message</text><text x="708" y="164">Readable and correctable</text><text x="928" y="164">Relevant files, not all history</text></g>
+<text x="488" y="164" font-size="11" fill="#c3d1ce">Keep / observe / later / skip</text>
+<text x="30" y="228" font-size="11" fill="#52655b">Your current Agent does the work. A new Agent can read the same AI Carry files.</text>
+<text x="1090" y="228" text-anchor="end" font-size="11" fill="#819184">Concept · not a background service</text>
+</svg>

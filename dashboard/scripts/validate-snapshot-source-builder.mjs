@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildSnapshotCandidate, computeSnapshotSourceDigest } from "./snapshot-source-builder.mjs";
 import { parseCurrentSnapshotEnvelope } from "./snapshot-envelope.mjs";
 import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
@@ -290,6 +292,28 @@ confirmation = "none"
   assert(snapshot.meta.source_digest === computeSnapshotSourceDigest(root).digest, "source digest did not match an independent deterministic rebuild");
   const repeated = buildSnapshotCandidate(root, { existingSource: first.source, now: new Date("2026-08-24T05:00:00+08:00") });
   assert(!repeated.updated && repeated.source === first.source, "unchanged formal truth refreshed generated_at or bytes");
+  // Exercise the actual repair entrypoint, not only its source builder. A
+  // missing derived file must be rebuildable without touching the truth.
+  const syncCli = fileURLToPath(new URL("./sync-snapshot.mjs", import.meta.url));
+  const sync = () => JSON.parse(execFileSync(process.execPath, [syncCli, root], { encoding: "utf8" }));
+  const publicSnapshot = resolve(root, "dashboard/public/snapshot.js");
+  const distSnapshot = resolve(root, "dashboard/dist/snapshot.js");
+  const sourceBeforeRepair = computeSnapshotSourceDigest(root).digest;
+  for (const missing of ["both", "public", "dist"]) {
+    if (missing !== "dist") rmSync(publicSnapshot, { force: true });
+    if (missing !== "public") rmSync(distSnapshot, { force: true });
+    const repaired = sync();
+    const bytes = readFileSync(publicSnapshot);
+    const repairedSnapshot = parseCurrentSnapshotEnvelope(bytes.toString("utf8"), `missing-${missing} repair`);
+    validateSnapshotSemantics(repairedSnapshot, `missing-${missing} repair`);
+    assert(repaired.generated_from_current_truth && bytes.equals(readFileSync(distSnapshot))
+      && repairedSnapshot.meta.identity_ref === expectedIdentity && repairedSnapshot.assets.sops === 1
+      && computeSnapshotSourceDigest(root).digest === sourceBeforeRepair,
+    `missing ${missing} snapshot did not rebuild from unchanged truth`);
+    sync();
+    assert(bytes.equals(readFileSync(publicSnapshot)) && bytes.equals(readFileSync(distSnapshot)),
+      `missing ${missing} repair was not idempotent`);
+  }
   const legacyEnvelope = `// Agent Carry snapshot envelope v1\nwindow.AGENT_CARRY_IS_REAL = true;\nwindow.AGENT_CARRY_SNAPSHOT = ${JSON.stringify(snapshot, null, 2)};\n`;
   const normalizedLegacy = buildSnapshotCandidate(root, { existingSource: legacyEnvelope, now: new Date("2026-08-24T04:00:00+08:00") });
   assert(normalizedLegacy.updated && normalizedLegacy.source === first.source,

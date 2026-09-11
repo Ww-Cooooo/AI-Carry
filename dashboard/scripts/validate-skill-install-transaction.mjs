@@ -149,6 +149,18 @@ try {
     && existsSync(resolve(root, ".assistant-local/skills/shared-checklist/SKILL.md")),
   "an injected local failure was not contained and rolled back without harming the existing Skill");
 
+  const displayFaultSource = resolve(root, "display-fault-source");
+  skill(displayFaultSource, "display-fault-skill", "The installed Skill must remain usable if the display refresh fails.");
+  const displayFaultPreview = prepareSkillInstall(root, displayFaultSource);
+  const displayFault = confirmSkillInstall(root, displayFaultPreview.confirmationRef, "安装", {
+    syncSnapshot: () => { throw new Error("synthetic display refresh failure"); },
+  });
+  assert(displayFault.decision === "skill-install-complete-snapshot-refresh-pending"
+    && existsSync(resolve(root, ".assistant-local/skills/display-fault-skill/SKILL.md"))
+    && readFileSync(resolve(root, "instance/skills/requirements.toml"), "utf8").includes("display-fault-skill")
+    && readFileSync(resolve(root, ".assistant-local/skills/shared-checklist/SKILL.md")).equals(upgradedSkillBytes),
+  "a display refresh fault revoked the new Skill or damaged the existing one");
+
   complete = true;
   console.log("Skill install transaction passed natural host-confirmed install/upgrade, unresolved-reply no-write, idempotence, conflict isolation and rollback without package execution.");
 } finally {

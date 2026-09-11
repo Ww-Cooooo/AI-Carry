@@ -100,6 +100,30 @@ function reuseStopRequestedForEntry(userSignal, entryPhrases) {
   });
 }
 
+function requestsExcludedScope(signal, phrase) {
+  const excludedText = normalizeMatchText(phrase);
+  if (excludedText.length < 2) return false;
+  let remainingMentions = normalizeMatchText(signal).split(excludedText).length - 1;
+  // An action explicitly prohibited in its own clause is not requested scope:
+  // “continue the task; do not send externally” must still find the local task.
+  // Only recognise direct prohibitions. Ambiguous, double-negative or mixed
+  // requests keep the exclusion; this does not rewrite the original instruction
+  // or authorise any action. Check every mention, not just the first one.
+  for (const clause of signal.split(clauseBoundary)) {
+    const normalized = normalizeMatchText(clause);
+    for (let offset = normalized.indexOf(excludedText); offset !== -1;
+      offset = normalized.indexOf(excludedText, offset + excludedText.length)) {
+      const prefix = normalized.slice(0, offset);
+      const prohibition = /(?:不要|请勿|切勿|禁止|不得|不准|不必|无需|不需要|别)(?:再|继续|自动|直接|擅自)?$|(?:donot|dont|mustnot|never)(?:automatically|directly)?$/u.exec(prefix);
+      if (!prohibition || automaticReuseStopSignal.test(phrase)
+        || /(?:不|没|无|别|非|donot|dont|isnot|isnt|never|cannot|cant|without)/u.test(prefix.slice(0, prohibition.index))) return true;
+      remainingMentions -= 1;
+    }
+  }
+  // Keep the original conservative match for mentions spanning punctuation.
+  return remainingMentions > 0;
+}
+
 export function rankRetrievalEntries(entries, request, { limit = 3, lifecyclePriority = () => 0 } = {}) {
   // The public callers keep the default model-visible cap of three. A trusted
   // route adapter may request more metadata-only ranked rows so invalid top
@@ -108,22 +132,15 @@ export function rankRetrievalEntries(entries, request, { limit = 3, lifecyclePri
   const userSignal = request.query;
   const hintSignals = request.hints;
   const workSignals = request.workSignals ?? Object.freeze([]);
-  const userNormalized = normalizeMatchText(userSignal);
   const ranked = [];
   for (const entry of entries) {
     const excludes = Array.isArray(entry.excludes) ? entry.excludes : [];
-    // User exclusions can remove a match. Verified work-context exclusions
+    // Requested excluded scope can remove a match. Work-context exclusions
     // prevent reuse, but keep metadata visible for diagnosis or correction.
     // Intent rewrites alone must never suppress a user-grounded match.
-    const excluded = Boolean(userNormalized) && excludes.some((phrase) => {
-      const normalized = normalizeMatchText(phrase);
-      return normalized.length >= 2 && userNormalized.includes(normalized);
-    });
+    const excluded = excludes.some((phrase) => requestsExcludedScope(userSignal, phrase));
     if (excluded) continue;
-    const workContextExcluded = excludes.some((phrase) => {
-      const normalized = normalizeMatchText(phrase);
-      return normalized.length >= 2 && workSignals.some((signal) => normalizeMatchText(signal).includes(normalized));
-    });
+    const workContextExcluded = excludes.some((phrase) => workSignals.some((signal) => requestsExcludedScope(signal, phrase)));
     const triggerPhrases = [...(entry.triggers ?? []), ...(entry.aliases ?? [])].filter(Boolean);
     const topicPhrases = [entry.topic_key].filter(Boolean);
     const subjectPhrases = [entry.subject_key].filter(Boolean);

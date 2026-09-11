@@ -261,7 +261,7 @@ projects_to = ["upgrade-system", "architecture-documentation"]
 [[components]]
 id = "upgrade-system"
 owner = "template-core"
-paths = ["core/guides/upgrade-guide.md", "core/protocols/UPGRADE_SESSION_ACTIVATION.md", "core/upgrade/**", "core/schemas/release-manifest.schema.md", "dashboard/scripts/upgrade-session-activation.mjs", "dashboard/scripts/validate-upgrade-session-activation.mjs", "dashboard/scripts/validate-release-authority.mjs"]
+paths = ["core/guides/upgrade-guide.md", "core/protocols/UPGRADE_SESSION_ACTIVATION.md", "core/upgrade/**", "core/schemas/release-manifest.schema.md", "dashboard/scripts/ai-carry-upgrade-cli.mjs", "dashboard/scripts/validate-ai-carry-upgrade-cli.mjs", "dashboard/scripts/validate-upgrade-local-containment.mjs", "dashboard/scripts/upgrade-session-activation.mjs", "dashboard/scripts/validate-upgrade-session-activation.mjs", "dashboard/scripts/validate-release-authority.mjs"]
 depends_on = ["identity-lifecycle", "context-routing", "asset-memory", "instance-governance", "instance-evolution-compatibility", "instance-components", "instance-professional-extensions", "instance-validation-evidence", "cross-session-signals", "instance-signal-projection", "asset-retrieval-runtime", "learning-signal-runtime", "startup-capsule-runtime", "instance-startup-capsule", "snapshot-runtime", "dashboard-snapshot-projection", "external-safety", "host-integration", "dashboard-actions", "installation-experience", "privacy-migration", "project-licensing", "open-source-community", "result-validation"]
 projects_to = ["architecture-documentation"]
 

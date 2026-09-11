@@ -117,6 +117,46 @@ const shortQueryNotExcluded = rankRetrievalEntries([{ ...retrievalEntries[0], ex
 assert(shortQueryNotExcluded.length === 1, "a short ambiguous query was hidden because it was a substring of an exclusion");
 const explicitExclusion = rankRetrievalEntries([{ ...retrievalEntries[0], excludes: ["修改原始成绩"] }], normalizeRetrievalRequest("这次我要修改原始成绩"));
 assert(explicitExclusion.length === 0, "an exclusion explicitly stated by the user remained eligible");
+// Real save/resume failure: a ban on sending swallowed the unrelated local task.
+// Apply the same distinction to autonomous work signals without changing input
+// or relaxing a genuine exclusion, an explicit opt-out, or action permissions.
+for (const [task, excludedAction, cases] of [
+  ["周末小课堂筹备", "对外发送", [
+    ["继续上次那个周末小课堂的筹备，把接下来该做的内容准备好给我看；不要对外发送。", false],
+    ["继续周末小课堂筹备但请勿自动对外发送", false],
+    ["继续周末小课堂筹备，直接对外发送。", true],
+    ["继续周末小课堂筹备，不要对外发送草稿；最后对外发送定稿。", true],
+    ["继续周末小课堂筹备，不要再问我，直接对外发送。", true],
+    ["继续周末小课堂筹备，不是不要对外发送。", true],
+    ["继续周末小课堂筹备，不要停止对外发送。", true],
+    ["继续周末小课堂筹备，不要对外发送草稿；定稿要对外，发送。", true],
+  ]],
+  ["weekend class preparation", "send externally", [
+    ["continue weekend class preparation; do not send externally.", false],
+    ["continue weekend class preparation but don't automatically send externally.", false],
+    ["continue weekend class preparation; don't ask again, send externally.", true],
+    ["continue weekend class preparation; don't forget to send externally.", true],
+  ]],
+]) {
+  const entry = { id: "task.exclusion-scope", title: task, triggers: [task], scope: [task], excludes: [excludedAction] };
+  for (const [query, excluded] of cases) {
+    const userRequest = normalizeRetrievalRequest(query);
+    const fromUser = rankRetrievalEntries([entry], userRequest);
+    assert(fromUser.length === (excluded ? 0 : 1), `user exclusion polarity was wrong: ${query}`);
+    assert(userRequest.query === query, "exclusion handling rewrote the user's actual restriction");
+    const fromWork = rankRetrievalEntries([entry], normalizeRetrievalRequest("", [], [query]));
+    assert(fromWork.length === 1 && fromWork[0].evidence.workContextExcluded === excluded,
+      `work exclusion polarity was wrong: ${query}`);
+    assert(fromWork[0].evidence.automaticScopeEvidence === !excluded,
+      "work-context exclusion did not govern automatic reuse");
+  }
+  const rejectedReuse = rankRetrievalEntries([entry], normalizeRetrievalRequest(`不要使用${task}这套方法；不要${excludedAction}`));
+  assert(rejectedReuse[0]?.evidence.reuseStopOrCorrectionRequested && !rejectedReuse[0].evidence.automaticScopeEvidence,
+    "a prohibition on external action cancelled an independent refusal to reuse the saved method");
+}
+assert(rankRetrievalEntries([{ ...retrievalEntries[0], excludes: ["不要整理成绩"] }],
+  normalizeRetrievalRequest("帮我整理学习通成绩，但不要整理成绩")).length === 0,
+"an exclusion whose own wording is negative lost its existing meaning");
 const lifecycleRanking = rankRetrievalEntries([
   ...retrievalEntries.slice(1).map((entry) => ({ ...entry, title: "学习通成绩辅助", summary: "只有很弱的成绩关联", triggers: ["成绩旁项"] })),
   retrievalEntries[0],

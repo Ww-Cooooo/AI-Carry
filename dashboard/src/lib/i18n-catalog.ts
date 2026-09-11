@@ -3,6 +3,20 @@
  * never turns this UI layer into a general-purpose translator for user assets.
  */
 export const ENGLISH_TEXT: Record<string, string> = {
+  "已暂停复制执行指令": "Action requests paused",
+  "先确认你打开的是哪一份助手": "Check which assistant this page belongs to",
+  "当前页面实际读取到的是“": "This page loaded “",
+  "尚未创建助手的空白模板": "a blank template with no assistant yet",
+  "常见原因": "Common causes",
+  "桌面上有多份入口、打开了旧书签，或者移动／复制目录后仍沿用了另一份助手的链接。": "You may have opened a different shortcut, an old bookmark, or a link left over after moving or copying a folder.",
+  "安全处理": "What to do next",
+  "请让当前 Agent 核对这个入口指向的安装目录、实例清单与看板快照；确认属于同一份助手后，再重建看板入口并重新打开。": "Ask your current Agent to check the folder, assistant identity, and dashboard data. Only rebuild and reopen the entry after confirming they belong to the same assistant.",
+  "链接里的匿名编号只用于发现开错入口，不包含助手名称、领域、个人资料或秘密，也不能当作授权凭据。": "The anonymous ID in the link only helps detect a wrong entry. It contains no assistant name, domain, personal data, or secrets, and grants no permission.",
+  "我知道了": "Got it",
+  "看板数据暂时无法读取，还不能判断是不是另一份助手，也不代表你的资料已经丢失。可以先复制只读排查请求。": "Dashboard data could not be read, so we cannot yet tell whether this is another assistant. This does not by itself mean your files are lost. Copy a read-only diagnostic request first.",
+  "复制只读排查请求": "Copy read-only diagnostic request",
+  "只读排查看板入口": "Read-only dashboard entry diagnosis",
+  "”，但浏览器入口携带的是另一份身份记录。看板内容仍可浏览；涉及执行的指令暂不复制，可以先只读排查。": "”, but the browser entry carries a different identity. You can still browse the dashboard; action requests are paused while you diagnose it read-only.",
   "部分内容暂未显示": "Some content is temporarily unavailable",
   "待办暂未完整显示": "Some to-dos are temporarily unavailable",
   "部分记录暂未显示，不能据此判断为空。请让 Agent 局部修复，其他工作仍可继续。": "Some records are unavailable, not necessarily empty. Ask the Agent to repair only the affected records; other work can continue.",

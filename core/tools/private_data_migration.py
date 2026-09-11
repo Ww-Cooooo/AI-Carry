@@ -1048,7 +1048,22 @@ def import_transaction_root(target_root: Path) -> Path:
     return root
 
 
-def recover_import_transaction(transaction_dir: Path, target_root: Path) -> str:
+def finish_import_transaction(transaction_dir: Path, cleanup_warnings: list[str]) -> None:
+    # Mark a verified commit before best-effort deletion. Even partial cleanup
+    # must never be interpreted on the next run as an interrupted data write.
+    completed = transaction_dir.with_name("completed-" + transaction_dir.name)
+    try:
+        transaction_dir.rename(completed)
+    except OSError:
+        cleanup_warnings.append(transaction_dir.name)
+        return  # The intact journal can still verify all installed bytes.
+    try:
+        shutil.rmtree(completed)
+    except OSError:
+        cleanup_warnings.append(completed.name)
+
+
+def recover_import_transaction(transaction_dir: Path, target_root: Path, cleanup_warnings: list[str] | None = None) -> str:
     manifest_path = transaction_dir / "transaction.json"
     if not manifest_path.is_file():
         raise MigrationError("import-journal-missing", "迁移写入事务缺少恢复清单；已保留现场。")
@@ -1069,7 +1084,7 @@ def recover_import_transaction(transaction_dir: Path, target_root: Path) -> str:
         for item, target, _ in entries
     )
     if all_installed:
-        shutil.rmtree(transaction_dir)
+        finish_import_transaction(transaction_dir, cleanup_warnings if cleanup_warnings is not None else [])
         return "completed"
 
     for item, target, backup in entries:
@@ -1090,17 +1105,26 @@ def recover_import_transaction(transaction_dir: Path, target_root: Path) -> str:
     return "rolled-back"
 
 
-def recover_import_transactions(target_root: Path) -> int:
+def recover_import_transactions(target_root: Path, cleanup_warnings: list[str] | None = None) -> int:
     root = import_transaction_root(target_root)
     if not root.exists():
         return 0
     recovered = 0
+    warnings = cleanup_warnings if cleanup_warnings is not None else []
     for transaction in sorted(root.iterdir()):
+        ensure_no_link_components(target_root, transaction, field="migration-transaction")
         if not transaction.is_dir():
             raise MigrationError("import-transaction-root-invalid", "迁移事务目录包含非目录对象；已保留现场。")
+        if re.fullmatch(r"completed-import-[0-9a-f]{32}", transaction.name):
+            # No recovery reads/writes to user data after a verified commit.
+            try:
+                shutil.rmtree(transaction)
+            except OSError:
+                warnings.append(transaction.name)
+            continue
         if not re.fullmatch(r"import-[0-9a-f]{32}", transaction.name):
             raise MigrationError("import-transaction-name-invalid", "迁移事务目录包含未知对象；已保留现场。")
-        recover_import_transaction(transaction, target_root)
+        recover_import_transaction(transaction, target_root, warnings)
         recovered += 1
     return recovered
 
@@ -1139,7 +1163,8 @@ def preview_import(package_path: Path, target_root: Path, *, policy_path: Path |
 
 def import_package(package_path: Path, target_root: Path, *, policy_path: Path | None = None, overwrite_conflicts: bool = False, confirmed_package_id: str | None = None) -> dict[str, Any]:
     target_root = require_root(target_root)
-    recovered_transactions = recover_import_transactions(target_root)
+    cleanup_warnings: list[str] = []
+    recovered_transactions = recover_import_transactions(target_root, cleanup_warnings)
     preview = preview_import(package_path, target_root, policy_path=policy_path)
     manifest = package_manifest(package_path)
     if preview["counts"]["conflict"] and not overwrite_conflicts:
@@ -1240,7 +1265,6 @@ def import_package(package_path: Path, target_root: Path, *, policy_path: Path |
             for plan in planned:
                 if not plan["target"].is_file() or sha256_file(plan["target"]) != plan["after_sha256"]:
                     raise MigrationError("post-import-verification-failed", "迁移写入后摘要复核失败。", details={"path": plan["restore_path"]})
-            shutil.rmtree(transaction_dir)
         except Exception as exc:
             try:
                 recover_import_transaction(transaction_dir, target_root)
@@ -1251,6 +1275,7 @@ def import_package(package_path: Path, target_root: Path, *, policy_path: Path |
                 "迁移写入中断，已恢复写入前数据。",
                 details={"category": type(exc).__name__, "installed_before_failure": installed},
             ) from exc
+        finish_import_transaction(transaction_dir, cleanup_warnings)
 
     written = len(planned)
 
@@ -1276,7 +1301,9 @@ def import_package(package_path: Path, target_root: Path, *, policy_path: Path |
         "secret_credentials_restored": False,
         "portable_paths": post_verification["portable_paths"],
         "recovered_incomplete_transactions": recovered_transactions,
-        "transaction_artifacts_remaining": 0,
+        "transaction_artifacts_remaining": len(cleanup_warnings),
+        "cleanup_warnings": cleanup_warnings,
+        "user_summary": "资料已恢复并回读通过；临时清理未完成，已恢复资料可正常使用，不需要重复导入。" if cleanup_warnings else "资料已恢复并回读通过。",
         "tool_version": TOOL_VERSION,
     }
 

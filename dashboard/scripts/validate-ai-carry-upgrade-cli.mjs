@@ -64,10 +64,10 @@ function gitBlobSha(bytes) {
 try {
   let localBoundaryRejected = false;
   try {
-    releaseBoundaryFrom(`[release_boundary]\nstatus = "local-unreleased-candidate"\nrelease_ref = "v2.0.10"\npublication_authorized = false\ninstance_replacement_authorized = false\n`);
+    releaseBoundaryFrom(`[release_boundary]\nstatus = "local-unreleased-candidate"\nrelease_ref = "v2.0.11"\npublication_authorized = false\ninstance_replacement_authorized = false\n`);
   } catch { localBoundaryRejected = true; }
   expect(localBoundaryRejected, "a local candidate release boundary could authorize instance replacement");
-  const published = releaseBoundaryFrom(`[release_boundary]\nstatus = "published-release"\nrelease_ref = "v2.0.10"\npublication_authorized = true\ninstance_replacement_authorized = true\n`);
+  const published = releaseBoundaryFrom(`[release_boundary]\nstatus = "published-release"\nrelease_ref = "v2.0.11"\npublication_authorized = true\ninstance_replacement_authorized = true\n`);
   expect(published.status === "published-release", "a published replacement boundary was not recognized");
 
   const archiveInstall = resolve(fixture, "archive-install");
@@ -83,6 +83,21 @@ try {
   write(legacyPublicClone, ".git/config", `[core]\nrepositoryformatversion = 0\n[remote "origin"]\nurl = https://github.com/Ww-Cooooo/Agent-Carry.git\n`);
   expect(inspectInstalledSourceLayout(legacyPublicClone).kind === "official-public-clone-install",
     "a clone using the redirected legacy repository address was rejected");
+  // Installed assistants can keep their own plans, host overrides and tools.
+  // These paths are not evidence that the source is a maintainer checkout.
+  const localFiles = [
+    [".planning/upgrade/task_plan.md", "Keep the user's unfinished plan.\n"],
+    ["AGENTS.override.md", "# Local assistant preferences\nPreserve my workspace.\n"],
+    ["skills-lock.json", '{"installed":[]}\n'],
+    ["dashboard/node_modules/local-tool/package.json", '{"name":"local-tool"}\n'],
+  ];
+  for (const installed of [archiveInstall, legacyPublicClone]) {
+    for (const [ref, body] of localFiles) write(installed, ref, body);
+    expect(inspectInstalledSourceLayout(installed).embeddedGit === (installed === legacyPublicClone),
+      "ordinary local task or tool files blocked an installed assistant");
+    for (const [ref, body] of localFiles) expect(readFileSync(resolve(installed, ref), "utf8") === body,
+      `source inspection changed local content: ${ref}`);
+  }
   write(publicClone, "maintainer-private/private-marker.txt", "private\n");
   let privateCloneRejected = false;
   try { inspectInstalledSourceLayout(publicClone); } catch { privateCloneRejected = true; }
@@ -96,7 +111,7 @@ try {
   const migratedManifest = migrateInstanceManifest(legacyManifest, "1.4.8", { migrateLegacyProfile: true });
   expect(migratedManifest.includes('future_vendor_field = "preserve-me"')
     && migratedManifest.includes('user_preferences_ref = "instance/profile/approved-profile.md"')
-    && migratedManifest.includes('product = "2.0.10"'),
+    && migratedManifest.includes('product = "2.0.11"'),
   "manifest migration did not preserve an unknown field while moving the legacy profile reference");
   const legacyProfileRoot = resolve(fixture, "legacy-profile-source");
   const legacyProfileCandidate = resolve(fixture, "legacy-profile-candidate");
@@ -136,7 +151,7 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
     === legacyGovernance.replace('id = "governance.memory-technology-review"', 'id = "governance.user-owned"'),
   "an unrelated governance card could be rewritten by the product-brand repair");
 
-  const releasePolicy = releasePathPolicyFrom(readFileSync(resolve(repository, "core/upgrade/release-manifest-2.0.10.toml"), "utf8"));
+  const releasePolicy = releasePathPolicyFrom(readFileSync(resolve(repository, "core/upgrade/release-manifest-2.0.11.toml"), "utf8"));
   const targetTree = {
     files: [
       { path: ".assistant-local/.gitkeep", bytes: 0 },
@@ -190,24 +205,24 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
   mkdirSync(releaseTarget);
   const releaseFiles = new Map([
     ["README.md", Buffer.from("AI Carry fixture\n")],
-    ["core/upgrade/release-manifest-2.0.10.toml", Buffer.from("release = \"2.0.10\"\n")],
+    ["core/upgrade/release-manifest-2.0.11.toml", Buffer.from("release = \"2.0.11\"\n")],
   ]);
   for (const [ref, bytes] of releaseFiles) write(releaseTarget, ref, bytes);
   const commitSha = "c".repeat(40);
   const treeSha = "d".repeat(40);
   const releaseObject = {
-    tag_name: "v2.0.10",
+    tag_name: "v2.0.11",
     draft: false,
     prerelease: false,
     id: 200,
-    html_url: "https://github.com/Ww-Cooooo/AI-Carry/releases/tag/v2.0.10",
+    html_url: "https://github.com/Ww-Cooooo/AI-Carry/releases/tag/v2.0.11",
   };
   let requestCount = 0;
   const requestJson = async (path) => {
     requestCount += 1;
-    if (path === "/releases/tags/v2.0.10") return releaseObject;
+    if (path === "/releases/tags/v2.0.11") return releaseObject;
     if (path === "/releases/latest") return releaseObject;
-    if (path === "/git/ref/tags/v2.0.10") return { object: { type: "commit", sha: commitSha } };
+    if (path === "/git/ref/tags/v2.0.11") return { object: { type: "commit", sha: commitSha } };
     if (path === "/git/ref/heads/main") throw new Error("main is moving and must not be consulted for release authority");
     if (path === `/git/commits/${commitSha}`) return { sha: commitSha, tree: { sha: treeSha } };
     if (path === `/git/trees/${treeSha}?recursive=1`) return {
@@ -283,7 +298,7 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
   try {
     await verifyOfficialAiCarryRelease({
       target: releaseTarget,
-      requestJson: async (path, label) => path === "/releases/tags/v2.0.10"
+      requestJson: async (path, label) => path === "/releases/tags/v2.0.11"
         ? { ...releaseObject, draft: true }
         : requestJson(path, label),
     });
@@ -293,7 +308,7 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
   try {
     await verifyOfficialAiCarryRelease({
       target: releaseTarget,
-      requestJson: async (path, label) => path === "/git/ref/tags/v2.0.10"
+      requestJson: async (path, label) => path === "/git/ref/tags/v2.0.11"
         ? { object: { type: "tag", sha: "e".repeat(40) } }
         : requestJson(path, label),
     });
@@ -326,11 +341,11 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
   expect(vagueReply.decision === "ai-carry-upgrade-confirmation-unverified" && vagueReply.updated === false,
     "a vague or pre-preview reply could authorize writes");
 
-  const releaseManifestSource = readFileSync(resolve(repository, "core/upgrade/release-manifest-2.0.10.toml"), "utf8");
+  const releaseManifestSource = readFileSync(resolve(repository, "core/upgrade/release-manifest-2.0.11.toml"), "utf8");
   const supportedSources = JSON.parse(/^from_versions\s*=\s*(\[[^\n]*\])/mu.exec(releaseManifestSource)?.[1] ?? "null");
-  expect(Array.isArray(supportedSources) && ["1.4.8", "1.4.9", "2.0.0", "2.0.1", "2.0.2", "2.0.3", "2.0.4", "2.0.5", "2.0.6", "2.0.7", "2.0.8", "2.0.9"]
+  expect(Array.isArray(supportedSources) && ["1.4.8", "1.4.9", "2.0.0", "2.0.1", "2.0.2", "2.0.3", "2.0.4", "2.0.5", "2.0.6", "2.0.7", "2.0.8", "2.0.9", "2.0.10"]
     .every((version) => supportedSources.includes(version)),
-  "a supported older version is missing from the direct 2.0.10 upgrade sources");
+  "a supported older version is missing from the direct 2.0.11 upgrade sources");
   const dashboardActions = JSON.parse(readFileSync(resolve(repository, "dashboard/src/generated/dashboard-actions.json"), "utf8"));
   expect(validateUpgradeRuntimeContract(releaseManifestSource, dashboardActions).action_id === "instance.upgrade-template",
     "the generated dashboard action and release manifest did not close the runtime reentry contract");

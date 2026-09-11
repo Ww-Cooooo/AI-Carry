@@ -192,8 +192,11 @@ const acceptedPublicGitOrigins = new Set([
 ]);
 
 export function inspectInstalledSourceLayout(source) {
-  for (const ref of ["maintainer-private", "AGENTS.override.md", ".planning", "skills-lock.json", "dashboard/node_modules"]) {
-    if (existsSync(resolve(source, ...ref.split("/")))) fail("source is a private or development tree, not an installed public AI Carry");
+  // A pure release package and an installed assistant have different owners.
+  // Local plans, host overrides and installed tools stay outside the product
+  // write set; their presence says nothing about the assistant's identity.
+  if (existsSync(resolve(source, "maintainer-private"))) {
+    fail("source contains maintainer-private and is a maintainer tree; choose the installed assistant as the upgrade source, without deleting or moving this directory");
   }
   const gitRoot = resolve(source, ".git");
   if (!existsSync(gitRoot)) return Object.freeze({ kind: "archive-install", embeddedGit: false });
@@ -223,14 +226,15 @@ function validateSource(source) {
   const instance = manifestIdentity(source, "source", { allowLegacyProfileReadme: true });
   if (assistant.version !== instance.version) fail("source assistant and instance versions disagree");
   if (instance.version === TARGET_VERSION && assistant.productId === PRODUCT_IDENTITY.productId) {
-    validateInstalledCurrentHealth(source, instance);
-    return Object.freeze({ assistant, instance, sourceLayout, alreadyCurrent: true });
+    validateInstalledCurrentCore(source, instance);
+    return Object.freeze({ assistant, instance, sourceLayout, alreadyCurrent: true,
+      snapshotHealth: inspectInstalledSnapshot(source, instance) });
   }
   if (!DIRECT_SOURCE_VERSIONS.has(instance.version)) fail(`source version ${instance.version} is not a direct ${TARGET_VERSION} source`);
   return Object.freeze({ assistant, instance, sourceLayout, alreadyCurrent: false });
 }
 
-function validateInstalledCurrentHealth(source, instance) {
+function validateInstalledCurrentCore(source, instance) {
   if (instance.validated.legacyProfileMigrationRequired) fail("current AI Carry still uses the legacy profile README as user content");
   if (inspectStartupCapsule(source).decision !== "startup-capsule-valid") fail("current AI Carry startup capsule is invalid");
   const capsule = parseSectionedToml(readUtf8(resolve(source, "instance/startup-capsule.toml"), "current AI Carry startup capsule", 16 * 1024), "current AI Carry startup capsule")[""] ?? {};
@@ -239,15 +243,26 @@ function validateInstalledCurrentHealth(source, instance) {
     || capsule.instance_id !== instance.instanceId || core.core_id !== PRODUCT_IDENTITY.coreId || core.version !== TARGET_VERSION) {
     fail("current AI Carry startup or core product identity is incomplete");
   }
-  const publicBytes = readFileSync(resolve(source, "dashboard/public/snapshot.js"));
-  const distBytes = readFileSync(resolve(source, "dashboard/dist/snapshot.js"));
-  if (Buffer.compare(publicBytes, distBytes) !== 0) fail("current AI Carry snapshot pair differs");
-  const snapshot = parseCurrentSnapshotEnvelope(publicBytes.toString("utf8"), "current AI Carry snapshot");
-  validateSnapshotSemantics(snapshot, "current AI Carry snapshot");
-  if (snapshot.overview?.product !== PRODUCT_IDENTITY.productName
-    || snapshot.meta?.product_version !== TARGET_VERSION
-    || snapshot.meta?.identity_ref !== (instance.state === "template" ? "template" : `ac-${sha256(Buffer.from(instance.instanceId, "utf8")).slice(0, 12)}`)) {
-    fail("current AI Carry identity closure is incomplete");
+}
+
+function inspectInstalledSnapshot(source, instance) {
+  try {
+    const publicBytes = readFileSync(resolve(source, "dashboard/public/snapshot.js"));
+    const distBytes = readFileSync(resolve(source, "dashboard/dist/snapshot.js"));
+    if (!publicBytes.equals(distBytes)) fail("current AI Carry snapshot pair differs");
+    const snapshot = parseCurrentSnapshotEnvelope(publicBytes.toString("utf8"), "current AI Carry snapshot");
+    validateSnapshotSemantics(snapshot, "current AI Carry snapshot");
+    if (snapshot.overview?.product !== PRODUCT_IDENTITY.productName
+      || snapshot.meta?.product_version !== TARGET_VERSION
+      || snapshot.meta?.identity_ref !== (instance.state === "template" ? "template" : `ac-${sha256(Buffer.from(instance.instanceId, "utf8")).slice(0, 12)}`)) {
+      fail("current AI Carry snapshot identity is incomplete");
+    }
+    return Object.freeze({ snapshotState: "current", snapshotWarning: "" });
+  } catch (error) {
+    // Report the cache failure separately; it cannot veto a valid new core or
+    // the current conversation's adoption of that core. No repair is implied.
+    return Object.freeze({ snapshotState: "pending", snapshotWarning: String(error?.message ?? error).slice(0, 500),
+      snapshotRefreshCommand: `node ${q(resolve(source, "dashboard/scripts/sync-snapshot.mjs"))} ${q(source)}` });
   }
 }
 
@@ -354,7 +369,9 @@ function validateTarget(target, sourceVersion) {
   const releaseBoundary = releaseBoundaryFrom(releaseSource);
   const releasePathPolicy = releasePathPolicyFrom(releaseSource);
   for (const guide of exactInstanceGuides) if (!existsSync(resolve(target, ...guide.split("/")))) fail(`target lacks ${guide}`);
-  validateInstalledCurrentHealth(target, instance);
+  validateInstalledCurrentCore(target, instance);
+  const targetSnapshot = inspectInstalledSnapshot(target, instance);
+  if (targetSnapshot.snapshotState !== "current") fail(`target snapshot is invalid: ${targetSnapshot.snapshotWarning}`);
   return Object.freeze({ assistant, instance, releaseRef, releaseBoundary, releasePathPolicy });
 }
 
@@ -436,15 +453,6 @@ function validateCurrentSessionReentry(sourceArgument, transactionRef, expectedI
     fail("rollback package does not close over the previewed file transaction");
   }
 
-  const publicBytes = readFileSync(resolve(source, "dashboard/public/snapshot.js"));
-  const distBytes = readFileSync(resolve(source, "dashboard/dist/snapshot.js"));
-  if (Buffer.compare(publicBytes, distBytes) !== 0) fail("session reentry snapshot pair differs");
-  const snapshot = parseCurrentSnapshotEnvelope(publicBytes.toString("utf8"), "session reentry snapshot");
-  validateSnapshotSemantics(snapshot, "session reentry snapshot");
-  if (snapshot.overview?.product !== PRODUCT_IDENTITY.productName || snapshot.meta?.product_version !== TARGET_VERSION) {
-    fail("session reentry snapshot does not expose the current AI Carry identity");
-  }
-
   const actions = JSON.parse(readUtf8(resolve(source, "dashboard/src/generated/dashboard-actions.json"), "session reentry actions", 2 * 1024 * 1024));
   const releaseManifestSource = readUtf8(resolve(source, `core/upgrade/release-manifest-${TARGET_VERSION}.toml`), "session reentry release manifest", 512 * 1024);
   validateUpgradeRuntimeContract(releaseManifestSource, actions);
@@ -454,11 +462,13 @@ function validateCurrentSessionReentry(sourceArgument, transactionRef, expectedI
     executable: false,
     updated: false,
     completionState: "session-observation-required",
+    ...installed.snapshotHealth,
     adoptionEvidence: Object.freeze({
       targetPackageBoundaryValidated: true,
       filesInstalled: true,
       instanceSwitched: true,
       targetRuntimeFilesValidated: true,
+      snapshotCurrent: installed.snapshotHealth.snapshotState === "current",
       sessionActivated: false,
       behaviorAccepted: false,
     }),
@@ -466,8 +476,8 @@ function validateCurrentSessionReentry(sourceArgument, transactionRef, expectedI
     scriptsExecuted: false,
     dependenciesInstalled: false,
     networkUsed: false,
-    claimLimit: "这只证明已切换根中的目标启动闭包、双快照、升级入口和同次回滚包可读；本地文件工具不能证明宿主已经把新版规则加载进当前会话，也不能把静态字符串当成真实代表行为。dashboard/package.json 中的开发、构建和发布 check:* 不属于已安装实例的升级验收。",
-    userSummary: `AI Carry ${TARGET_VERSION} 的文件事务与目标运行入口已经回读通过；当前会话采用和代表行为仍由宿主实际运行事实决定，工具没有自报通过。`,
+    claimLimit: "这只证明已切换根中的目标启动闭包、升级入口和同次回滚包可读；双快照状态另报，不作为接续新版规则的前提。本地文件工具不能证明宿主已经把新版规则加载进当前会话，也不能把静态字符串当成真实代表行为。dashboard/package.json 中的开发、构建和发布 check:* 不属于已安装实例的升级验收。",
+    userSummary: `AI Carry ${TARGET_VERSION} 的文件事务与目标运行入口已经回读通过；当前会话采用和代表行为仍由宿主实际运行事实决定，工具没有自报通过。${installed.snapshotHealth.snapshotState === "pending" ? "看板数据仍待修复，请按返回命令单独处理，不妨碍当前对话接续新版。" : ""}`,
     nextStep: "当前对话继续原工作，或由宿主完成一项与用户当前目标相关的无破坏代表行为；不要新建专门测试任务，也不要在实例中运行开发仓库 check:* 全集。宿主不能原地重载时，下一次自然打开会读取新版入口。",
   });
 }
@@ -880,9 +890,8 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
       "dashboard/public/snapshot.js",
       "dashboard/dist/snapshot.js",
     ]);
-    const staticPaths = sourceState.instance.state === "instance"
-      ? writePaths.filter((path) => !instanceDerived.has(path))
-      : writePaths;
+    const staticPaths = writePaths.filter((path) => !snapshotPaths.has(path)
+      && (sourceState.instance.state !== "instance" || !instanceDerived.has(path)));
     const currentStatic = snapshotPathStates(source, staticPaths, "current installed product paths");
     const targetByPath = new Map(targetTree.files.map((item) => [item.path, item]));
     for (const entry of currentStatic.entries) {
@@ -894,13 +903,16 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
     return Object.freeze({
       decision: "ai-carry-upgrade-already-current", executable: false, updated: false,
       productVersion: TARGET_VERSION, instanceId: sourceState.instance.instanceId,
+      ...sourceState.snapshotHealth,
       officialEvidence, targetTreeFingerprint: targetTree.fingerprint,
       verifiedStaticProductFileCount: staticPaths.length,
       authorityVerified: verifyOfficial, networkUsed: verifyOfficial,
       userSummary: verifyOfficial
         ? `这份助手已经通过正式 Release 与固定目标整树回读，是 AI Carry ${TARGET_VERSION}；本次没有重复改文件、刷新时间或生成候选。`
         : `这份助手已经是 AI Carry ${TARGET_VERSION}；本次只核对本地目标与已安装产品，没有联网或重复改文件。`,
-      nextStep: "可以继续原来的工作；如果只是看板显示旧状态，让 Agent 重新读取本地快照。",
+      nextStep: sourceState.snapshotHealth.snapshotState === "current"
+        ? "可以继续原来的工作；本次不需要重复升级。"
+        : "产品已是当前版本，但看板数据待修复；让 Agent 执行返回的 snapshotRefreshCommand 定向重建，普通工作和新版规则接续不必等待。",
     });
   }
   const platformMetadata = validatePlatformMetadata(source, writePaths);
@@ -976,7 +988,7 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
   if (reviewRequired) return Object.freeze({
     decision: "ai-carry-upgrade-review-required", executable: false, updated: false,
     ...common,
-    nextStep: "只核对预览指出的工作区登记或组件状态；修复后重新运行 prepare。旧实例、普通对话和其他能力继续可用。",
+    nextStep: "只核对旧个人档案与 approved-profile.md 的内容冲突；保留两份原文，确定正确归属后再生成升级预览。旧实例、普通对话和其他能力继续可用。",
   });
   return Object.freeze({
     decision: "ai-carry-upgrade-confirmation-required", executable: false,
@@ -1088,7 +1100,7 @@ function applyUpgradeWithHostConfirmation(sourceArgument, targetArgument, confir
         : "AI Carry 核心产品已经安全切换，实例与用户内容保持；看板刷新暂未完成，但不会撤销有效升级或影响普通对话。",
       nextStep: snapshotState === "current"
         ? "执行本次返回的 sessionReentryCommand 核对目标运行入口；随后继续当前工作或完成一项相关的无破坏代表行为。不要在实例中运行开发仓库 check:* 全集；会话采用和行为结果必须来自宿主真实事实，不能手填 passed。"
-        : "先执行 snapshotRefreshCommand 只重试看板刷新；成功后再执行 sessionReentryCommand。其他能力可以继续使用。",
+        : "执行 sessionReentryCommand 接续已经有效的新核心；另用 snapshotRefreshCommand 只重试看板刷新。看板待修复不妨碍普通工作，但不能宣称升级全部完成。",
       derived,
     });
   } catch (error) {

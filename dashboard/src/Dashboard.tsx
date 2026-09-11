@@ -233,11 +233,7 @@ export default function Dashboard() {
     if (!dashboardIdentity.mismatch) setIdentityIssueOpen(false);
   }, [dashboardIdentity]);
 
-  const requestCopy = useCallback(async (text: string, label: string) => {
-    if (dashboardIdentity.mismatch) {
-      setIdentityIssueOpen(true);
-      return;
-    }
+  const copyRequest = useCallback(async (text: string, label: string) => {
     const localizedRequest = localizeAgentRequest(text);
     try {
       await navigator.clipboard.writeText(localizedRequest);
@@ -245,7 +241,20 @@ export default function Dashboard() {
     } catch {
       setCopyState({ open: true, copied: false, text: localizedRequest, label });
     }
-  }, [dashboardIdentity.mismatch]);
+  }, []);
+
+  const requestCopy = useCallback(async (text: string, label: string) => {
+    if (dashboardIdentity.mismatch) {
+      setIdentityIssueOpen(true);
+      return;
+    }
+    await copyRequest(text, label);
+  }, [dashboardIdentity.mismatch, copyRequest]);
+
+  const requestIdentityDiagnosis = () => {
+    setIdentityIssueOpen(false);
+    void copyRequest("我的 AI Carry 看板提示数据不可用或入口身份不一致。请先只读核对：当前对话加载的是哪份助手、我打开的看板属于哪个目录、实例清单与快照能否对应。看板地址不清楚时先问我，不扫描其他实例，也不把地址栏当作授权。只报告原因、影响和建议，不修改文件、不升级、不导入、不重新实例化。普通对话和无关工作继续。", "只读排查看板入口");
+  };
 
   const currentNav = NAV_ITEMS.find((item) => item.page === route.page) ?? NAV_ITEMS[0];
   const localStatus = getSnapshotStatus(refreshError);
@@ -452,7 +461,9 @@ export default function Dashboard() {
             </div>
             <DialogTitle>先确认你打开的是哪一份助手</DialogTitle>
             <DialogDescription>
-              当前页面实际读取到的是“{profile.state === "instance" ? profile.displayName : "尚未创建助手的空白模板"}”，但浏览器入口携带的是另一份身份记录。看板内容仍可浏览，任何会交给 Agent 执行的指令都不会复制。
+              {profile.state === "snapshot-unavailable"
+                ? "看板数据暂时无法读取，还不能判断是不是另一份助手，也不代表你的资料已经丢失。可以先复制只读排查请求。"
+                : <>当前页面实际读取到的是“{profile.state === "instance" ? profile.displayName : "尚未创建助手的空白模板"}”，但浏览器入口携带的是另一份身份记录。看板内容仍可浏览；涉及执行的指令暂不复制，可以先只读排查。</>}
             </DialogDescription>
           </DialogHeader>
 
@@ -472,6 +483,7 @@ export default function Dashboard() {
           </p>
 
           <DialogFooter>
+            <Button className="control-button" onClick={requestIdentityDiagnosis}><ClipboardCopy size={15} />复制只读排查请求</Button>
             <Button className="control-button" onClick={() => setIdentityIssueOpen(false)}>我知道了</Button>
           </DialogFooter>
         </DialogContent>

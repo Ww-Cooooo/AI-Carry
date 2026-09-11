@@ -1,7 +1,7 @@
 {
   "name": "ai-carry-dashboard",
   "private": true,
-  "version": "2.0.10",
+  "version": "2.0.11",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -29,7 +29,7 @@
     "check:proactive-learning": "node scripts/validate-proactive-learning-guidance.mjs",
     "check:task-closeout": "node scripts/validate-task-closeout-contract.mjs",
     "check:upgrade-session": "node scripts/validate-upgrade-session-activation.mjs",
-    "check:upgrade-cli": "node scripts/validate-ai-carry-upgrade-cli.mjs",
+    "check:upgrade-cli": "node scripts/validate-ai-carry-upgrade-cli.mjs && node scripts/validate-upgrade-local-containment.mjs",
     "check:release-authority": "node scripts/validate-release-authority.mjs",
     "check:product-identity": "node scripts/validate-product-identity-contract.mjs",
     "check:brand-residuals": "node scripts/validate-brand-residuals.mjs",

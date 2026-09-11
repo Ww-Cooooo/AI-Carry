@@ -14,9 +14,16 @@ import { synchronizeSnapshotPair } from "./snapshot-sync-transaction.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(process.argv[2] ?? resolve(here, "..", ".."));
 const targets = [resolve(root, "dashboard", "public", "snapshot.js"), resolve(root, "dashboard", "dist", "snapshot.js")];
-const currentInfo = await lstat(targets[0]);
-if (currentInfo.isSymbolicLink() || !currentInfo.isFile()) throw new Error("Current public snapshot must be a physical regular file.");
-const existingSource = (await readFile(targets[0])).toString("utf8");
+let existingSource = "";
+try {
+  const currentInfo = await lstat(targets[0]);
+  if (currentInfo.isSymbolicLink() || !currentInfo.isFile()) throw new Error("Current public snapshot must be a physical regular file.");
+  existingSource = (await readFile(targets[0])).toString("utf8");
+} catch (error) {
+  // A missing cache is a reason to rebuild, not a missing source of truth.
+  // Unsafe paths, permission failures and other I/O errors still stay visible.
+  if (error.code !== "ENOENT") throw error;
+}
 const candidate = buildSnapshotCandidate(root, { existingSource, mode: "operational" });
 const sourceBytes = Buffer.from(candidate.source, "utf8");
 const validateBytes = (bytes, label) => validateSnapshotSemantics(parseCurrentSnapshotEnvelope(bytes.toString("utf8"), label), label);
