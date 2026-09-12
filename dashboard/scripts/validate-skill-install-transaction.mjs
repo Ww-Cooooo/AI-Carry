@@ -23,7 +23,8 @@ const snapshotStub = () => ({ decision: "snapshot-pair-installed", byte_identica
 try {
   write(root, "instance/manifest.toml", "schema_version = 1\ninstance_id = \"ac-skill-install-fixture\"\nstate = \"active\"\n");
   write(root, "instance/skills/requirements.toml", "schema_version = 1\ninstance_id = \"template\"\ngenerated_at = \"\"\nstatus = \"scan-after-instantiation\"\n");
-  write(root, ".assistant-local/skills/.gitkeep", "");
+  // Start like a genuinely fresh instance: there is no local install parent.
+  assert(!existsSync(resolve(root, ".assistant-local/skills")), "fixture pre-created the first-install directory");
 
   // 1. A ready source only creates a local preview receipt; it does not install,
   // execute scripts, or alter the formal requirements map before confirmation.
@@ -36,7 +37,7 @@ try {
   const prepared = prepareSkillInstall(root, source, { platform: "fixture-host" });
   assert(prepared.decision === "skill-install-confirmation-required" && prepared.userPreview.includes("如果同意，请回复“安装”")
     && prepared.confirmCommand.includes("--user-reply"), "a ready Skill did not produce one exact novice-facing confirmation path");
-  assert(!existsSync(resolve(root, ".assistant-local/skills/shared-checklist"))
+  assert(!existsSync(resolve(root, ".assistant-local/skills"))
     && readFileSync(resolve(root, "instance/skills/requirements.toml")).equals(requirementsBefore)
     && !existsSync(marker), "prepare installed, registered, or executed the package");
 
@@ -164,6 +165,7 @@ try {
   complete = true;
   console.log("Skill install transaction passed natural host-confirmed install/upgrade, unresolved-reply no-write, idempotence, conflict isolation and rollback without package execution.");
 } finally {
-  if (complete) rmSync(root, { recursive: true, force: true });
+  if (complete && !process.argv.includes("--keep-fixture")) rmSync(root, { recursive: true, force: true });
+  else if (complete) console.log(`Skill installation test evidence kept at ${root}`);
   else console.error(`Skill installation failure evidence kept at ${root}`);
 }

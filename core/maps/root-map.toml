@@ -23,7 +23,7 @@ map = "core/maps/evolution-model.toml"
 [[categories]]
 id = "local-operations"
 label = "安装、宿主接入、本地迁移、看板与平台适配"
-triggers = ["安装AI Carry", "GitHub链接安装", "压缩包安装", "创建桌面看板入口", "修复看板快捷方式", "新会话恢复", "接入AI Carry", "连接宿主", "换Agent", "恢复接入", "能力发现", "宿主记忆迁移", "任务回传", "打开看板", "刷新快照", "生成问题报告", "反馈问题", "哪里出问题了", "把问题发给开发者", "Git安全副本", "上传Git", "Git备份", "导入", "导出", "迁移电脑", "适配平台", "初始化Skill", "Skill工坊", "把SOP转成Skill", "把方法分享成Skill", "导出Skill", "安装别人分享的Skill", "升级Skill", "判断这个Skill能不能装"]
+triggers = ["安装AI Carry", "GitHub链接安装", "压缩包安装", "创建桌面看板入口", "打开客户端", "安装客户端", "修复两个桌面入口", "修复看板快捷方式", "新会话恢复", "接入AI Carry", "连接宿主", "换Agent", "恢复接入", "能力发现", "宿主记忆迁移", "任务回传", "打开看板", "刷新快照", "生成问题报告", "反馈问题", "哪里出问题了", "把问题发给开发者", "Git安全副本", "上传Git", "Git备份", "导入", "导出", "迁移电脑", "适配平台", "初始化Skill", "Skill工坊", "把SOP转成Skill", "把方法分享成Skill", "导出Skill", "安装别人分享的Skill", "升级Skill", "判断这个Skill能不能装"]
 map = "core/maps/local-operations.toml"
 
 [[categories]]

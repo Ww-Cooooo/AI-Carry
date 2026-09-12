@@ -17,6 +17,8 @@ const inventoryPath = resolve(outputDirectory, 'dashboard-production-dependencie
 const noticesPath = resolve(outputDirectory, 'dashboard-production-dependencies.txt')
 const checkOnly = process.argv.includes('--check')
 const licenseOverrides = new Map([
+  ['gsap@3.15.0', [{filename: 'GSAP Standard License (official website)', path: resolve(dashboardRoot, 'license-overrides', 'GSAP-standard-license.txt')}]],
+  ['@gsap/react@2.1.2', [{filename: 'GSAP Standard License (official website)', path: resolve(dashboardRoot, 'license-overrides', 'GSAP-standard-license.txt')}]],
   [
     'react-remove-scroll-bar@2.3.8',
     [

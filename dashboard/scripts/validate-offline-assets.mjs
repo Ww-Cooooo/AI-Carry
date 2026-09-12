@@ -1,3 +1,4 @@
+import {checkPackagedFonts} from './packaged-fonts.mjs';
 // Post-build assertion for the actual file:// deliverable. This is intentionally
 // a developer/build check only; end users still open dashboard.html directly.
 
@@ -65,32 +66,7 @@ for (const style of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-assert(manifest.schemaVersion === 1, 'Unsupported font manifest schema.')
-assert(Array.isArray(manifest.fonts) && manifest.fonts.length === 4, 'Font manifest must describe the four packaged faces.')
-
-for (const font of manifest.fonts) {
-  const fontPath = resolve(dirname(manifestPath), font.file)
-  const bytes = await readFile(fontPath)
-  assert(bytes.length > 0, `Packaged font is empty: ${font.file}`)
-  assert(sha256(bytes) === font.sha256, `Font checksum mismatch: ${font.file}`)
-  assert(html.includes(`url(./fonts/${font.file})`), `Offline CSS does not reference packaged font: ${font.file}`)
-
-  const licensePath = resolve(dirname(manifestPath), font.licenseFile)
-  const license = await readFile(licensePath, 'utf8')
-  assert(/SIL OPEN FONT LICENSE Version 1\.1/i.test(license), `OFL 1.1 text is missing for ${font.family}.`)
-  assert(font.licenseSpdx === 'OFL-1.1', `SPDX OFL-1.1 identifier is missing for ${font.family}.`)
-  assert(Boolean(font.copyright), `Copyright metadata is missing for ${font.family}.`)
-  assert(
-    sha256(Buffer.from(license.replace(/\r\n/g, '\n').trim())) === font.licenseSha256,
-    `Font license checksum mismatch: ${font.file}`,
-  )
-  assert(font.conversionValidation?.nameTableMetadataMatched === true, `Font metadata preservation is unverified: ${font.file}`)
-  assert(
-    font.conversionValidation?.sourceGlyphCount === font.conversionValidation?.outputGlyphCount &&
-      font.conversionValidation?.sourceUnicodeMappingCount === font.conversionValidation?.outputUnicodeMappingCount,
-    `Font conversion changed glyph or cmap coverage: ${font.file}`,
-  )
-}
+await checkPackagedFonts(resolve(dist, 'fonts'), manifest, html)
 
 const legacyFonts = ['InterVariable.woff2', 'JetBrainsMono-Regular.woff2', 'JetBrainsMono-Medium.woff2', 'JetBrainsMono-Bold.woff2']
 const distributedFonts = await readdir(resolve(dist, 'fonts'))

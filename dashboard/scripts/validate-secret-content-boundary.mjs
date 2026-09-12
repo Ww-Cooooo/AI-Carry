@@ -43,13 +43,15 @@ const windowsProfilePattern = /\b[A-Za-z]:[\\/]+Users[\\/]+([^\\/\s`"'<>]+)/giu;
 const posixHomePattern = /\/home\/([^/\s`"'<>]+)/giu;
 const remoteWebUrlPattern = /https?:\/\/[^\s<>"'`]+/giu;
 const publicProfilePlaceholders = new Set(["...", "alice", "bob", "example", "someone", "somebody", "user", "username", "yourname", "某人"]);
-const bundledFontNames = new Set([
-  "NotoSansMonoCJKsc-Bold.woff2", "NotoSansMonoCJKsc-Regular.woff2",
-  "NotoSansSC-Variable.woff2", "SpaceGrotesk-Variable.woff2",
+const bundledFontDigests = new Map([
+  ['MiSans-Regular.woff2','d704c1a932c0bd7e8a071d276cd81c0ed0c9fecfa26ac234f4bed0559fe1cb2d'],
+  ['MiSans-Medium.woff2','44e28ca6c2f0ca79829f192831ef87b5eec7c464f5cfb7a83467f57bb6e58114'],
+  ['MiSans-Semibold.woff2','78227c6ec59566785c65ac0b5312328bfa2f879918f3d7403725785615a9a8f6'],
+  ['MiSans-License.pdf','4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86'],
 ]);
 
 const projectAssetInventory = "docs/assets/project-assets.json";
-const reviewedImagePath = /^docs\/readme-assets\/dashboard-empty\.(?:en|zh)\.png$/u;
+const reviewedImagePath = /^(?:docs\/readme-assets\/dashboard-empty\.(?:en|zh)\.png|dashboard\/src\/app\/assets\/(?:ai-carry-tv-blue|knowledge-bag)\.png|dashboard\/dist\/assets\/(?:ai-carry-tv-blue|knowledge-bag)-[\w-]+\.png|dashboard\/(?:dist|public)\/ai-carry\.ico|desktop\/icon\.(?:png|ico|icns))$/u;
 const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 function reviewedImages(files, findings) {
@@ -68,8 +70,9 @@ function reviewedImages(files, findings) {
 
 function approvedBinary(relativePath, bytes, images) {
   const match = relativePath.match(/^dashboard\/(?:dist|public)\/fonts\/([^/]+)$/u);
-  if (match !== null && bundledFontNames.has(match[1])) return true;
-  if (!reviewedImagePath.test(relativePath) || !bytes.subarray(0, 8).equals(pngSignature)) return false;
+  if (match !== null && bundledFontDigests.has(match[1])) return bundledFontDigests.get(match[1])===createHash('sha256').update(bytes).digest('hex');
+  const correctFormat=relativePath.endsWith('.png')?bytes.subarray(0,8).equals(pngSignature):relativePath.endsWith('.ico')?bytes.subarray(0,4).equals(Buffer.from([0,0,1,0])):relativePath.endsWith('.icns')?bytes.subarray(0,4).toString()==='icns':false;
+  if (!reviewedImagePath.test(relativePath) || !correctFormat) return false;
   const records = images.filter((asset) => asset.path === relativePath);
   return records.length === 1 && records[0].sha256 === createHash("sha256").update(bytes).digest("hex");
 }

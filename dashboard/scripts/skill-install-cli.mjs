@@ -521,6 +521,9 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
   let targetInstalled = false; let previousTargetMoved = false;
   let requirementsMoved = false; let requirementsInstalled = false;
   try {
+    // A fresh instance has no local Skill directory yet. Create only the
+    // physical parent at confirmation, not during the user's preview.
+    ensurePhysicalDirectory(root, ".assistant-local/skills");
     if (record.operation === "upgrade" || !assessment.targetAlreadyPresent) {
       const delivery = createSkillDelivery(inspection.packageRoot, { format: "folder", outputPath: paths.candidate });
       if (delivery.sourceDigest !== record.source_digest) throw new Error("候选 Skill 与预览内容摘要不一致");

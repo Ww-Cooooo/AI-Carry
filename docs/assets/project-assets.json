@@ -9,14 +9,14 @@
     },
     {
       "path": "docs/readme-assets/dashboard-empty.en.png",
-      "sha256": "36022ffe10a0c2cb966c1e0dd5ed0a5b9d8fb4f2519caf1020900164ccfa2a48",
-      "origin": "Actual 1440x920 screenshot of this project's local dashboard.en.html, version 2.0.9, uninstantiated template with zero portable items. External requests blocked; no user or maintainer-private data. Bundled third-party font notices remain in THIRD_PARTY_NOTICES.md.",
+      "sha256": "856806c113dcbb9aa533a14735587c01be23e8af90e2d164af46cae98b4ecfc2",
+      "origin": "Actual 1440x920 offline AI Carry 2.1.0 empty-template screenshot. No user or private development data; bundled MiSans attribution is retained.",
       "license": "Apache-2.0"
     },
     {
       "path": "docs/readme-assets/dashboard-empty.zh.png",
-      "sha256": "f5cd3b60fcc33d9a68c75356b17178449de080231e9a68919eb648ad6cb30caf",
-      "origin": "Actual 1440x920 screenshot of this project's local dashboard.html, version 2.0.9, uninstantiated template with zero portable items. External requests blocked; no user or maintainer-private data. Bundled third-party font notices remain in THIRD_PARTY_NOTICES.md.",
+      "sha256": "51a2380b7233ef1da87d18e4e5fb4faafe66994a48942e69cd04eb21bed4bb9f",
+      "origin": "Actual 1440x920 offline AI Carry 2.1.0 empty-template screenshot. No user or private development data; bundled MiSans attribution is retained.",
       "license": "Apache-2.0"
     },
     {
@@ -29,6 +29,60 @@
       "path": "docs/readme-assets/learning-loop.zh.svg",
       "sha256": "907649ac6d102594fb9a8c4321846d6cdf0ab02f563ef738f4320f57f29d0df7",
       "origin": "Original Chinese AI Carry learning-flow concept diagram; authored locally, no external images, fonts, scripts or user data. Animation illustrates data flow, not background execution.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "dashboard/src/app/assets/ai-carry-tv-blue.png",
+      "sha256": "b30deacc0d3e223fe6e3c049a843f54a18d43b125edbe9bdf7af01374cd104e9",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "dashboard/src/app/assets/knowledge-bag.png",
+      "sha256": "4d8d916963b1584031aba73a5475d4a9570403d9bd1f6b4cf6111c6c16102fab",
+      "origin": "Project-created approved line-drawing carry bag; no third-party images or private data.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "dashboard/dist/assets/ai-carry-tv-blue-CzLhNFXK.png",
+      "sha256": "b30deacc0d3e223fe6e3c049a843f54a18d43b125edbe9bdf7af01374cd104e9",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "dashboard/dist/assets/knowledge-bag-BFwazuLV.png",
+      "sha256": "4d8d916963b1584031aba73a5475d4a9570403d9bd1f6b4cf6111c6c16102fab",
+      "origin": "Project-created approved line-drawing carry bag; no third-party images or private data.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "dashboard/public/ai-carry.ico",
+      "sha256": "a722082bbed0d0372605144ea91de67cf3bb84c029ed7552dd8565c1b6883867",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "dashboard/dist/ai-carry.ico",
+      "sha256": "a722082bbed0d0372605144ea91de67cf3bb84c029ed7552dd8565c1b6883867",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "desktop/icon.png",
+      "sha256": "b30deacc0d3e223fe6e3c049a843f54a18d43b125edbe9bdf7af01374cd104e9",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "desktop/icon.ico",
+      "sha256": "a722082bbed0d0372605144ea91de67cf3bb84c029ed7552dd8565c1b6883867",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "desktop/icon.icns",
+      "sha256": "aa9a7f54c032a8dcc4d33881379c74fbc45a7ac26257004cebd1d5436c267e61",
+      "origin": "Blue television brand derivative authorized by the maintainer for the AI Carry product. Exported icon sizes preserve the approved artwork; no private IP source documents included.",
       "license": "Apache-2.0"
     }
   ]

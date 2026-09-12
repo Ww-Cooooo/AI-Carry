@@ -30,9 +30,9 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.0.11.zip)**　当前版本：`2.0.11`
+**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.0.zip)**　当前版本：`2.1.0`
 
-<sub>本版修复升级被本地文件误拦的问题。看板资料刷新异常时可单独排查，不再阻止有效助手接续；你的记忆、Skill 和私密资料继续保留。</sub>
+<sub>2.1.0：网页版与客户端换上同一套界面，桌面上可直接打开；点按钮复制请求，再发给你想用的 Agent。原有记忆、Skill 和私密资料继续保留。</sub>
 
 这是 GitHub 的完整源码压缩包，**已带可直接打开的看板**，不是只下载一个网页。下载后，把 ZIP 的本地路径发给 Agent，并说：
 
@@ -49,6 +49,14 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 安装后，Agent 应告诉你**看板在哪、助手是否已创建、现在可以做什么**，而不只是说“文件已下载”。已有助手请走[检查与升级](#move)，不要用 ZIP 整包覆盖。
 
 **以后怎么接着用？** 新开对话时，仍指向这份 AI Carry 目录；若宿主没有自动读取入口，就让它先读其中的 `BOOTSTRAP.md`。在其他业务项目中使用时，先让 Agent 确认能同时访问这份积累，不必一律搬动业务资料。重新打开看板后，可以在“当前状态”核对自己的助手方向；若仍显示空模板，先让 Agent 检查保存或刷新显示，不要重复创建。
+
+### 同一份积累，两个打开方式
+
+安装时，Agent 会在桌面放好 **AI Carry（网页版）** 和 **AI Carry（客户端）**。两者读取同一份助手资料；客户端还能直接选择本地文件夹和 ZIP。它不会自动连接 Agent，仍由你复制请求、粘贴发送。
+
+[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-x64.zip)
+
+客户端包不代替完整助手目录。Mac 包未签名、尚未完成 Mac 实机验收；Linux 继续使用网页版。
 
 ## 按你的情况，创建自己的助手
 

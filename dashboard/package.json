@@ -1,7 +1,7 @@
 {
   "name": "ai-carry-dashboard",
   "private": true,
-  "version": "2.0.11",
+  "version": "2.1.0",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -60,6 +60,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "gsap": "3.15.0",
+    "@gsap/react": "2.1.2",
     "@xyflow/react": "^12.11.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

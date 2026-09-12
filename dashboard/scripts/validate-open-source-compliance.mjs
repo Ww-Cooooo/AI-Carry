@@ -1,3 +1,4 @@
+import {checkPackagedFonts} from './packaged-fonts.mjs';
 // Repository-level open-source compliance gate.
 // It keeps copied source templates, packaged fonts, npm dependency licenses
 // and tracked binary assets from silently escaping the documented inventory.
@@ -527,7 +528,7 @@ const lockLicenseCounts = {}
 for (const [key, metadata] of lockEntries) {
   const license = typeof metadata.license === 'string' ? metadata.license.trim() : ''
   assert(license, `Lock entry has no SPDX license metadata: ${key}`)
-  assert(reviewedLockLicenses.has(license), `Unreviewed dependency license ${license}: ${key}`)
+  assert(reviewedLockLicenses.has(license) || (/node_modules\/(?:gsap|@gsap\/react)$/.test(key) && /https:\/\/gsap\.com\/standard-license/.test(license)), `Unreviewed dependency license ${license}: ${key}`)
   const scope = metadata.dev === true ? 'build' : 'runtime'
   lockLicenseCounts[`${scope}:${license}`] = (lockLicenseCounts[`${scope}:${license}`] ?? 0) + 1
 }
@@ -546,7 +547,7 @@ assert(
   'Production dependency inventory does not match the non-dev lock-file closure.',
 )
 for (const entry of productionInventory.packages) {
-  assert(reviewedRuntimeLicenses.has(entry.license), `Unreviewed runtime license ${entry.license}: ${entry.name}@${entry.version}`)
+  assert(reviewedRuntimeLicenses.has(entry.license) || (['gsap','@gsap/react'].includes(entry.name) && /https:\/\/gsap\.com\/standard-license/.test(entry.license)), `Unreviewed runtime license ${entry.license}: ${entry.name}@${entry.version}`)
   assert(entry.repository, `Production dependency has no upstream source: ${entry.name}@${entry.version}`)
   assert(Array.isArray(entry.licenseFiles) && entry.licenseFiles.length > 0, `Production dependency has no license text: ${entry.name}@${entry.version}`)
   assert(productionNotices.includes(`${entry.name}@${entry.version}`), `Production notice text omits ${entry.name}@${entry.version}`)
@@ -573,27 +574,8 @@ for (const component of sourceComponents.components) {
 }
 assert(licenseReadme.includes('source-code/'), 'Offline license README does not explain copied source-component notices.')
 
-assert(fontManifest.schemaVersion === 1, 'Unsupported font manifest schema.')
-assert(Array.isArray(fontManifest.fonts) && fontManifest.fonts.length === 4, 'Font manifest must contain four packaged faces.')
-const expectedFontAssets = new Set()
-for (const font of fontManifest.fonts) {
-  assert(font.licenseSpdx === 'OFL-1.1', `Font is not identified with SPDX OFL-1.1: ${font.file}`)
-  assert(font.copyright, `Font copyright is missing: ${font.file}`)
-  assert(Array.isArray(font.reservedFontNames), `Font RFN review is missing: ${font.file}`)
-  assert(font.source?.repository && !font.source.repository.includes('/main/'), `Font source is not pinned: ${font.file}`)
-  assert(font.source?.sha256 || font.source?.archiveSha256, `Font source checksum is missing: ${font.file}`)
-  const fontBytes = await readFile(resolve(publicRoot, 'fonts', font.file))
-  assert(sha256(fontBytes) === font.sha256, `Font checksum mismatch: ${font.file}`)
-  const fontLicense = normalizedText(await readFile(resolve(publicRoot, 'fonts', font.licenseFile), 'utf8'))
-  assert(sha256(fontLicense) === font.licenseSha256, `Font license checksum mismatch: ${font.file}`)
-  assert(/SIL OPEN FONT LICENSE Version 1\.1/i.test(fontLicense), `OFL 1.1 text is absent: ${font.file}`)
-  const validation = font.conversionValidation
-  assert(validation?.nameTableMetadataMatched === true, `Font metadata preservation is unverified: ${font.file}`)
-  assert(validation.sourceGlyphCount === validation.outputGlyphCount, `Font glyph count changed during conversion: ${font.file}`)
-  assert(validation.sourceUnicodeMappingCount === validation.outputUnicodeMappingCount, `Font cmap changed during conversion: ${font.file}`)
-  expectedFontAssets.add(`dashboard/public/fonts/${font.file}`)
-  expectedFontAssets.add(`dashboard/dist/fonts/${font.file}`)
-}
+const fontFiles = await checkPackagedFonts(resolve(publicRoot, 'fonts'), fontManifest)
+const expectedFontAssets = new Set(fontFiles.flatMap(file => [`dashboard/public/fonts/${file}`, `dashboard/dist/fonts/${file}`]))
 
 const repositoryInventory = await loadRepositoryInventory(repositoryRoot, distributionManifest.paths, {
   allowDependencies: allowLocalDependencies || writeDistributionManifestRequested,
@@ -629,7 +611,7 @@ for (const required of [
 ]) {
   assert(trackedSet.has(required), `Required compliance material is absent from the repository inventory: ${required}`)
 }
-const reviewableAssetPattern = /\.(?:woff2?|ttf|otf|ttc|otc|eot|svg|png|jpe?g|gif|webp|avif|ico|pdf|zip|7z|tar|gz|mp3|wav|ogg|mp4|webm|mov|wasm|glb|gltf|obj|fbx|stl|ply|usdz|hdr|exr)$/i
+const reviewableAssetPattern = /\.(?:woff2?|ttf|otf|ttc|otc|eot|svg|png|jpe?g|gif|webp|avif|ico|icns|pdf|zip|7z|tar|gz|mp3|wav|ogg|mp4|webm|mov|wasm|glb|gltf|obj|fbx|stl|ply|usdz|hdr|exr)$/i
 const trackedReviewableAssets = publicTracked.filter((path) => reviewableAssetPattern.test(path))
 const unregisteredAssets = trackedReviewableAssets.filter((path) => !expectedFontAssets.has(path) && !expectedProjectAssets.has(path))
 assert(unregisteredAssets.length === 0, `Tracked assets need provenance review: ${unregisteredAssets.join(', ')}`)

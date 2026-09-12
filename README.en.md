@@ -31,9 +31,9 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.0.11.zip)**　Current version: `2.0.11`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.0.zip)**　Current version: `2.1.0`
 
-<sub>This patch stops local instance files from being mistaken for a development checkout. Dashboard refresh faults can be diagnosed separately without blocking a valid assistant from resuming. Your memories, Skills and private files are preserved.</sub>
+<sub>New in 2.1.0: one shared web and desktop design, blue-TV desktop entries, and the same copy-to-Agent workflow. Existing memories, Skills and private files remain yours.</sub>
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -51,6 +51,14 @@ dashboard, and guide me to create my assistant. Do not overwrite anything.
 After installation, the Agent should tell you **where the dashboard is, whether your assistant has been created, and what to do next**, not merely that files were downloaded. Already have an assistant? Use [check and upgrade](#move), not a whole-folder ZIP overwrite.
 
 **How do you continue later?** Point a new conversation at the same AI Carry folder. If the host does not load its entry automatically, ask it to read `BOOTSTRAP.md` there. To use it alongside another work project, first have the Agent check access to both; you do not need to move all your work into AI Carry. Reopen the dashboard and check your assistant's direction under “Current status.” If it still shows an empty template, ask the Agent to check the saved setup or refresh the display instead of creating another assistant.
+
+### Two ways to open the same assistant
+
+The installer creates **web** and **desktop** entries. Both use the same saved materials; the desktop app adds a native folder/ZIP picker. It does not bind to an Agent or send requests automatically.
+
+[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-x64.zip)
+
+These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 
 ## Create an assistant that fits you
 

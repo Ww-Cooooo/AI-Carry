@@ -7,7 +7,8 @@ import { stableAssetId } from "./asset-route-contract.mjs";
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const skillName = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const skillVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
-const allowedRoots = new Set(["SKILL.md", "LICENSE", "LICENSE.md", "agents", "references", "scripts", "assets"]);
+// Layout alone is not trust: examples receive the same content/path inspection.
+const allowedRoots = new Set(["SKILL.md", "LICENSE", "LICENSE.md", "agents", "references", "examples", "scripts", "assets"]);
 const textExtensions = new Set([".md", ".txt", ".json", ".toml", ".yaml", ".yml", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".py", ".ps1", ".sh", ".bat", ".cmd", ".css", ".html", ".xml", ".csv", ".tsv", ".svg", ".sql", ".ini", ".cfg"]);
 const forbiddenPrivateMarkers = ["private://", ".assistant-private", ".assistant-local", "maintainer-private", "AGENTS.override.md"];
 

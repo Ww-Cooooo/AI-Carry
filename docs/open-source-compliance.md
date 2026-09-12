@@ -15,13 +15,11 @@
 
 ### 项目原创或程序化生成
 
-当前 Markdown／TOML 架构、任务协议、看板业务代码、AI Carry 品牌几何图形、内联 favicon、CSS 视觉设计以及 Three.js 行星场景由本项目形成。行星纹理、光晕、轨道和卫星在本地运行时由代码生成，不包含外部图片或模型。
-
-README 随包提供本项目原创的 SVG 品牌示意、学习流程图和中英文空模板看板截图，登记在 `docs/assets/project-assets.json`。SVG 是关系示意，不表示兼容性认证；截图来自本项目离线空模板，没有真实用户资料，所呈现的字体继续遵守随包第三方声明。未从其他项目复制品牌图片或字体。仓库当前没有随包照片、音视频、3D 模型、外部贴图、PDF 素材、WASM、闭源 SDK、付费字体或付费 UI 包。以后如果加入项目自己生成的文档截图，必须在同一清单保存页面来源、SHA-256 与项目许可证；第三方二进制素材还必须登记来源、版权、许可证和修改情况。自动门禁会拒绝未登记的二进制资产。
+本项目的 Markdown/TOML 架构、业务代码、界面、蓝色小电视品牌派生和线稿收纳包用于当前产品；旧行星代码只是历史实现，不代表当前画面。图片、图标和无个人资料的中英文空模板截图登记在 `docs/assets/project-assets.json`。MiSans 字体与许可 PDF 单独在字体清单登记。Electron 运行时只进入正式应用包，不进入源仓库，其原始版权声明随包保留。
 
 ### npm 运行依赖
 
-准确生产依赖闭包来自 `dashboard/package-lock.json` 中非开发条目。当前去重后的生产包使用 MIT、Apache-2.0、ISC、0BSD 或 BSD-3-Clause；其中 BSD-3-Clause 来自 React Flow 关系布局所需的 `d3-ease`，许可证正文随离线产物保留。准确数量由机器清单给出。机器清单与完整许可证／NOTICE 文本分别是：
+准确生产依赖闭包来自 `dashboard/package-lock.json` 中非开发条目。当前生产包主要使用 MIT、Apache-2.0、ISC、0BSD 或 BSD-3-Clause；GSAP 与 @gsap/react 另用已审查的 GSAP Standard License，不标成 Apache 或 OSI 开源；其中 BSD-3-Clause 来自 React Flow 关系布局所需的 `d3-ease`，许可证正文随离线产物保留。准确数量由机器清单给出。机器清单与完整许可证／NOTICE 文本分别是：
 
 - `dashboard/public/licenses/dashboard-production-dependencies.json`
 - `dashboard/public/licenses/dashboard-production-dependencies.txt`
@@ -39,9 +37,7 @@ README 随包提供本项目原创的 SVG 品牌示意、学习流程图和中�
 
 ### 字体
 
-当前分发三个 OFL-1.1 字体家族、四个字体面：Noto Sans SC、Space Grotesk，以及 Noto Sans Mono CJK SC Regular／Bold。`dashboard/public/fonts/font-manifest.json` 固定上游提交或 Release、原文件／压缩包摘要、产物摘要、版权、Reserved Font Name 审核、许可证摘要和转换验证结果。
-
-WOFF2 转换只进行格式压缩，不裁剪 Unicode、不修改字形。根据 OFL 对 Web 字体与 Reserved Font Name 的要求，发布前必须确认转换前后的版权、名称、版本、商标、许可证元数据、字形数量和字符映射保持一致；否则应视为修改版并重新评估命名。准确 OFL 文本随字体一起分发。
+当前分发官方 MiSans Regular、Medium、Semibold WOFF2，保持上游字节不变，适用随包小米许可。来源、原包条目与摘要见 `dashboard/public/fonts/font-manifest.json`，许可正文是同目录 MiSans-License.pdf。允许随本应用分发不等于允许单独再分发或售卖字体。
 
 ### 构建工具
 
@@ -68,7 +64,7 @@ Codex、Claude Code、DeepSeek、QoderWork 等名称只用于兼容示例。项�
 
 README 等文档中的项目截图也属于受管资产。门禁会根据 `docs/assets/project-assets.json` 核对路径、SHA-256、生成来源和 Apache-2.0 声明，避免个人实例截图或来源不明的视觉素材被顺手提交。
 
-公开内容扫描只接收已审核并在该清单登记的中英文空模板 PNG 截图，且图片必须与登记字节相符；其他未知二进制仍被拒绝。素材清单也属于固定发布来源的一部分，不能临时补写允许项绕过检查。图片新增或内容改变时仍须人工查看：登记和摘要不能证明画面没有私密信息，也不能代替许可证审查。
+公开内容扫描只接收已审核并在该清单登记的项目图像、图标和空模板截图，且图片必须与登记字节相符；其他未知二进制仍被拒绝。素材清单也属于固定发布来源的一部分，不能临时补写允许项绕过检查。图片新增或内容改变时仍须人工查看：登记和摘要不能证明画面没有私密信息，也不能代替许可证审查。
 
 门禁只证明候选符合已经编码的规则，不代替人工来源判断。新增第三方内容时应先审查再登记，不能先把未知内容加入允许集合以消除报错。
 

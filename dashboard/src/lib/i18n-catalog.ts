@@ -2,7 +2,9 @@
  * Reviewed product copy only. Unknown strings stay unchanged so AI Carry
  * never turns this UI layer into a general-purpose translator for user assets.
  */
+import {APP_ENGLISH} from './app-copy';
 export const ENGLISH_TEXT: Record<string, string> = {
+  ...APP_ENGLISH,
   "已暂停复制执行指令": "Action requests paused",
   "先确认你打开的是哪一份助手": "Check which assistant this page belongs to",
   "当前页面实际读取到的是“": "This page loaded “",

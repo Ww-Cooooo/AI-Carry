@@ -27,7 +27,10 @@ const css = (await readFile(stylePath, 'utf8'))
   // into dist/index.html, bundled fonts are one level nearer.
   .replaceAll('url(../fonts/', 'url(./fonts/')
 const js = await readFile(scriptPath, 'utf8')
-const safeInlineJs = js.replaceAll('</script', '<\\/script')
+// Imported pictures are relative to the emitted module, not the HTML page.
+// Preserve that base when moving the module inline (file:// and Electron alike).
+const moduleBase = `new URL(${JSON.stringify(scriptMatch[1])},document.baseURI).href`
+const safeInlineJs = js.replaceAll('import.meta.url', moduleBase).replaceAll('</script', '<\\/script')
 
 html = html
   // Function replacements are required: generated CSS/JS can contain `$&`,

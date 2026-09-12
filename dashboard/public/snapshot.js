@@ -4,7 +4,7 @@ window.AI_CARRY_SNAPSHOT = {
   "meta": {
     "schema_version": "1.1",
     "generated_at": "",
-    "product_version": "2.0.11",
+    "product_version": "2.1.0",
     "state": "template",
     "freshness_seconds": 86400,
     "source_digest": "template-empty",
@@ -14,7 +14,7 @@ window.AI_CARRY_SNAPSHOT = {
     "product": "AI Carry",
     "state": "template",
     "domain": "uninstantiated",
-    "startup_chars": 6173,
+    "startup_chars": 6172,
     "startup_budget": 20000
   },
   "profile": {

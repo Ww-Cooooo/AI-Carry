@@ -32,7 +32,7 @@ function countOr(value: unknown, fallback = 0): number {
 }
 
 /** 只适配显示结构，不改真源，也不把不完整条目伪装成已通过检查。 */
-function normalizeSnapshot(input: Snap): Snap {
+export function normalizeSnapshot(input: Snap): Snap {
   const next = { ...input };
   const affected = new Set<string>();
   let isolated = 0;
@@ -42,6 +42,16 @@ function normalizeSnapshot(input: Snap): Snap {
     return value.filter((item) => {
       if (isRecord(item)) return true;
       affected.add(area); isolated += 1; return false;
+    }).map(item => {
+      const row = { ...item };
+      for (const key of ['triggers', 'steps']) {
+        if (row[key] != null && (!Array.isArray(row[key]) || row[key].some((v: unknown) => typeof v !== 'string'))) { affected.add(area); isolated += 1; }
+        row[key] = stringList(row[key]);
+      }
+      for (const key of ['id', 'title', 'summary', 'purpose', 'frequency', 'body', 'source_summary']) {
+        if (row[key] != null && typeof row[key] !== 'string') { affected.add(area); isolated += 1; row[key] = ''; }
+      }
+      return row;
     });
   };
   for (const area of ["memories", "sops", "capabilities", "experiences", "evolution", "governance", "todo", "deferred", "changes"]) {

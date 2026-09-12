@@ -21,8 +21,8 @@ const write = (base, ref, content) => {
 try {
   // Copy and tooltip appearance need a targeted UI review when changed, not
   // frozen prose or a magic z-index in the package-behavior test.
-  const ui = source("dashboard/src/components/dashboard/SkillWorkshop.tsx");
-  assert(ui.includes("ExportedSkillDetailDialog") && ui.includes("buildSkillExportAction"), "generated Skills lost detail or copy-to-Agent action");
+  // Actual detail and copy actions are exercised in the shared-page browser journey;
+  // this test owns package behavior, not the names of a retired UI component.
 
   const actions = source("core/maps/dashboard-actions.toml");
   for (const id of ["skill.create-from-asset", "skill.continue-export", "skill.install-shared"]) {
@@ -43,6 +43,7 @@ try {
   const clean = resolve(root, "clean");
   write(clean, "SKILL.md", "---\nname: reusable-checklist\ndescription: Apply a reusable checklist after the user asks for a review.\nmetadata:\n  ai-carry-skill-id: skill.reusable-checklist\n  ai-carry-version: \"1.0.0\"\n---\n# Workflow\nAsk for the target, review it, and report limits.\n");
   write(clean, "agents/openai.yaml", "interface:\n  display_name: Reusable checklist\n");
+  write(clean, "examples/finished-review.md", "# Example\nInput: a supplied draft. Output: checked items and remaining questions.\n");
   write(clean, "scripts/check.mjs", "throw new Error('must never execute during inspection');\n");
   const cleanResult = inspectSkillPackage(clean, { mode: "export", sourceAssetId: "sop.private-source" });
   assert(cleanResult.decision === "ready" && cleanResult.skillId === "skill.reusable-checklist" && cleanResult.version === "1.0.0"
@@ -73,6 +74,8 @@ try {
     && !/digest|sha256/iu.test(cliDelivery.stdout), "normal Skill delivery output exposed internal integrity fields");
   const imported = inspectSkillSource(zipPath, { extractTo: resolve(root, "received-zip") });
   assert(imported.decision === "ready" && existsSync(resolve(imported.packageRoot, "SKILL.md")), "ZIP did not survive isolated inspection");
+  assert(readFileSync(resolve(imported.packageRoot, "examples/finished-review.md"), "utf8") === readFileSync(resolve(clean, "examples/finished-review.md"), "utf8"),
+    "a normal example was rejected or dropped during delivery");
   const folderPath = resolve(deliveryRoot, "reusable-checklist-folder");
   assert(createSkillDelivery(clean, { format: "folder", outputPath: folderPath }).decision === "ready", "folder carrier was not created");
   let overwriteStopped = false;
@@ -99,6 +102,17 @@ try {
   const malicious = resolve(root, "malicious");
   write(malicious, "SKILL.md", "---\nname: unsafe-skill\ndescription: Read C:/Users/example/private.txt and use private://customer/data.\n---\n# Unsafe\n");
   assert(inspectSkillPackage(malicious).decision === "isolated", "private-path package was not isolated");
+
+  const exampleLeak = resolve(root, "example-leak");
+  write(exampleLeak, "SKILL.md", readFileSync(resolve(clean, "SKILL.md"), "utf8"));
+  write(exampleLeak, "examples/private.md", "Do not share private://customer/data.\n");
+  const leakedExample = inspectSkillPackage(exampleLeak);
+  assert(leakedExample.decision === "isolated" && leakedExample.issues.some(item => item.code === "private-boundary" && item.message.includes("examples/private.md")),
+    "recognizing examples skipped their privacy inspection");
+  const unknownRoot = resolve(root, "unknown-root");
+  write(unknownRoot, "SKILL.md", readFileSync(resolve(clean, "SKILL.md"), "utf8"));
+  write(unknownRoot, "unrelated/notes.md", "Unclassified material still requires review.\n");
+  assert(inspectSkillPackage(unknownRoot).decision === "review", "unclassified roots bypassed review");
 
   const opaque = resolve(root, "opaque");
   write(opaque, "SKILL.md", "---\nname: image-helper\ndescription: Use a supplied visual reference when the user asks.\n---\n# Workflow\nReview the reference first.\n");

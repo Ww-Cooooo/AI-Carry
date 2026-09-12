@@ -5,7 +5,9 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const TARGET_VERSION = "2.0.11";
+const productSource = readFileSync(new URL('../../assistant.toml',import.meta.url),'utf8');
+const TARGET_VERSION = /^product_version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"\s*$/mu.exec(productSource)?.[1];
+if(!TARGET_VERSION)throw Error('Official release verifier cannot read the current product version.');
 const REPOSITORY = "Ww-Cooooo/AI-Carry";
 const API_ROOT = `https://api.github.com/repos/${REPOSITORY}`;
 const MAX_FILES = 8192;
@@ -64,7 +66,7 @@ async function apiJson(path, label, fetchImpl = globalThis.fetch) {
   const response = await fetchImpl(`${API_ROOT}${path}`, {
     headers: {
       Accept: "application/vnd.github+json",
-      "User-Agent": "AI-Carry-release-verifier/2.0.11",
+      "User-Agent": `AI-Carry-release-verifier/${TARGET_VERSION}`,
       "X-GitHub-Api-Version": "2022-11-28",
     },
     redirect: "error",

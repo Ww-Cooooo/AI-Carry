@@ -3,8 +3,8 @@ map_id = "local-operations"
 
 [[routes]]
 id = "agent-guided-installation"
-summary = "从 GitHub 链接或完整压缩包安装 AI Carry，在稳定本地目录保留完整项目，创建可验证的桌面看板入口，并把空白模板连续交给首次创建引导。"
-triggers = ["安装AI Carry", "从GitHub链接安装", "从压缩包安装", "创建桌面看板入口", "修复看板快捷方式", "安装后继续创建助手"]
+summary = "从 GitHub 链接或完整压缩包安装 AI Carry，在稳定本地目录保留完整项目，创建网页版与客户端两个桌面入口，并把空白模板连续交给首次创建引导。"
+triggers = ["安装AI Carry", "从GitHub链接安装", "从压缩包安装", "创建桌面看板入口", "打开客户端", "安装客户端", "修复两个桌面入口", "修复看板快捷方式", "安装后继续创建助手"]
 target = "INSTALL.md"
 state = "active"
 minimum_level = 1
