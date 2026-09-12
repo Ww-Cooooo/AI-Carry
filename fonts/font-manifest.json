@@ -1,135 +1,54 @@
 {
-  "schemaVersion": 1,
-  "policy": "Every runtime font is packaged locally. The dashboard never fetches fonts from a CDN or depends on a platform-specific Chinese font.",
-  "conversion": {
-    "format": "WOFF2",
-    "fontTools": "4.63.0",
-    "brotli": "1.2.0",
-    "glyphPolicy": "Format conversion only; no Unicode subsetting and no outline changes.",
-    "metadataPolicy": "Copyright, family, style, version, trademark and OFL metadata are preserved from each upstream font.",
-    "verificationPolicy": "Each output must match its pinned source in glyph count, Unicode cmap count and name-table metadata before distribution under the upstream family name."
-  },
+  "policy": "Unmodified official MiSans WOFF2 files, bundled only with AI Carry; Xiaomi license and attribution accompany the app.",
   "fonts": [
     {
-      "family": "Noto Sans SC",
-      "role": "Chinese-first interface body, labels, English and numbers",
-      "version": "2.004-H2",
-      "weight": "100 900",
-      "style": "normal",
-      "file": "NotoSansSC-Variable.woff2",
-      "bytes": 7782072,
-      "sha256": "aef8c34277afad81ecd0227138a830263c0caea65b7aea66d1195395f097b55a",
+      "family": "MiSans",
+      "weight": 400,
+      "licenseSpdx": "LicenseRef-MiSans",
+      "sha256": "d704c1a932c0bd7e8a071d276cd81c0ed0c9fecfa26ac234f4bed0559fe1cb2d",
+      "licenseSha256": "4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86",
+      "unchangedUpstreamBytes": true,
+      "file": "MiSans-Regular.woff2",
+      "copyright": "Xiaomi Inc.",
       "source": {
-        "repository": "https://github.com/google/fonts/tree/352f6b7d9d6cc4fa9e242b931291d31b21a6dc84/ofl/notosanssc",
-        "file": "NotoSansSC[wght].ttf",
-        "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+        "archiveSha256": "b6aa1fc827035922612df8edf36e5609bca1c5441e25cd57572204569b7b81d9",
+        "repository": "https://hyperos.mi.com/font/zh/download/",
+        "member": "MiSans/woff2/MiSans-Regular.woff2"
       },
-      "license": "SIL Open Font License 1.1",
-      "licenseSpdx": "OFL-1.1",
-      "copyright": "Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'",
-      "reservedFontNames": [
-        "Source"
-      ],
-      "trademark": "Source is a trademark of Adobe in the United States and/or other countries.",
-      "licenseFile": "../licenses/fonts/NotoSansSC-OFL-1.1.txt",
-      "licenseSha256": "38f36cca6d5feb8dd3a25fece6db49772cc45dec94fa3aec84d6609c355d6622",
-      "conversionValidation": {
-        "sourceGlyphCount": 31036,
-        "outputGlyphCount": 31036,
-        "sourceUnicodeMappingCount": 30890,
-        "outputUnicodeMappingCount": 30890,
-        "nameTableMetadataMatched": true
-      }
+      "licenseFile": "MiSans-License.pdf"
     },
     {
-      "family": "Space Grotesk",
-      "role": "Brand wordmark, display headings and prominent numbers",
-      "version": "2.000",
-      "weight": "300 700",
-      "style": "normal",
-      "file": "SpaceGrotesk-Variable.woff2",
-      "bytes": 49256,
-      "sha256": "8e085aa438094f11487a836652edd5c054fa6a96f63fc7c282105ee3a4b08c07",
+      "family": "MiSans",
+      "weight": 500,
+      "licenseSpdx": "LicenseRef-MiSans",
+      "sha256": "44e28ca6c2f0ca79829f192831ef87b5eec7c464f5cfb7a83467f57bb6e58114",
+      "licenseSha256": "4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86",
+      "unchangedUpstreamBytes": true,
+      "file": "MiSans-Medium.woff2",
+      "copyright": "Xiaomi Inc.",
       "source": {
-        "repository": "https://github.com/google/fonts/tree/352f6b7d9d6cc4fa9e242b931291d31b21a6dc84/ofl/spacegrotesk",
-        "file": "SpaceGrotesk[wght].ttf",
-        "sha256": "acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72"
+        "archiveSha256": "b6aa1fc827035922612df8edf36e5609bca1c5441e25cd57572204569b7b81d9",
+        "repository": "https://hyperos.mi.com/font/zh/download/",
+        "member": "MiSans/woff2/MiSans-Medium.woff2"
       },
-      "license": "SIL Open Font License 1.1",
-      "licenseSpdx": "OFL-1.1",
-      "copyright": "Copyright 2020 The Space Grotesk Project Authors (https://github.com/floriankarsten/space-grotesk)",
-      "reservedFontNames": [],
-      "licenseFile": "../licenses/fonts/SpaceGrotesk-OFL-1.1.txt",
-      "licenseSha256": "041cf58f576710d4f2a507b173b334b24f3d66a05d61068231ea57ed82be6b5a",
-      "conversionValidation": {
-        "sourceGlyphCount": 1001,
-        "outputGlyphCount": 1001,
-        "sourceUnicodeMappingCount": 735,
-        "outputUnicodeMappingCount": 735,
-        "nameTableMetadataMatched": true
-      }
+      "licenseFile": "MiSans-License.pdf"
     },
     {
-      "family": "Noto Sans Mono CJK SC",
-      "role": "Code, paths, identifiers and aligned Chinese-English technical text",
-      "version": "2.004",
-      "weight": "400",
-      "style": "normal",
-      "file": "NotoSansMonoCJKsc-Regular.woff2",
-      "bytes": 11415392,
-      "sha256": "0cea0dcb735a3ea12099c1caff6b729536157bef510e523945626d51d1b25861",
+      "family": "MiSans",
+      "weight": 600,
+      "licenseSpdx": "LicenseRef-MiSans",
+      "sha256": "78227c6ec59566785c65ac0b5312328bfa2f879918f3d7403725785615a9a8f6",
+      "licenseSha256": "4a93a27cd2bd81b3b5ecfd0a853144a876fa26938a93a68443c67d74172fcb86",
+      "unchangedUpstreamBytes": true,
+      "file": "MiSans-Semibold.woff2",
+      "copyright": "Xiaomi Inc.",
       "source": {
-        "repository": "https://github.com/notofonts/noto-cjk/releases/tag/Sans2.004",
-        "archive": "13_NotoSansMonoCJKsc.zip",
-        "archiveSha256": "e252c39994f8a278676507600a955663c23c24a7827dc63a4300b2f7b427cd5d",
-        "file": "NotoSansMonoCJKsc-Regular.otf",
-        "sha256": "ec04cc376b34887cedbdf84074e2e226ed2761eeabdcb9173fc1dd7bfd153ef7"
+        "archiveSha256": "b6aa1fc827035922612df8edf36e5609bca1c5441e25cd57572204569b7b81d9",
+        "repository": "https://hyperos.mi.com/font/zh/download/",
+        "member": "MiSans/woff2/MiSans-Semibold.woff2"
       },
-      "license": "SIL Open Font License 1.1",
-      "licenseSpdx": "OFL-1.1",
-      "copyright": "© 2014-2021 Adobe (http://www.adobe.com/).",
-      "reservedFontNames": [],
-      "trademark": "Noto is a trademark of Google Inc.",
-      "licenseFile": "../licenses/fonts/NotoSansMonoCJKsc-OFL-1.1.txt",
-      "licenseSha256": "9f6ffa4d4ceb839c1d12b830273c1d9f01cb0f5e2535f6143b8f7befdd5650d5",
-      "conversionValidation": {
-        "sourceGlyphCount": 65535,
-        "outputGlyphCount": 65535,
-        "sourceUnicodeMappingCount": 44810,
-        "outputUnicodeMappingCount": 44810,
-        "nameTableMetadataMatched": true
-      }
-    },
-    {
-      "family": "Noto Sans Mono CJK SC",
-      "role": "Bold code, paths, identifiers and aligned technical labels",
-      "version": "2.004",
-      "weight": "700",
-      "style": "normal",
-      "file": "NotoSansMonoCJKsc-Bold.woff2",
-      "bytes": 12118380,
-      "sha256": "a74adf8ae1e22c07a272d97a3c7d7e15d4f446180022c85e895dbd402208c87f",
-      "source": {
-        "repository": "https://github.com/notofonts/noto-cjk/releases/tag/Sans2.004",
-        "archive": "13_NotoSansMonoCJKsc.zip",
-        "archiveSha256": "e252c39994f8a278676507600a955663c23c24a7827dc63a4300b2f7b427cd5d",
-        "file": "NotoSansMonoCJKsc-Bold.otf",
-        "sha256": "a452fedfc0619e43e080b7b861ce34cbd3ec4fbcea495bf8c402a5a02a5dcbdc"
-      },
-      "license": "SIL Open Font License 1.1",
-      "licenseSpdx": "OFL-1.1",
-      "copyright": "© 2014-2021 Adobe (http://www.adobe.com/).",
-      "reservedFontNames": [],
-      "trademark": "Noto is a trademark of Google Inc.",
-      "licenseFile": "../licenses/fonts/NotoSansMonoCJKsc-OFL-1.1.txt",
-      "licenseSha256": "9f6ffa4d4ceb839c1d12b830273c1d9f01cb0f5e2535f6143b8f7befdd5650d5",
-      "conversionValidation": {
-        "sourceGlyphCount": 65535,
-        "outputGlyphCount": 65535,
-        "sourceUnicodeMappingCount": 44810,
-        "outputUnicodeMappingCount": 44810,
-        "nameTableMetadataMatched": true
-      }
+      "licenseFile": "MiSans-License.pdf"
     }
-  ]
+  ],
+  "schemaVersion": 1
 }
