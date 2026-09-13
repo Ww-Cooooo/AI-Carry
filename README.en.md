@@ -31,9 +31,9 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.0.zip)**　Current version: `2.1.0`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.1.zip)**　Current version: `2.1.1`
 
-<sub>New in 2.1.0: one shared web and desktop design, blue-TV desktop entries, and the same copy-to-Agent workflow. Existing memories, Skills and private files remain yours.</sub>
+<sub>New in 2.1.1: approved SOPs generate the correct requests. If copying stays unconfirmed, select the full request and copy it manually. Web and desktop receive the same fixes; your materials and approvals are preserved.</sub>
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -56,7 +56,7 @@ After installation, the Agent should tell you **where the dashboard is, whether 
 
 The installer creates **web** and **desktop** entries. Both use the same saved materials; the desktop app adds a native folder/ZIP picker. It does not bind to an Agent or send requests automatically.
 
-[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-x64.zip)
+[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-x64.zip)
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 

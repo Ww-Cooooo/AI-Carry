@@ -10,7 +10,7 @@ import {type Asset,useClient} from './client-state';
 import {AssistantNotice,type Ask} from './shared';
 import './base.css';
 import {buildDashboardAction,buildHabitCorrectionAction,buildHabitForgetAction} from '../lib/data';
-const actionTarget=(entry:Asset)=>({...entry,status:entry.state||entry.status,reliability:entry.maturity||entry.reliability,approvalState:entry.approval_state,activationBasis:entry.activation_basis,approvedByUser:entry.approved_by_user});
+const actionTarget=(entry:Asset)=>({...entry,status:entry.state||entry.status,reliability:entry.maturity||entry.reliability,approvalState:entry.approval_state,activationBasis:entry.activation_basis,approvedByUser:entry.approved_by_user,riskTier:entry.risk_tier});
 
 gsap.registerPlugin(useGSAP);
 type Kind='memories'|'sops'|'capabilities'|'experiences';

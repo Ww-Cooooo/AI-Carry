@@ -30,9 +30,9 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.0.zip)**　当前版本：`2.1.0`
+**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.1.zip)**　当前版本：`2.1.1`
 
-<sub>2.1.0：网页版与客户端换上同一套界面，桌面上可直接打开；点按钮复制请求，再发给你想用的 Agent。原有记忆、Skill 和私密资料继续保留。</sub>
+<sub>2.1.1：修复已批准 SOP 的使用请求；复制没有及时返回结果时，可选中全文手动复制。网页版与客户端同步更新，原有资料与批准记录保留。</sub>
 
 这是 GitHub 的完整源码压缩包，**已带可直接打开的看板**，不是只下载一个网页。下载后，把 ZIP 的本地路径发给 Agent，并说：
 
@@ -54,7 +54,7 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 安装时，Agent 会在桌面放好 **AI Carry（网页版）** 和 **AI Carry（客户端）**。两者读取同一份助手资料；客户端还能直接选择本地文件夹和 ZIP。它不会自动连接 Agent，仍由你复制请求、粘贴发送。
 
-[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.0/AI-Carry-2.1.0-darwin-x64.zip)
+[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-x64.zip)
 
 客户端包不代替完整助手目录。Mac 包未签名、尚未完成 Mac 实机验收；Linux 继续使用网页版。
 

@@ -47,19 +47,27 @@ export function RequestDialog({request,onClose}:{request:Request|null;onClose:()
   const {act,demo}=useClient();
   const [expanded,setExpanded]=useState(false),[extra,setExtra]=useState(''),[copied,setCopied]=useState(false),[copyError,setCopyError]=useState(''),[busy,setBusy]=useState(false);
   const serial=useRef(0),text=useRef<HTMLTextAreaElement>(null);
-  useEffect(()=>{serial.current++;setExpanded(false);setExtra('');setCopied(false);setCopyError('');setBusy(false);},[request]);
+  useEffect(()=>{serial.current++;setExpanded(false);setExtra('');setCopied(false);setCopyError('');setBusy(false);return()=>{serial.current++;};},[request]);
   const body=request?(demo?'这是界面演示用的虚构请求，仅用于查看操作方式；不要把示例条目当作真实资料。\n\n':'')+localizeAgentRequest(manualRequest(request,extra)):'';
   const copy=async()=>{
-    if(busy)return;const current=serial.current;setBusy(true);
-    try{await act('copy',{text:body});if(current===serial.current){setCopied(true);setCopyError('');}}
-    catch{if(current===serial.current){setExpanded(true);setCopyError('没能自动复制。请点“选中全文”，手动复制后发给 Agent。');}}
-    finally{if(current===serial.current)setBusy(false);}
+    if(busy)return;const current=++serial.current;setBusy(true);setCopied(false);setCopyError('');
+    let timer:ReturnType<typeof setTimeout>|undefined,timedOut=false;
+    try{
+      // A missing browser/desktop reply must not trap this dialog. The native
+      // write cannot be cancelled; a late reply must not claim a newer copy.
+      await Promise.race([act('copy',{text:body}),new Promise<never>((_,reject)=>{
+        timer=setTimeout(()=>{timedOut=true;reject(new Error('copy-not-confirmed'));},4000);
+      })]);
+      if(current===serial.current){setCopied(true);setCopyError('');}
+    }
+    catch{if(current===serial.current){setExpanded(true);setCopyError(timedOut?'暂时无法确认是否复制成功。请点“选中全文”，手动复制后发给 Agent。':'没能自动复制。请点“选中全文”，手动复制后发给 Agent。');}}
+    finally{clearTimeout(timer);if(current===serial.current)setBusy(false);}
   };
   return <Dialog.Root open={!!request} onOpenChange={v=>{if(!v)onClose();}}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="request-dialog manual-request-dialog" data-lenis-prevent><Dialog.Close className="dialog-close" aria-label="关闭请求预览"><X size={20}/></Dialog.Close><Reveal kind="selection"><span className="request-icon"><MessageCircle size={26}/></span><Dialog.Title>{request?.title}</Dialog.Title><Dialog.Description>{demo?'这里预览的是演示请求，示例条目不对应真实文件。':'点击“复制请求”，粘贴到你想用的 Agent 对话中，再发送。'}</Dialog.Description>
     {request?.preferredDestination==='new'&&<p className="manual-task-hint">这件事可以在 Agent 中另开对话处理，不必打断手头的任务。</p>}
     {copyError&&<p className="copy-feedback copy-failed" role="status">{copyError}</p>}
     <label className="dispatch-extra">补充要求（可选）<textarea value={extra} onChange={e=>{serial.current++;setExtra(e.target.value);setCopied(false);setBusy(false);setCopyError('');}} rows={2} placeholder="还有什么要求？比如内容主题、输出格式或保存位置。" maxLength={4000}/></label>
-    <div className="request-copy progressive-copy">{expanded?<textarea ref={text} id="preview-request-body" aria-label="完整请求" className="full-request-text" readOnly value={body}/>:<p id="preview-request-body" className="request-text condensed">{body}</p>}<button className="text-button" aria-expanded={expanded} aria-controls="preview-request-body" onClick={()=>setExpanded(!expanded)}>{expanded?'收起全文':'展开完整请求'}</button>{copyError&&<button className="text-button select-request" onClick={()=>{text.current?.focus();text.current?.select();}}>选中全文</button>}</div>
+    <div className="request-copy progressive-copy">{expanded?<textarea ref={text} id="preview-request-body" aria-label="完整请求" className="full-request-text" readOnly value={body}/>:<p id="preview-request-body" className="request-text condensed">{body}</p>}<button className="text-button" aria-expanded={expanded} aria-controls="preview-request-body" onClick={()=>setExpanded(!expanded)}>{expanded?'收起全文':'展开完整请求'}</button>{expanded&&<button className="text-button select-request" onClick={()=>{text.current?.focus();text.current?.select();}}>选中全文</button>}</div>
     <button className="primary-button" disabled={busy} onClick={()=>void copy()}>{copied?'再次复制':busy?'正在复制…':demo?'复制演示请求':'复制请求'}{copied?<Check size={19}/>:<Copy size={19}/>}</button>
     <p className={`copy-feedback ${copied?'copy-success':''}`} role="status">{copyError?'原请求已保留，可以选中全文手动复制。':demo?(copied?'演示请求已复制，没有执行任何任务。':'可查看完整流程；此窗口不会调用 Agent 或修改助手资料。'):(copied?'已复制。粘贴到你想用的 Agent 对话中，再发送。':'复制的是完整请求，折叠的内容也会带上。')}</p>
   </Reveal></Dialog.Content></Dialog.Portal></Dialog.Root>;
