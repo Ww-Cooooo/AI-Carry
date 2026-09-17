@@ -5,6 +5,344 @@
   "scope": "Conservative production dependency closure used to build the offline dashboard; explicitly dev-only entries are excluded.",
   "packages": [
     {
+      "name": "@antv/algorithm",
+      "version": "0.1.26",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/algorithm",
+      "licenseFiles": [
+        {
+          "filename": "MIT declaration and attribution (package metadata)",
+          "sha256": "1f14a3c0db87990d356d940869b8c6615107480b97be75de71bbacc97558cd12"
+        }
+      ]
+    },
+    {
+      "name": "@antv/component",
+      "version": "2.1.11",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/component",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "98edde832138822906fb3f365b59a9a54b3abf6e85e52de0f5f1fd804ff83ab7"
+        }
+      ]
+    },
+    {
+      "name": "@antv/event-emitter",
+      "version": "0.1.3",
+      "license": "MIT",
+      "direct": false,
+      "repository": "git@github.com:antvis/event-emitter",
+      "licenseFiles": [
+        {
+          "filename": "MIT declaration and attribution (package metadata)",
+          "sha256": "1f14a3c0db87990d356d940869b8c6615107480b97be75de71bbacc97558cd12"
+        }
+      ]
+    },
+    {
+      "name": "@antv/expr",
+      "version": "1.0.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/expr",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "569ccd3187702094992adbf3b0461976ee8c92e8ed50404d08aef58b3da4c900"
+        }
+      ]
+    },
+    {
+      "name": "@antv/g-canvas",
+      "version": "2.2.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/g",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7cd9f15ca43ba039aa3503d92cd1a453e4e78ff90abd15c0d471f34b08921d6f"
+        }
+      ]
+    },
+    {
+      "name": "@antv/g-lite",
+      "version": "2.7.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/g",
+      "licenseFiles": [
+        {
+          "filename": "MIT declaration and attribution (package metadata)",
+          "sha256": "1f14a3c0db87990d356d940869b8c6615107480b97be75de71bbacc97558cd12"
+        }
+      ]
+    },
+    {
+      "name": "@antv/g-math",
+      "version": "3.1.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/g",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7cd9f15ca43ba039aa3503d92cd1a453e4e78ff90abd15c0d471f34b08921d6f"
+        }
+      ]
+    },
+    {
+      "name": "@antv/g-plugin-dragndrop",
+      "version": "2.1.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/g",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7cd9f15ca43ba039aa3503d92cd1a453e4e78ff90abd15c0d471f34b08921d6f"
+        }
+      ]
+    },
+    {
+      "name": "@antv/g",
+      "version": "6.3.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/g",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7cd9f15ca43ba039aa3503d92cd1a453e4e78ff90abd15c0d471f34b08921d6f"
+        }
+      ]
+    },
+    {
+      "name": "@antv/g6",
+      "version": "5.1.1",
+      "license": "MIT",
+      "direct": true,
+      "repository": "https://github.com/antvis/g6",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7e5eecab5b55179a1e5c6e42c1565b76140653f219139bbc917eec41a75dcfab"
+        }
+      ]
+    },
+    {
+      "name": "@antv/graphlib",
+      "version": "2.0.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/graphlib",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "f40b9ef0ae733d5990d572a546f2453ae31f19484b8e53cfd907c65a7177e281"
+        }
+      ]
+    },
+    {
+      "name": "@antv/hierarchy",
+      "version": "0.7.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "git@github.com:antvis/hierarchy",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "3d84f61c3fdd8334a19f0f8e7b697b8ebba0b9cefeca9cf4ebb156138f71ddb0"
+        }
+      ]
+    },
+    {
+      "name": "@antv/layout",
+      "version": "2.0.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/layout",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7e5eecab5b55179a1e5c6e42c1565b76140653f219139bbc917eec41a75dcfab"
+        }
+      ]
+    },
+    {
+      "name": "@antv/scale",
+      "version": "0.4.16",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/scale",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "98edde832138822906fb3f365b59a9a54b3abf6e85e52de0f5f1fd804ff83ab7"
+        }
+      ]
+    },
+    {
+      "name": "@antv/util",
+      "version": "2.0.17",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/antvis/util",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE (upstream repository)",
+          "sha256": "bc5c63c7e4d3746a23ff5e072652819c2705cc2d3eab1af281a9ce903a660250"
+        }
+      ]
+    },
+    {
+      "name": "@antv/util",
+      "version": "3.3.11",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/antvis/util",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "98edde832138822906fb3f365b59a9a54b3abf6e85e52de0f5f1fd804ff83ab7"
+        }
+      ]
+    },
+    {
+      "name": "@antv/vendor",
+      "version": "1.0.11",
+      "license": "MIT AND ISC",
+      "direct": false,
+      "repository": "https://github.com/antvis/vendor",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "600088fb37b459ecf38eb8fa4984a69efc31b324f6fc0c92891bacf5b707ea33"
+        },
+        {
+          "filename": "lib-vendor/d3-array/LICENSE",
+          "sha256": "f57e3a2cabf2b43ab2fc942a8e9f4b38366ab0d1f859c6439b1fb69e80d9af73"
+        },
+        {
+          "filename": "lib-vendor/d3-binarytree/LICENSE",
+          "sha256": "c81e08f2a4364d08611c888e00017d1000168d4a6991b2df34ccec52e71c84a5"
+        },
+        {
+          "filename": "lib-vendor/d3-color/LICENSE",
+          "sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8"
+        },
+        {
+          "filename": "lib-vendor/d3-dispatch/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-dsv/LICENSE",
+          "sha256": "4c1cd1d0c4f880ec6cc58495f54e57877fccefcf0a4050fe09c9d81b757bf494"
+        },
+        {
+          "filename": "lib-vendor/d3-ease/LICENSE",
+          "sha256": "69af84a0cb486bc97d578ea76f0aea3ad628ad97147551d2a898902941bd6db6"
+        },
+        {
+          "filename": "lib-vendor/d3-fetch/LICENSE",
+          "sha256": "9d00baf34d17d2e5ca9301230b256f1ced369cdb41712daa6f18716d93c6e88c"
+        },
+        {
+          "filename": "lib-vendor/d3-force/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-force-3d/LICENSE",
+          "sha256": "c81e08f2a4364d08611c888e00017d1000168d4a6991b2df34ccec52e71c84a5"
+        },
+        {
+          "filename": "lib-vendor/d3-format/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-geo/LICENSE",
+          "sha256": "e87ae4ac338d47ce509af51623763b9a197e6ca26f958be54f67c1a64cd0062c"
+        },
+        {
+          "filename": "lib-vendor/d3-geo-projection/LICENSE",
+          "sha256": "8a4496e71cb0ce730930eb4c118c3861d41c3ee184afdba54f494cd59cf15249"
+        },
+        {
+          "filename": "lib-vendor/d3-hierarchy/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-interpolate/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-octree/LICENSE",
+          "sha256": "c81e08f2a4364d08611c888e00017d1000168d4a6991b2df34ccec52e71c84a5"
+        },
+        {
+          "filename": "lib-vendor/d3-path/LICENSE",
+          "sha256": "58f959e2911ca1fdd6812a2cebe42193c6137922ecbcce86d8233873706181ab"
+        },
+        {
+          "filename": "lib-vendor/d3-quadtree/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-random/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-regression/LICENSE",
+          "sha256": "0480e9e98034a82d058789d7e4a6a59b837f4581d06973af12294f7cb3147f6f"
+        },
+        {
+          "filename": "lib-vendor/d3-scale/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-scale-chromatic/LICENSE",
+          "sha256": "1549638d9e45cf99379d6e71aa706583e5952cd875a26a02f58c9b26499c94e9"
+        },
+        {
+          "filename": "lib-vendor/d3-shape/LICENSE",
+          "sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8"
+        },
+        {
+          "filename": "lib-vendor/d3-time/LICENSE",
+          "sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8"
+        },
+        {
+          "filename": "lib-vendor/d3-time-format/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/d3-timer/LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        },
+        {
+          "filename": "lib-vendor/internmap/LICENSE",
+          "sha256": "f4bb8f655fdb4d119878a0eea6dfcb871da509d83baa7426794f7c70b9bb9d46"
+        }
+      ]
+    },
+    {
+      "name": "@babel/runtime",
+      "version": "7.29.7",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/babel/babel",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "8f08c824b2bb54eda2b6ee6053d2eeed46877b3b7b2ef3f60fc2b9fa580f54b2"
+        }
+      ]
+    },
+    {
       "name": "@floating-ui/core",
       "version": "1.8.0",
       "license": "MIT",
@@ -850,8 +1188,34 @@
       ]
     },
     {
+      "name": "@types/d3-array",
+      "version": "3.2.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
       "name": "@types/d3-color",
       "version": "3.1.3",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-dispatch",
+      "version": "3.0.7",
       "license": "MIT",
       "direct": false,
       "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
@@ -876,6 +1240,97 @@
       ]
     },
     {
+      "name": "@types/d3-dsv",
+      "version": "3.0.7",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-ease",
+      "version": "3.0.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-fetch",
+      "version": "3.0.7",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-force",
+      "version": "3.0.10",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-format",
+      "version": "3.0.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-geo",
+      "version": "3.1.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-hierarchy",
+      "version": "3.1.7",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
       "name": "@types/d3-interpolate",
       "version": "3.0.4",
       "license": "MIT",
@@ -889,8 +1344,112 @@
       ]
     },
     {
+      "name": "@types/d3-path",
+      "version": "3.1.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-quadtree",
+      "version": "3.0.6",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-random",
+      "version": "3.0.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-scale-chromatic",
+      "version": "3.1.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-scale",
+      "version": "4.0.9",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
       "name": "@types/d3-selection",
       "version": "3.0.11",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-shape",
+      "version": "3.2.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-time",
+      "version": "3.0.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/d3-timer",
+      "version": "3.0.2",
       "license": "MIT",
       "direct": false,
       "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
@@ -917,6 +1476,19 @@
     {
       "name": "@types/d3-zoom",
       "version": "3.0.8",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ff82c90f84945c60601e96b43246009b9bc589f3ebe1cd8a0fd39a3520d8c310"
+        }
+      ]
+    },
+    {
+      "name": "@types/geojson",
+      "version": "7946.0.16",
       "license": "MIT",
       "direct": false,
       "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
@@ -993,6 +1565,32 @@
       ]
     },
     {
+      "name": "base64-arraybuffer",
+      "version": "1.0.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/niklasvh/base64-arraybuffer",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c"
+        }
+      ]
+    },
+    {
+      "name": "bubblesets-js",
+      "version": "2.3.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/upsetjs/bubblesets-js",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "78b22d63cc69476fb3317e018f3c35e204e9d35e72a50b69d0f784defb113eb4"
+        }
+      ]
+    },
+    {
       "name": "class-variance-authority",
       "version": "0.7.1",
       "license": "Apache-2.0",
@@ -1032,6 +1630,71 @@
       ]
     },
     {
+      "name": "color-name",
+      "version": "1.1.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "git@github.com:colorjs/color-name",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7357445bac398c76c0aef75a587009fe406d40de6a79789eb5b7ecbbad317ef2"
+        }
+      ]
+    },
+    {
+      "name": "color-string",
+      "version": "1.9.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "Qix-/color-string",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "7fb9acbf1a9cecf4ede0b16292653bf488997c43f5d25a9d7b3dd7eacff09821"
+        }
+      ]
+    },
+    {
+      "name": "comlink",
+      "version": "4.4.2",
+      "license": "Apache-2.0",
+      "direct": false,
+      "repository": "https://github.com/GoogleChromeLabs/comlink",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "b3e17cd48de9bfefe076d376cc136df378ebfceffbb48069205c0dd0231a0cae"
+        }
+      ]
+    },
+    {
+      "name": "commander",
+      "version": "7.2.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/tj/commander.js",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "4cc9c2af4eb0056cd4d2297b7404819e3816b4c44b7f8012c42d5fd671d783d3"
+        }
+      ]
+    },
+    {
+      "name": "css-line-break",
+      "version": "2.1.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "ssh://git@github.com/niklasvh/css-line-break",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ce1ee0539f7fe1f7b75b76d121e674cb897c709c3e24ddba7f9a10fe2d0d88a5"
+        }
+      ]
+    },
+    {
       "name": "csstype",
       "version": "3.2.3",
       "license": "MIT",
@@ -1041,6 +1704,32 @@
         {
           "filename": "LICENSE",
           "sha256": "6a972b33787e14304b4cfca68387f8644d11788a5d551731196b8e64dd9f0431"
+        }
+      ]
+    },
+    {
+      "name": "d3-array",
+      "version": "3.2.4",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-array",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "f57e3a2cabf2b43ab2fc942a8e9f4b38366ab0d1f859c6439b1fb69e80d9af73"
+        }
+      ]
+    },
+    {
+      "name": "d3-binarytree",
+      "version": "1.0.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/vasturiano/d3-binarytree",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "c81e08f2a4364d08611c888e00017d1000168d4a6991b2df34ccec52e71c84a5"
         }
       ]
     },
@@ -1084,6 +1773,19 @@
       ]
     },
     {
+      "name": "d3-dsv",
+      "version": "3.0.1",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-dsv",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "4c1cd1d0c4f880ec6cc58495f54e57877fccefcf0a4050fe09c9d81b757bf494"
+        }
+      ]
+    },
+    {
       "name": "d3-ease",
       "version": "3.0.1",
       "license": "BSD-3-Clause",
@@ -1093,6 +1795,97 @@
         {
           "filename": "LICENSE",
           "sha256": "69af84a0cb486bc97d578ea76f0aea3ad628ad97147551d2a898902941bd6db6"
+        }
+      ]
+    },
+    {
+      "name": "d3-fetch",
+      "version": "3.0.1",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-fetch",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "9d00baf34d17d2e5ca9301230b256f1ced369cdb41712daa6f18716d93c6e88c"
+        }
+      ]
+    },
+    {
+      "name": "d3-force-3d",
+      "version": "3.0.6",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/vasturiano/d3-force-3d",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "c81e08f2a4364d08611c888e00017d1000168d4a6991b2df34ccec52e71c84a5"
+        }
+      ]
+    },
+    {
+      "name": "d3-force",
+      "version": "3.0.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-force",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        }
+      ]
+    },
+    {
+      "name": "d3-format",
+      "version": "3.1.2",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-format",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "9fe3e95ca3e8ef778fc93263946e9c4e8a10ff3afe9c3333f54402bb99079bc1"
+        }
+      ]
+    },
+    {
+      "name": "d3-geo-projection",
+      "version": "4.0.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-geo-projection",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "8a4496e71cb0ce730930eb4c118c3861d41c3ee184afdba54f494cd59cf15249"
+        }
+      ]
+    },
+    {
+      "name": "d3-geo",
+      "version": "3.1.1",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-geo",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "e87ae4ac338d47ce509af51623763b9a197e6ca26f958be54f67c1a64cd0062c"
+        }
+      ]
+    },
+    {
+      "name": "d3-hierarchy",
+      "version": "3.1.2",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-hierarchy",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
         }
       ]
     },
@@ -1110,6 +1903,97 @@
       ]
     },
     {
+      "name": "d3-octree",
+      "version": "1.1.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/vasturiano/d3-octree",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "c81e08f2a4364d08611c888e00017d1000168d4a6991b2df34ccec52e71c84a5"
+        }
+      ]
+    },
+    {
+      "name": "d3-path",
+      "version": "3.1.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-path",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "58f959e2911ca1fdd6812a2cebe42193c6137922ecbcce86d8233873706181ab"
+        }
+      ]
+    },
+    {
+      "name": "d3-quadtree",
+      "version": "3.0.1",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-quadtree",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        }
+      ]
+    },
+    {
+      "name": "d3-random",
+      "version": "3.0.1",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-random",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        }
+      ]
+    },
+    {
+      "name": "d3-regression",
+      "version": "1.3.10",
+      "license": "BSD-3-Clause",
+      "direct": false,
+      "repository": "https://github.com/HarryStevens/d3-regression",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "0480e9e98034a82d058789d7e4a6a59b837f4581d06973af12294f7cb3147f6f"
+        }
+      ]
+    },
+    {
+      "name": "d3-scale-chromatic",
+      "version": "3.1.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-scale-chromatic",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "1549638d9e45cf99379d6e71aa706583e5952cd875a26a02f58c9b26499c94e9"
+        }
+      ]
+    },
+    {
+      "name": "d3-scale",
+      "version": "4.0.2",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-scale",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        }
+      ]
+    },
+    {
       "name": "d3-selection",
       "version": "3.0.0",
       "license": "ISC",
@@ -1119,6 +2003,45 @@
         {
           "filename": "LICENSE",
           "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        }
+      ]
+    },
+    {
+      "name": "d3-shape",
+      "version": "3.2.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-shape",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8"
+        }
+      ]
+    },
+    {
+      "name": "d3-time-format",
+      "version": "4.1.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-time-format",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "6019bf3451952141c4561a8a814c965b71166df316a8c7f3f435f090b3c329c1"
+        }
+      ]
+    },
+    {
+      "name": "d3-time",
+      "version": "3.1.0",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/d3/d3-time",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "4f4f9997e3d96636b08171484bf3e2b5a8a46745e2b0dd4d4f86b0e5cfa632e8"
         }
       ]
     },
@@ -1162,6 +2085,19 @@
       ]
     },
     {
+      "name": "dagre",
+      "version": "0.8.5",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/dagrejs/dagre",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "25add1a0136af5d3bbae590f3a04d6da2820e06913282012855fb34c0d8632e7"
+        }
+      ]
+    },
+    {
       "name": "detect-node-es",
       "version": "1.1.0",
       "license": "MIT",
@@ -1171,6 +2107,45 @@
         {
           "filename": "LICENSE",
           "sha256": "5dd2a43c0ed685c43ca99a0e640318ea1a36ba95395f843a5ba8cc779b7cab2b"
+        }
+      ]
+    },
+    {
+      "name": "eventemitter3",
+      "version": "5.0.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/primus/eventemitter3",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "ce0337175145faf4475b35bc8679a1a4b7de01f05cabe2ac6a4780239a7d5ae1"
+        }
+      ]
+    },
+    {
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/epoberezkin/fast-deep-equal",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "aa407ee69b3f646286f5162d0679256a0fe5b7fcc51f104ffb647efe167715ea"
+        }
+      ]
+    },
+    {
+      "name": "fecha",
+      "version": "4.2.3",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://taylorhakes@github.com/taylorhakes/fecha",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "5db9794ad7e8ad2e1d10570700ca6493bcf00ac0a2fa0105cdbcdd8114901b88"
         }
       ]
     },
@@ -1201,6 +2176,32 @@
       ]
     },
     {
+      "name": "gl-matrix",
+      "version": "3.4.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/toji/gl-matrix",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE.md",
+          "sha256": "af62d31a0cdc1bf95d5e19428c3e0de368b727d9d5b6b6cdb466f8a52e68ad06"
+        }
+      ]
+    },
+    {
+      "name": "graphlib",
+      "version": "2.1.8",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/dagrejs/graphlib",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "25add1a0136af5d3bbae590f3a04d6da2820e06913282012855fb34c0d8632e7"
+        }
+      ]
+    },
+    {
       "name": "gsap",
       "version": "3.15.0",
       "license": "Standard 'no charge' license: https://gsap.com/standard-license.",
@@ -1210,6 +2211,71 @@
         {
           "filename": "GSAP Standard License (official website)",
           "sha256": "1da096508b7400524ff1feb8fdcc699589ab5b5e42b944e7d1fbac85c0ee5823"
+        }
+      ]
+    },
+    {
+      "name": "html2canvas",
+      "version": "1.4.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "git@github.com:niklasvh/html2canvas",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "86200ce4e92d9a22c41c8647a55f7a5fddff304ff89b4d36ecc699ed8c123d2c"
+        }
+      ]
+    },
+    {
+      "name": "iconv-lite",
+      "version": "0.6.3",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/ashtuchkin/iconv-lite",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "48186f5950f28caaafaa7f4c18b0b31350bea5c93f3a2d74b883b35a0d528863"
+        }
+      ]
+    },
+    {
+      "name": "internmap",
+      "version": "2.0.3",
+      "license": "ISC",
+      "direct": false,
+      "repository": "https://github.com/mbostock/internmap",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "f4bb8f655fdb4d119878a0eea6dfcb871da509d83baa7426794f7c70b9bb9d46"
+        }
+      ]
+    },
+    {
+      "name": "is-any-array",
+      "version": "3.0.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/cheminfo-js/is-any-array",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "e139ec167928b0054a7c631988930bf7f304c080018491beeb00e83d684ed5fb"
+        }
+      ]
+    },
+    {
+      "name": "is-arrayish",
+      "version": "0.3.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/qix-/node-is-arrayish",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "849dffdc5103ad6274d337e9608d70198a6e76b6f8fa0aecdf303fa07f03cae4"
         }
       ]
     },
@@ -1227,6 +2293,19 @@
       ]
     },
     {
+      "name": "lodash",
+      "version": "4.18.1",
+      "license": "MIT",
+      "direct": false,
+      "repository": "lodash/lodash",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "2314aa0e2bae2fcbc099b29c8815e26688cef6c2cf76226927a3f24f091f7114"
+        }
+      ]
+    },
+    {
       "name": "lucide-react",
       "version": "1.31.0",
       "license": "ISC",
@@ -1236,6 +2315,58 @@
         {
           "filename": "LICENSE",
           "sha256": "ee35498e6684b30c9efaae009415884772f4450b3f6a3ae49103cd550a2c8ceb"
+        }
+      ]
+    },
+    {
+      "name": "ml-array-max",
+      "version": "2.0.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/mljs/array",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "51c24e98d4c50e4d191d5d6a027ac4a4fda39c6c5b6731e43f4134971e5e1b56"
+        }
+      ]
+    },
+    {
+      "name": "ml-array-min",
+      "version": "2.0.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/mljs/array",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "03ef97abefc90bc54c92114799888a87fd121d0b26fa2f1f5004eacf97c8c0e9"
+        }
+      ]
+    },
+    {
+      "name": "ml-array-rescale",
+      "version": "2.0.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/mljs/array",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "03ef97abefc90bc54c92114799888a87fd121d0b26fa2f1f5004eacf97c8c0e9"
+        }
+      ]
+    },
+    {
+      "name": "ml-matrix",
+      "version": "6.15.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/mljs/matrix",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "08337584cbfc0f930da9f1173c926279a5fcc8534aadfa431b56be8a6de7b41f"
         }
       ]
     },
@@ -1357,6 +2488,32 @@
       ]
     },
     {
+      "name": "rw",
+      "version": "1.3.3",
+      "license": "BSD-3-Clause",
+      "direct": false,
+      "repository": "http://github.com/mbostock/rw",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "1325cb60c071ba88c009d7b199e66bef7df85eb62e67c855949ac353e3da434c"
+        }
+      ]
+    },
+    {
+      "name": "safer-buffer",
+      "version": "2.1.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/ChALkeR/safer-buffer",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "aa72fb6117e423794ec098a00d0413fa4ceb2369b68869e07d32ca32235a5f1e"
+        }
+      ]
+    },
+    {
       "name": "scheduler",
       "version": "0.27.0",
       "license": "MIT",
@@ -1366,6 +2523,32 @@
         {
           "filename": "LICENSE",
           "sha256": "cf9b17822d1fcd4ff32ccbe14183386fb3adf6f2ff92dc184130823f7fc28173"
+        }
+      ]
+    },
+    {
+      "name": "simple-swizzle",
+      "version": "0.2.4",
+      "license": "MIT",
+      "direct": false,
+      "repository": "qix-/node-simple-swizzle",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "28e0462832d8b5cb5ed2a44c518fd23a2d9ab9c63f9dd100dcf9c1bfb561e92e"
+        }
+      ]
+    },
+    {
+      "name": "svg-path-parser",
+      "version": "1.1.0",
+      "license": "MIT",
+      "direct": false,
+      "repository": "https://github.com/hughsk/svg-path-parser",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "a9385520d8a19b149728f5fe1b959505629bbb4e58fd6814ace97483763a6dcd"
         }
       ]
     },
@@ -1392,6 +2575,19 @@
         {
           "filename": "LICENSE",
           "sha256": "fdd854c84f367147ac4376837dee5002b0d2db39e8effed810ebc48f9bb70318"
+        }
+      ]
+    },
+    {
+      "name": "text-segmentation",
+      "version": "1.0.3",
+      "license": "MIT",
+      "direct": false,
+      "repository": "ssh://git@github.com/niklasvh/text-segmentation",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "8b00952cd8d0f5cbbefb13576778e1185dc963943151353d90c4e14a5a4caf40"
         }
       ]
     },
@@ -1457,6 +2653,19 @@
         {
           "filename": "LICENSE",
           "sha256": "cf9b17822d1fcd4ff32ccbe14183386fb3adf6f2ff92dc184130823f7fc28173"
+        }
+      ]
+    },
+    {
+      "name": "utrie",
+      "version": "1.0.2",
+      "license": "MIT",
+      "direct": false,
+      "repository": "ssh://git@github.com/niklasvh/utrie",
+      "licenseFiles": [
+        {
+          "filename": "LICENSE",
+          "sha256": "8b00952cd8d0f5cbbefb13576778e1185dc963943151353d90c4e14a5a4caf40"
         }
       ]
     },
