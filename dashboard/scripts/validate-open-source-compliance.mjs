@@ -521,8 +521,8 @@ for (const marker of ['Apache License', 'Version 2.0, January 2004', 'END OF TER
 }
 assert(packageJson.license === 'Apache-2.0', 'Dashboard package metadata must use SPDX Apache-2.0.')
 
-const reviewedLockLicenses = new Set(['MIT', 'Apache-2.0', 'ISC', '0BSD', 'BSD-3-Clause', 'MPL-2.0'])
-const reviewedRuntimeLicenses = new Set(['MIT', 'Apache-2.0', 'ISC', '0BSD', 'BSD-3-Clause'])
+const reviewedLockLicenses = new Set(['MIT', 'Apache-2.0', 'ISC', 'MIT AND ISC', '0BSD', 'BSD-3-Clause', 'MPL-2.0'])
+const reviewedRuntimeLicenses = new Set(['MIT', 'Apache-2.0', 'ISC', 'MIT AND ISC', '0BSD', 'BSD-3-Clause'])
 const lockEntries = Object.entries(packageLock.packages ?? {}).filter(([key]) => key.includes('node_modules/'))
 const lockLicenseCounts = {}
 for (const [key, metadata] of lockEntries) {
@@ -551,6 +551,9 @@ for (const entry of productionInventory.packages) {
   assert(entry.repository, `Production dependency has no upstream source: ${entry.name}@${entry.version}`)
   assert(Array.isArray(entry.licenseFiles) && entry.licenseFiles.length > 0, `Production dependency has no license text: ${entry.name}@${entry.version}`)
   assert(productionNotices.includes(`${entry.name}@${entry.version}`), `Production notice text omits ${entry.name}@${entry.version}`)
+  if (entry.name === '@antv/vendor') {
+    assert(entry.licenseFiles.some(file => file.filename === 'lib-vendor/d3-force/LICENSE'), 'AntV vendor notices omit the bundled D3 licenses.')
+  }
 }
 
 assert(sourceComponents.schemaVersion === 1, 'Unsupported source-component inventory schema.')

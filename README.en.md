@@ -31,9 +31,9 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.1.zip)**　Current version: `2.1.1`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.2.zip)**　Current version: `2.1.2`
 
-<sub>New in 2.1.1: approved SOPs generate the correct requests. If copying stays unconfirmed, select the full request and copy it manually. Web and desktop receive the same fixes; your materials and approvals are preserved.</sub>
+<sub>New in 2.1.2: explore your accumulated knowledge and task records on a map. Select an item for a summary, then open its full content in the list. Web and desktop share the update; your materials stay unchanged.</sub>
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -56,7 +56,7 @@ After installation, the Agent should tell you **where the dashboard is, whether 
 
 The installer creates **web** and **desktop** entries. Both use the same saved materials; the desktop app adds a native folder/ZIP picker. It does not bind to an Agent or send requests automatically.
 
-[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-x64.zip)
+[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 
@@ -141,10 +141,12 @@ See [learning and assets (Chinese)](docs/asset-evolution.md). Actual recall also
 | In the dashboard | What you can do |
 | --- | --- |
 | **Creation and current state** | Create an assistant, see its direction and state, and change your collaboration style. |
-| **Your accumulated knowledge** | Browse habits, memories, capabilities, SOPs, and experience; ask the Agent to explain or correct an item. |
+| **Your accumulated knowledge** | See saved knowledge, task records, and existing relationships on a map; open a summary, then read or use the full item in the categorized list. |
 | **Skill Workshop** | Turn your methods into something others can use, or bring their methods into your assistant. |
 | **Growth and governance** | Review learning suggestions, to-dos, and longer-term improvement tasks; choose what to work on next. |
 | **Migration and safety** | Move computers, back up, import or export local materials, or create a problem report. |
+
+The map uses relationships supported by your saved materials, not guessed connections. Older items without source records remain available in the list; no rewrite is needed to use the map.
 
 **Summary first, details on click, explanations when needed.** Action buttons generally copy a request. Send that text to your current Agent, which explains and performs the work; the web page does not directly change your files.
 

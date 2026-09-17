@@ -65,7 +65,7 @@ GitHub ZIP 通常有一层外目录。真正的项目根至少同时包含：
 默认在系统实际桌面创建两个入口：**AI Carry（网页版）**、**AI Carry（客户端）**。两者使用同一份助手资料，都先预览并复制请求，再由用户发给 Agent。不要把一个 HTML 文件单独复制到桌面，也不使用 CMD 脚本作为客户端日常入口。
 
 1. 网页入口指向本次安装根的 `dashboard.html`；英文入口可指向 `dashboard.en.html`。
-2. 在已经核验的同一正式 Release 中选择操作系统与架构匹配的客户端包：`AI-Carry-2.1.1-win32-x64.zip`、`AI-Carry-2.1.1-darwin-arm64.zip` 或 `AI-Carry-2.1.1-darwin-x64.zip`。不要从其他网站下载同名文件。解压到新的本机应用目录，保留包内所有文件；不要覆盖已有非空目录，也不把程序存进实例资产。
+2. 在已经核验的同一正式 Release 中选择操作系统与架构匹配的客户端包：`AI-Carry-2.1.2-win32-x64.zip`、`AI-Carry-2.1.2-darwin-arm64.zip` 或 `AI-Carry-2.1.2-darwin-x64.zip`。不要从其他网站下载同名文件。解压到新的本机应用目录，保留包内所有文件；不要覆盖已有非空目录，也不把程序存进实例资产。
 3. 使用包内应用的 `--install-shortcuts --assistant-root "本次安装的完整目录"` 参数创建两个入口。Windows 执行 `AI Carry.exe`；macOS 执行应用包中的 `Contents/MacOS/AI Carry`。入口使用蓝色小电视图标；创建过程不设置开机启动、不修改权限、不连接 Agent。系统桌面位置由应用取得，不猜 Desktop 路径。具体结果见应用用户目录的 `installation-result.json`。
 4. 实际打开两个入口，确认同一版本、同一实例或空模板；客户端不应出现命令行窗口。再次安装时只更新能确定属于同一助手的入口，其他同名文件保留。
 

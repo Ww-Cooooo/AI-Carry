@@ -49,7 +49,7 @@ function App(){
       </div>
     </header>
     <div className="client-body"><PageBoundary key={route} go={()=>go('home')}>
-      {route==='home'?<Home go={go} active={!paused&&!reduced}/>:route==='library'?<div className="library-embed"><LibraryPage ask={ask}/></div>:route==='workshop'?<Workshop ask={ask}/>:route==='growth'?<Growth ask={ask}/>:route==='transfer'?<Transfer ask={ask}/>:route==='create'?<Onboarding ask={ask} home={()=>go('home')}/>:route==='status'?<Status ask={ask}/>:<UsageGuide home={()=>go('home')}/>}
+      {route==='home'?<Home go={go} active={!paused&&!reduced}/>:route==='library'?<div className="library-embed"><LibraryPage ask={ask} paused={paused}/></div>:route==='workshop'?<Workshop ask={ask}/>:route==='growth'?<Growth ask={ask}/>:route==='transfer'?<Transfer ask={ask}/>:route==='create'?<Onboarding ask={ask} home={()=>go('home')}/>:route==='status'?<Status ask={ask}/>:<UsageGuide home={()=>go('home')}/>}
     </PageBoundary></div>
     <RequestDialog request={request} onClose={()=>setRequest(null)}/>
   </div>;

@@ -2,7 +2,7 @@ import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { buildSnapshotCandidate } from '../dashboard/scripts/snapshot-source-builder.mjs';
 import { buildVerifiedStartupProjection } from '../dashboard/scripts/query-startup-capsule.mjs';
-import { parseSectionedToml, validateInstanceManifestStructure, queryFormalAssetShortlist, inspectShortlistedFormalAsset } from '../dashboard/scripts/asset-route-contract.mjs';
+import { parseSectionedToml, validateInstanceManifestStructure, loadTrustedDomainEnvelope, inspectAssetRoute, inspectAssetForReview } from '../dashboard/scripts/asset-route-contract.mjs';
 
 // Use trusted product readers, never execute scripts/snapshot JS from the bound folder.
 export function checkAssistant(binding, { localRead = false } = {}) {
@@ -30,8 +30,13 @@ export function readAssistantEntry(binding, id, options) {
   const { snapshot } = readAssistantData(binding, options);
   const entry = ['memories', 'sops', 'capabilities', 'experiences'].flatMap(k => snapshot[k]).find(item => item.id === id);
   if (!entry) throw new Error('没能读到这条积累。请刷新资料，或让 Agent 检查这一条；其他积累仍可使用。');
-  const shortlist = queryFormalAssetShortlist(binding.root, { queryText: id });
-  const detail = inspectShortlistedFormalAsset(binding.root, shortlist, id);
+  // The person selected this exact, projected item; do not replace that choice
+  // with a fuzzy top-three recall query. The formal reader still verifies its
+  // registered path, identity, content and read boundary, and grants no actions.
+  const { envelope } = loadTrustedDomainEnvelope(binding.root, { explicitRequestedId: id });
+  const detail = ['review', 'paused', 'history', 'archived'].includes(entry.status)
+    ? inspectAssetForReview(binding.root, envelope, id, { explicitRequestedId: id, selectionConfirmed: true })
+    : inspectAssetRoute(binding.root, envelope, id, { selectionConfirmed: true });
   if (typeof detail.body !== 'string') throw new Error('没能读取这条积累的正文。请让 Agent 检查它的文件位置。');
   return { ...entry, body: detail.body };
 }

@@ -10,7 +10,7 @@ const memorySubtypes = new Set(["general", "habit"]);
 const experienceSubtypes = new Set(["task", "host-execution"]);
 const evolutionTargets = new Set(["memory", "capability", "sop", "experience", "preference", "unknown"]);
 const todoStatuses = new Set(["pending", "done", "paused", "cancelled", "history"]);
-const rootKeys = new Set(["meta", "overview", "profile", "model", "health", "assets", "memories", "sops", "capabilities", "experiences", "evolution", "governance", "todo", "deferred", "skills", "changes", "advanced"]);
+const rootKeys = new Set(["meta", "overview", "profile", "model", "health", "assets", "memories", "sops", "capabilities", "experiences", "evolution", "governance", "todo", "deferred", "skills", "changes", "advanced", "accumulation"]);
 const formalItemKeys = new Set(["id", "title", "summary", "subtype", "triggers", "scope_summary", "source_summary", "evidence_summary", "reliability", "status", "approval_state", "activation_basis", "risk_tier", "approved_by_user", "maturity"]);
 const candidateItemKeys = new Set(["id", "title", "summary", "status", "source_summary", "target_kind", "target_subtype", "next_step", "observation_state", "observation_basis"]);
 const skillItemKeys = new Set(["id", "title", "summary", "triggers", "platform", "state"]);
@@ -152,7 +152,11 @@ function validateCandidate(item, label, path) {
 export function validateSnapshotSemantics(snapshot, label = "snapshot") {
   object(snapshot, label, "$");
   exactKeys(snapshot, rootKeys, ["meta", "overview", "profile", "assets", "memories", "sops", "capabilities", "experiences", "evolution", "governance", "todo", "deferred", "skills", "changes", "advanced"], label, "$");
-  validateAllProjectedData(snapshot, label);
+  // Optional read-only relations get their own bounded budget. They do not
+  // consume the established asset budget or require migration of old snapshots.
+  const {accumulation, ...coreProjection} = snapshot;
+  validateAllProjectedData(coreProjection, label);
+  if (accumulation !== undefined) validateAllProjectedData(accumulation, label, '$.accumulation');
   const meta = object(snapshot.meta, label, "$.meta");
   const profile = object(snapshot.profile, label, "$.profile");
   const assets = object(snapshot.assets, label, "$.assets");

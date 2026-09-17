@@ -535,7 +535,7 @@ function projectCandidateSnapshotEntry(entry) {
   });
 }
 
-export function projectCandidatesForSnapshot(repository, { instanceContext } = {}) {
+export function projectCandidatesForSnapshot(repository, { instanceContext, onSource } = {}) {
   auditCandidateSourceClosure(repository, { instanceContext });
   const identity = readTrustedInstanceIdentity(repository, instanceContext);
   if (!identity) fail("candidate snapshot projection lacks trusted instance identity");
@@ -550,12 +550,13 @@ export function projectCandidatesForSnapshot(repository, { instanceContext } = {
     if (!candidateSourceMatchesEntry(source, entry)) fail("candidate snapshot projection found source drift");
     const body = read.text.replaceAll("\r\n", "\n").slice(parsedSource.bodyOffset);
     if (locateHighConfidenceSecretCandidates(body).blocked || containsForbiddenLocationReference(body)) fail("candidate snapshot projection found unsafe body content");
+    onSource?.({asset: source});
     return projectCandidateSnapshotEntry(entry);
   }));
 }
 
 export function projectCandidatesForOperationalSnapshot(repository, {
-  instanceContext, requiredSourceRefs = new Set(), onIssue = undefined,
+  instanceContext, requiredSourceRefs = new Set(), onIssue = undefined, onSource,
 } = {}) {
   if (!(requiredSourceRefs instanceof Set) || typeof onIssue !== "function") fail("operational candidate projection requires bounded isolation controls");
   const identity = readTrustedInstanceIdentity(repository, instanceContext);
@@ -582,6 +583,7 @@ export function projectCandidatesForOperationalSnapshot(repository, {
       const body = read.text.replaceAll("\r\n", "\n").slice(parsedSource.bodyOffset);
       if (locateHighConfidenceSecretCandidates(body).blocked || containsForbiddenLocationReference(body)) fail("operational candidate body is unsafe");
       projected.push(projectCandidateSnapshotEntry(entry));
+      onSource?.({asset: source});
     } catch (error) {
       if (requiredSourceRefs.has(entry.source_ref)) throw error;
       onIssue({ area: "evolution", sourceRef: entry.source_ref, code: "candidate-source-invalid" });

@@ -190,7 +190,7 @@ projects_to = ["host-integration", "upgrade-system", "installation-experience", 
 [[components]]
 id = "snapshot-runtime"
 owner = "dashboard-runtime"
-paths = ["dashboard/scripts/snapshot-envelope.mjs", "dashboard/scripts/snapshot-semantics.mjs", "dashboard/scripts/snapshot-source-builder.mjs", "dashboard/scripts/snapshot-sync-transaction.mjs", "dashboard/scripts/sync-snapshot.mjs", "dashboard/scripts/validate-formal-template-snapshots.mjs", "dashboard/scripts/validate-snapshot-source-builder.mjs", "dashboard/scripts/validate-snapshot-sync-transaction.mjs"]
+paths = ["dashboard/scripts/snapshot-envelope.mjs", "dashboard/scripts/snapshot-semantics.mjs", "dashboard/scripts/snapshot-source-builder.mjs", "dashboard/scripts/accumulation-projection.mjs", "dashboard/scripts/validate-accumulation-map.mjs", "dashboard/scripts/snapshot-sync-transaction.mjs", "dashboard/scripts/sync-snapshot.mjs", "dashboard/scripts/validate-formal-template-snapshots.mjs", "dashboard/scripts/validate-snapshot-source-builder.mjs", "dashboard/scripts/validate-snapshot-sync-transaction.mjs"]
 depends_on = ["dashboard-snapshot-contract", "asset-retrieval-runtime", "instance-validation-evidence", "result-validation"]
 projects_to = ["dashboard-ui", "upgrade-system", "architecture-documentation"]
 

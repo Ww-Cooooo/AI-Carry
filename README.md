@@ -30,9 +30,9 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.1.zip)**　当前版本：`2.1.1`
+**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.2.zip)**　当前版本：`2.1.2`
 
-<sub>2.1.1：修复已批准 SOP 的使用请求；复制没有及时返回结果时，可选中全文手动复制。网页版与客户端同步更新，原有资料与批准记录保留。</sub>
+<sub>2.1.2：新增积累地图，看清记忆、方法与任务记录之间的联系；点开节点查看摘要，再跳到列表阅读完整内容。网页版与客户端同步更新，原有资料保持不变。</sub>
 
 这是 GitHub 的完整源码压缩包，**已带可直接打开的看板**，不是只下载一个网页。下载后，把 ZIP 的本地路径发给 Agent，并说：
 
@@ -54,7 +54,7 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 安装时，Agent 会在桌面放好 **AI Carry（网页版）** 和 **AI Carry（客户端）**。两者读取同一份助手资料；客户端还能直接选择本地文件夹和 ZIP。它不会自动连接 Agent，仍由你复制请求、粘贴发送。
 
-[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.1/AI-Carry-2.1.1-darwin-x64.zip)
+[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
 
 客户端包不代替完整助手目录。Mac 包未签名、尚未完成 Mac 实机验收；Linux 继续使用网页版。
 
@@ -139,10 +139,12 @@ AI Carry 不把整段聊天都当成永久记忆。它引导 Agent 在真实工�
 | 在看板里 | 你能做什么 |
 | --- | --- |
 | **创建与当前状态** | 创建助手，了解当前方向、状态，调整交流方式。 |
-| **我的积累** | 查看习惯、记忆、能力、SOP 和经验；有疑问就让 Agent 解释或修改。 |
+| **我的积累** | 用地图查看积累、任务记录和已有关系；点开摘要，再到分类列表看全文或让 Agent 使用。 |
 | **Skill 工坊** | 把自己的方法整理给别人用，也把别人分享的方法接进来。 |
 | **成长与治理** | 查看学习建议、待办和长期改进任务，选择下一步要处理的事。 |
 | **迁移与安全** | 换电脑、备份、导入导出本地资料，或生成一份问题报告。 |
+
+地图只展示资料中已有依据的关系，不猜测关联。旧资料没有来源记录时仍可在列表查看；不需要为了显示地图补写或改造原资料。
 
 **先看摘要，点开看详情，再按需看解释。** 看板里的操作按钮通常是“复制请求”：点击后把文字发给当前 Agent，由它说明并执行，不是网页直接修改电脑文件。
 

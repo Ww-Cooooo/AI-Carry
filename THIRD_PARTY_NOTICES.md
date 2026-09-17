@@ -25,6 +25,7 @@ AI Carry 的离线网页和 Electron 客户端共用同一套界面。React、GS
 | Three.js | 0.185.1 | MIT |
 | Motion | 12.43.0 | MIT |
 | React Flow (`@xyflow/react`) | 12.11.3 | MIT |
+| AntV G6 | 5.1.1 | MIT |
 | Lenis | 1.3.26 | MIT |
 | Radix UI | 1.6.7 | MIT |
 | Tailwind CSS | 4.3.3 | MIT |
@@ -39,6 +40,10 @@ AI Carry 的离线网页和 Electron 客户端共用同一套界面。React、GS
 - `dashboard/public/licenses/dashboard-production-dependencies.txt`
 
 它们由 `npm run licenses:generate` 从锁文件中已安装的非 dev 依赖生成；正式构建会先验证其与当前锁文件和包元数据一致，再把它们复制到离线产物。
+
+少数 AntV 传递依赖的 npm 包没有附带许可证文件。`dashboard/license-overrides/` 保留已核对的 MIT 包声明、上游来源及补充文本，并明确区分上游许可证原文与依据包元数据整理的标准 MIT 文本；不将补充文本冒充缺失的版本原件。
+
+`@antv/vendor` 声明 `MIT AND ISC`：它自己的 MIT 许可与内嵌 D3 等库的许可同时适用。生成器一并收录该包 `lib-vendor/` 中各库随包附带的许可证，不用根目录的 MIT 文件代替这些声明。
 
 ## 仅用于源码构建的工具
 

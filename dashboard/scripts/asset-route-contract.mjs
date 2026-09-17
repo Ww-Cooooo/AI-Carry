@@ -1157,7 +1157,7 @@ function formalSnapshotArea(kind) {
   return { memory: "memory", sop: "sops", capability: "capabilities", experience: "experiences" }[kind] ?? "formal-assets";
 }
 
-export function projectFormalAssetsForSnapshot(repository) {
+export function projectFormalAssetsForSnapshot(repository, { onSource } = {}) {
   auditFormalSourceClosure(repository);
   const { envelope } = loadTrustedDomainEnvelope(repository);
   const trust = trustedEnvelopes.get(envelope);
@@ -1169,12 +1169,13 @@ export function projectFormalAssetsForSnapshot(repository) {
   for (const route of [...trust.maintenanceRoutes].filter((entry) => entry.asset_kind !== "task-family")) {
     const projected = projectFormalSnapshotRoute(repository, route, routeIndex, evidenceRegistry);
     result[projected.targetKey].push(projected.item);
+    onSource?.({asset: projected.asset, uses: evidenceRegistry.recordsByAssetId.get(route.id) ?? []});
   }
   return freezeFormalProjection(result);
 }
 
 export function projectFormalAssetsForOperationalSnapshot(repository, {
-  requiredSourceRefs = new Set(), onIssue = undefined,
+  requiredSourceRefs = new Set(), onIssue = undefined, onSource,
 } = {}) {
   if (!(requiredSourceRefs instanceof Set) || typeof onIssue !== "function") fail("operational formal projection requires bounded isolation controls");
   const { envelope } = loadTrustedDomainEnvelope(repository);
@@ -1231,7 +1232,10 @@ export function projectFormalAssetsForOperationalSnapshot(repository, {
     }
   }
   const result = { memory: [], sops: [], capabilities: [], experiences: [] };
-  for (const projected of projectedById.values()) result[projected.targetKey].push(projected.item);
+  for (const projected of projectedById.values()) {
+    result[projected.targetKey].push(projected.item);
+    onSource?.({asset: projected.asset, uses: evidenceRegistry.recordsByAssetId.get(projected.asset.id) ?? []});
+  }
   return freezeFormalProjection(result);
 }
 

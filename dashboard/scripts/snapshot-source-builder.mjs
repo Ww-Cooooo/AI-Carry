@@ -10,6 +10,7 @@ import { parseCurrentSnapshotEnvelope, serializeSnapshotEnvelope } from "./snaps
 import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
 import { inspectStartupCapsule } from "./startup-capsule-contract.mjs";
 import { measureModelVisibleStartupContext } from "./query-startup-capsule.mjs";
+import { projectAccumulation } from './accumulation-projection.mjs';
 
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 const unsafeText = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u;
@@ -357,7 +358,7 @@ function projectSkillDelivery(repository, item) {
   }
 }
 
-function projectSkillExports(repository, instanceId, { mode = "strict", requiredSourceRefs = new Set(), issues = [] } = {}) {
+function projectSkillExports(repository, instanceId, { mode = "strict", requiredSourceRefs = new Set(), issues = [], onSource } = {}) {
   const ref = "instance/skills/exports/index.toml";
   if (!existsSync(resolve(repository, ...ref.split("/")))) return [];
   try {
@@ -380,6 +381,7 @@ function projectSkillExports(repository, instanceId, { mode = "strict", required
         continue;
       }
       items.push({ id: item.id, title: item.title, summary: item.summary, state: item.state, ...projectSkillDelivery(repository, item) });
+      onSource?.({asset: {...item, kind: 'skill-export'}});
     }
     return items.sort((left, right) => compareOrdinal(left.id, right.id));
   } catch (error) {
@@ -388,7 +390,7 @@ function projectSkillExports(repository, instanceId, { mode = "strict", required
   }
 }
 
-function projectSkills(repository, instanceId, { mode = "strict", requiredSourceRefs = new Set(), issues = [] } = {}) {
+function projectSkills(repository, instanceId, { mode = "strict", requiredSourceRefs = new Set(), issues = [], onSource } = {}) {
   const ref = "instance/skills/requirements.toml";
   let items = [];
   let status = "尚未登记 Skill";
@@ -417,7 +419,7 @@ function projectSkills(repository, instanceId, { mode = "strict", requiredSource
     isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-index-invalid", error.message);
     status = "部分 Skill 登记暂时隔离，其他功能仍可使用";
   }
-  const exports = projectSkillExports(repository, instanceId, { mode, requiredSourceRefs, issues });
+  const exports = projectSkillExports(repository, instanceId, { mode, requiredSourceRefs, issues, onSource });
   return { count: items.length, status, path: "", items, exports };
 }
 
@@ -495,13 +497,15 @@ export function buildSnapshotCandidate(repository, {
   const sources = computeSnapshotSourceDigestWithMode(root, { mode, requiredSourceRefs: requiredSourceRefSet, issues });
   const { context } = loadTrustedDomainEnvelope(root);
   const onProjectionIssue = ({ area, sourceRef, code }) => recordOperationalIssue(issues, { area, sourceRef, code });
+  const accumulationSources = [];
+  const onSource = source => accumulationSources.push(source);
   const formal = mode === "operational"
-    ? projectFormalAssetsForOperationalSnapshot(root, { requiredSourceRefs: requiredSourceRefSet, onIssue: onProjectionIssue })
-    : projectFormalAssetsForSnapshot(root);
+    ? projectFormalAssetsForOperationalSnapshot(root, { requiredSourceRefs: requiredSourceRefSet, onIssue: onProjectionIssue, onSource })
+    : projectFormalAssetsForSnapshot(root, { onSource });
   const evolution = mode === "operational"
-    ? projectCandidatesForOperationalSnapshot(root, { instanceContext: context, requiredSourceRefs: requiredSourceRefSet, onIssue: onProjectionIssue })
-    : projectCandidatesForSnapshot(root, { instanceContext: context });
-  const projectionOptions = { mode, requiredSourceRefs: requiredSourceRefSet, issues };
+    ? projectCandidatesForOperationalSnapshot(root, { instanceContext: context, requiredSourceRefs: requiredSourceRefSet, onIssue: onProjectionIssue, onSource })
+    : projectCandidatesForSnapshot(root, { instanceContext: context, onSource });
+  const projectionOptions = { mode, requiredSourceRefs: requiredSourceRefSet, issues, onSource };
   const todo = projectSupportDirectory(root, "todo", "todo", projectionOptions);
   const governance = projectSupportDirectory(root, "governance", "governance", projectionOptions);
   const deferred = projectSupportDirectory(root, "deferred", "deferred-work", projectionOptions);
@@ -521,6 +525,7 @@ export function buildSnapshotCandidate(repository, {
     memories: formal.memory, sops: formal.sops, capabilities: formal.capabilities, experiences: formal.experiences,
     evolution, governance, todo, deferred, skills, changes: [], advanced: { file_count: sources.fileCount, entry_files: ["AGENTS.md", "BOOTSTRAP.md", "assistant.toml", "core/maps/root-map.toml"] },
   };
+  snapshot.accumulation = projectAccumulation(accumulationSources, snapshot);
   validateSnapshotSemantics(snapshot, "generated instance snapshot");
   const source = serializeSnapshotEnvelope(snapshot);
   if (locateHighConfidenceSecretCandidates(source).blocked || containsForbiddenLocationReference(source)) fail("generated snapshot contains unsafe projected content");

@@ -17,6 +17,8 @@ const inventoryPath = resolve(outputDirectory, 'dashboard-production-dependencie
 const noticesPath = resolve(outputDirectory, 'dashboard-production-dependencies.txt')
 const checkOnly = process.argv.includes('--check')
 const licenseOverrides = new Map([
+  ...['@antv/algorithm@0.1.26', '@antv/event-emitter@0.1.3', '@antv/g-lite@2.7.0'].map(name => [name, [{filename: 'MIT declaration and attribution (package metadata)', path: resolve(dashboardRoot, 'license-overrides', 'AntV-MIT-metadata-notice.txt')}]]),
+  ['@antv/util@2.0.17', [{filename: 'LICENSE (upstream repository)', path: resolve(dashboardRoot, 'license-overrides', 'AntV-util-2.0.17-LICENSE.txt')}]],
   ['gsap@3.15.0', [{filename: 'GSAP Standard License (official website)', path: resolve(dashboardRoot, 'license-overrides', 'GSAP-standard-license.txt')}]],
   ['@gsap/react@2.1.2', [{filename: 'GSAP Standard License (official website)', path: resolve(dashboardRoot, 'license-overrides', 'GSAP-standard-license.txt')}]],
   [
@@ -101,6 +103,26 @@ async function loadDependency(name, dependency, directory) {
   const licenseSources = bundledLicenseFiles.length > 0
     ? bundledLicenseFiles.map((filename) => ({ filename, path: resolve(directory, filename) }))
     : licenseOverrides.get(`${name}@${version}`) ?? []
+
+  // @antv/vendor bundles D3/InternMap inside its own package. Its root MIT
+  // license does not replace those libraries' notices (including ISC).
+  if (name === '@antv/vendor') {
+    const vendorRoot = resolve(directory, 'lib-vendor')
+    const libraries = (await readdir(vendorRoot, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .sort((left, right) => left.name.localeCompare(right.name, 'en'))
+    for (const library of libraries) {
+      const libraryRoot = resolve(vendorRoot, library.name)
+      const licenses = (await readdir(libraryRoot))
+        .filter((filename) => /^(licen[cs]e|copying|notice)(\.|$)/i.test(filename))
+        .sort((left, right) => left.localeCompare(right, 'en'))
+      if (licenses.length === 0) throw new Error(`No bundled license found for ${name}/${library.name}.`)
+      for (const filename of licenses) licenseSources.push({
+        filename: `lib-vendor/${library.name}/${filename}`,
+        path: resolve(libraryRoot, filename),
+      })
+    }
+  }
   if (licenseSources.length === 0) throw new Error(`No license or notice file found for ${name}@${version}.`)
 
   const texts = []

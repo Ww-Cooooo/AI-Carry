@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import { parseCurrentSnapshotEnvelope } from "./snapshot-envelope.mjs";
 import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
 import { buildStartupCapsule } from "./startup-capsule-contract.mjs";
 import { createSkillDelivery } from "./skill-package.mjs";
+import { readAssistantEntry } from "../../desktop/assistant-data.mjs";
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Snapshot source builder contract failed: ${message}`); };
 const root = mkdtempSync(join(tmpdir(), "ai-carry-snapshot-builder-"));
@@ -217,7 +218,7 @@ lifecycle = "recurring"
 expected_next_use = ""
 related_asset_ids = []
 body_sections = []
-source_refs = []
+source_refs = ["event.fixture-source"]
 private_refs = ["private://private.collection.grade-workflow/context.md"]
 supersedes = []
 minimum_level = 2
@@ -288,6 +289,19 @@ confirmation = "none"
     && snapshot.skills.exports[0].source_asset_id === undefined && snapshot.skills.exports[0].entry === undefined,
   "Skill workshop projection did not expose exactly the low-sensitivity installed/export metadata");
   assert(!first.source.includes("private://") && !first.source.includes("private.collection.grade-workflow"), "a validated private locator leaked into the snapshot projection");
+  assert(snapshot.accumulation.links.some(link => link.source === "asset:sop.grade-summary" && link.target === "export:grade-summary-share" && link.kind === "produced"), "the real export source relation was lost");
+  assert(snapshot.accumulation.records.length === 1 && snapshot.accumulation.links.some(link => link.kind === "source") && !first.source.includes("event.fixture-source"), "source evidence was invented or its raw event identifier leaked");
+  const relationProjection = buildSnapshotCandidate(root, {mode: "operational"});
+  assert(JSON.stringify(relationProjection.snapshot.accumulation) === JSON.stringify(snapshot.accumulation), "strict and operational relation projection disagree");
+  if (process.argv.includes("--keep-preview")) {
+    const preview = mkdtempSync(join(tmpdir(), "ai-carry-accumulation-preview-"));
+    cpSync(root, preview, {recursive: true});
+    for (const part of ["public", "dist"]) {
+      mkdirSync(join(preview, "dashboard", part), {recursive: true});
+      writeFileSync(join(preview, "dashboard", part, "snapshot.js"), first.source, "utf8");
+    }
+    console.log(`Accumulation preview fixture: ${preview}`);
+  }
   assert(!first.source.includes("audio-transcriber") && !first.source.includes(".assistant-local"), "component-local or private locator metadata leaked into the snapshot projection");
   assert(snapshot.meta.source_digest === computeSnapshotSourceDigest(root).digest, "source digest did not match an independent deterministic rebuild");
   const repeated = buildSnapshotCandidate(root, { existingSource: first.source, now: new Date("2026-08-24T05:00:00+08:00") });
@@ -536,6 +550,23 @@ unexpected_field = "must-survive-byte-for-byte"
   let locationBlocked = false; try { buildSnapshotCandidate(root); } catch { locationBlocked = true; }
   assert(locationBlocked, "an absolute local location hidden in the instance source set was accepted");
   rmSync(resolve(root, "instance/profile/local-note.md"), { force: true });
+
+  // A clicked item is an exact choice, not a fuzzy top-three recall. Similar
+  // assets must not prevent the desktop from reading the selected source.
+  const originalMap = readFileSync(resolve(root, "instance/maps/domain-map.toml"), "utf8");
+  const sourceSop = readFileSync(resolve(root, "instance/sops/grade-summary.md"), "utf8");
+  const sourceRoute = "[[routes]]" + originalMap.split("[[routes]]")[1];
+  const duplicates = ["a", "b", "c"].map(suffix => {
+    const id = `sop.a-similar-${suffix}`, ref = `instance/sops/a-similar-${suffix}.md`;
+    write(ref, sourceSop.replaceAll("sop.grade-summary", id));
+    return sourceRoute.replaceAll("sop.grade-summary", id).replaceAll("instance/sops/grade-summary.md", ref);
+  });
+  write("instance/maps/domain-map.toml", originalMap + "\n" + duplicates.join("\n"));
+  const selectedBody = readAssistantEntry({root, instanceId: "ac-snapshot-fixture"}, "sop.grade-summary", {localRead: true});
+  assert(selectedBody.id === "sop.grade-summary" && selectedBody.body.includes("先核对输入列"), "desktop exact selection was displaced by similar assets");
+  let invalidSelectionRejected = false;
+  try { readAssistantEntry({root, instanceId: "ac-snapshot-fixture"}, "../outside", {localRead: true}); } catch { invalidSelectionRejected = true; }
+  assert(invalidSelectionRejected, "desktop exact selection accepted an unprojected path");
 
   complete = true;
   console.log("Snapshot source builder passed mixed valid/invalid Skill lists, count/date tolerance, strict source boundaries, stale delivery, local isolation and unchanged source bytes.");
