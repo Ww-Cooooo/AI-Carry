@@ -31,9 +31,11 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.3.zip)**　Current version: `2.1.3`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.4.zip)**　Current version: `2.1.4`
 
-<sub>New in 2.1.3: clearer boundaries between the public memory contract and member or custom memory-upgrade services, while existing materials stay unchanged.</sub>
+<sub>New in 2.1.4: the memory-engine upgrade guide is not ready for general use and has been withdrawn for further refinement. Everyday memory, learning, SOPs, and existing materials are unaffected.</sub>
+
+**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; 2.1.4 has explicitly withdrawn it. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.4. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.4 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -58,7 +60,7 @@ The installer creates **web** and **desktop** entries. Both use the same saved m
 
 [Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
 
-This 2.1.3 release only updates public documentation and the memory-service boundary; the desktop program is unchanged, so the verified 2.1.2 app bundles remain the correct downloads.
+This 2.1.4 release updates memory-engine upgrade guidance. The desktop program is unchanged, so the verified 2.1.2 app bundles remain the correct downloads.
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 
@@ -239,7 +241,7 @@ The public AI Carry core and original content shipped in this repository use the
 
 **The brand is separate from the code license.** The `AI Carry` name, logo, and official identity follow the [brand-use policy](TRADEMARKS.md). Third parties may say that their software is “compatible with AI Carry” or “based on AI Carry,” but may not present a modified version as the official product or imply endorsement by Hushan or AI Carry.
 
-**Membership content and services are a separate layer.** Curated workflows, private Skills, the full memory-engine upgrade guide, custom memory setups, installation and migration, RAG or knowledge-base integration, and technical support may be provided under separate content terms or service agreements. They do not change the public core license or transfer ownership of a user's personal materials and memories. Fonts, models, audio, icons, and other third-party materials remain under their own licenses.
+**Membership content and services are a separate layer.** Curated workflows, private Skills, custom memory setups, installation and migration, RAG or knowledge-base integration, and technical support may be provided under separate content terms or service agreements. The full memory-engine upgrade guide is still private work in progress; it is not represented as ready to sell or deploy, and any future offering will be described separately. These services do not change the public core license or transfer ownership of a user's personal materials and memories. Fonts, models, audio, icons, and other third-party materials remain under their own licenses.
 
 ---
 

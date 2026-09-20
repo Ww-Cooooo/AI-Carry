@@ -58,7 +58,7 @@ For a user-provided ZIP, check bounded size and entry count, reject absolute or 
 
 For Windows and macOS, the normal installation provides **AI Carry (web)** and **AI Carry (desktop)**. Both open the same installed assistant. Neither launches an Agent or sends messages: the user still copies a request and sends it to their chosen Agent.
 
-The 2.1.3 release has no desktop program change. Download the matching asset from the verified official v2.1.2 Release: `AI-Carry-2.1.2-win32-x64.zip`, `AI-Carry-2.1.2-darwin-arm64.zip`, or `AI-Carry-2.1.2-darwin-x64.zip`. Unpack to a new stable application folder. Do not overwrite an existing app or place user materials inside it. The desktop bundle includes its runtime; users need no npm installation or build.
+The 2.1.4 release has no desktop program change. Download the matching asset from the verified official v2.1.2 Release: `AI-Carry-2.1.2-win32-x64.zip`, `AI-Carry-2.1.2-darwin-arm64.zip`, or `AI-Carry-2.1.2-darwin-x64.zip`. Unpack to a new stable application folder. Do not overwrite an existing app or place user materials inside it. The desktop bundle includes its runtime; users need no npm installation or build.
 
 After reviewing the packaged installer, launch the actual application with `--install-shortcuts --assistant-root <installed-assistant-root>`. It uses the system's Desktop location, creates two entries with the AI Carry icon, preserves unrelated same-name entries, and records the result under the app's local user data. On Windows the desktop shortcut targets the real EXE, not CMD. The web entry opens the complete installation's `dashboard.html`; English is available from the language toggle or `dashboard.en.html`. Do not copy a lone HTML file to the Desktop.
 

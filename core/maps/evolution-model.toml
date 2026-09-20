@@ -46,12 +46,3 @@ target = "core/protocols/DEFERRED_MODEL_WORK.md"
 state = "on-demand"
 minimum_level = 1
 confirmation = "before-resume"
-
-[[routes]]
-id = "memory-engine-upgrade"
-summary = "当文件规模或检索质量需要时，把 Markdown 真源接入本地全文、RAG 或向量索引。"
-triggers = ["记忆混乱", "检索失败", "文件太多", "升级RAG", "升级向量数据库"]
-target = "core/guides/memory-engine-upgrade-guide.md"
-state = "gated-heavy"
-minimum_level = 3
-confirmation = "explicit"

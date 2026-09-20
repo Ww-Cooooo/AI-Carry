@@ -30,9 +30,11 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.3.zip)**　当前版本：`2.1.3`
+**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.4.zip)**　当前版本：`2.1.4`
 
-<sub>2.1.3：补充品牌与服务边界，并把记忆系统升级分成公开兼容说明和会员／定制服务内容；原有资料保持不变。</sub>
+<sub>2.1.4：记忆系统升级方案尚未成熟，暂从公版撤回继续打磨；日常记忆、学习、SOP 和已有资料不受影响。</sub>
+
+**关于 2.1.3 的旧说明：** 2.1.3 曾公开过这套记忆系统升级方法；2.1.4 已明确撤回。若你仍自行按 2.1.3 的旧说明安装、改造或接入 RAG／向量数据库，这属于未经 2.1.4 支持的自定义操作。由此产生的兼容、数据、隐私、资源或运行问题，需要你自行评估和承担；AI Carry 2.1.4 不为这条旧路线提供产品支持。普通记忆、学习、SOP 和现有资料不在这条边界内。
 
 这是 GitHub 的完整源码压缩包，**已带可直接打开的看板**，不是只下载一个网页。下载后，把 ZIP 的本地路径发给 Agent，并说：
 
@@ -56,7 +58,7 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 [Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
 
-本次 2.1.3 只更新公开说明与记忆服务边界，客户端程序没有变化，继续使用已验收的 2.1.2 客户端包。
+本次 2.1.4 调整记忆系统升级指引，客户端程序没有变化，继续使用已验收的 2.1.2 客户端包。
 
 客户端包不代替完整助手目录。Mac 包未签名、尚未完成 Mac 实机验收；Linux 继续使用网页版。
 
@@ -237,7 +239,7 @@ AI Carry 公开核心和随仓库发布的原创内容采用 [Apache License 2.0
 
 **品牌不等于代码许可。** `AI Carry` 名称、Logo 和官方身份按[品牌使用说明](TRADEMARKS.md)处理。第三方可以说明“兼容 AI Carry”或“基于 AI Carry”，但不能把修改版包装成官方版本，或暗示湖衫和 AI Carry 官方为它背书。
 
-**会员内容与服务是另一层。** 成熟工作流、私有 Skill、完整的记忆系统升级手册、定制记忆方案、安装迁移、RAG／知识库接入和技术支持，可能按单独的内容授权或服务约定提供；它们不改变公开核心的许可证，也不替用户取得的个人资料和记忆设置所有权。字体、模型、音频、图标和其他第三方材料仍按各自许可执行。
+**会员内容与服务是另一层。** 成熟工作流、私有 Skill、定制记忆方案、安装迁移、RAG／知识库接入和技术支持，可能按单独的内容授权或服务约定提供。完整的记忆系统升级手册目前仍处于私密打磨阶段，不代表已经成熟可售或可部署；若未来提供相关服务，以单独说明为准。它们不改变公开核心的许可证，也不替用户取得的个人资料和记忆设置所有权。字体、模型、音频、图标和其他第三方材料仍按各自许可执行。
 
 ---
 
