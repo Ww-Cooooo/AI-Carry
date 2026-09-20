@@ -31,9 +31,9 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.2.zip)**　Current version: `2.1.2`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.3.zip)**　Current version: `2.1.3`
 
-<sub>New in 2.1.2: explore your accumulated knowledge and task records on a map. Select an item for a summary, then open its full content in the list. Web and desktop share the update; your materials stay unchanged.</sub>
+<sub>New in 2.1.3: clearer boundaries between the public memory contract and member or custom memory-upgrade services, while existing materials stay unchanged.</sub>
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -57,6 +57,8 @@ After installation, the Agent should tell you **where the dashboard is, whether 
 The installer creates **web** and **desktop** entries. Both use the same saved materials; the desktop app adds a native folder/ZIP picker. It does not bind to an Agent or send requests automatically.
 
 [Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
+
+This 2.1.3 release only updates public documentation and the memory-service boundary; the desktop program is unchanged, so the verified 2.1.2 app bundles remain the correct downloads.
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 
@@ -230,6 +232,14 @@ The protocols target different file-capable hosts, not a claim that every brand,
 The design principles: **contain small faults locally; think and design comprehensively to deliver a good product; verify precisely and keep processes practical; never turn comprehensive thinking into comprehensive control.** Remove low-value tests and process overhead, not functionality, experience, or quality. Keep necessary data and privacy protections.
 
 </details>
+
+## License, brand, and services
+
+The public AI Carry core and original content shipped in this repository use the [Apache License 2.0](LICENSE). You may use them for personal, team, and commercial work. The code license does not require a membership and does not restrict the work you do with your own materials.
+
+**The brand is separate from the code license.** The `AI Carry` name, logo, and official identity follow the [brand-use policy](TRADEMARKS.md). Third parties may say that their software is “compatible with AI Carry” or “based on AI Carry,” but may not present a modified version as the official product or imply endorsement by Hushan or AI Carry.
+
+**Membership content and services are a separate layer.** Curated workflows, private Skills, the full memory-engine upgrade guide, custom memory setups, installation and migration, RAG or knowledge-base integration, and technical support may be provided under separate content terms or service agreements. They do not change the public core license or transfer ownership of a user's personal materials and memories. Fonts, models, audio, icons, and other third-party materials remain under their own licenses.
 
 ---
 

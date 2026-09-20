@@ -2,7 +2,7 @@
 
 仅在用户明确要求检查或应用模板更新时读取。实例运行良好时不强制升级。进入本路线时同时读取 `core/protocols/INSTANCE_EVOLUTION_COMPATIBILITY.md`，让升级计划真实遵守同一组所有权、保留、适配、重连和局部隔离原则；不能只在文档里提到协定而不用于当前实例方案。
 
-2.1.2 的积累地图与旧资料兼容说明见 `core/upgrade/upgrade-2.1.1-to-2.1.2.md`。2.1.1 的看板请求修复见 `core/upgrade/upgrade-2.1.0-to-2.1.1.md`。2.1.0 的网页/客户端入口变化见 `core/upgrade/upgrade-2.0.11-to-2.1.0.md`；均不要求搬移实例资料，也不恢复自动连接 Agent。
+2.1.3 的公开记忆契约与 VIP 内容边界见 `core/upgrade/upgrade-2.1.2-to-2.1.3.md`。2.1.2 的积累地图与旧资料兼容说明见 `core/upgrade/upgrade-2.1.1-to-2.1.2.md`。2.1.1 的看板请求修复见 `core/upgrade/upgrade-2.1.0-to-2.1.1.md`。2.1.0 的网页/客户端入口变化见 `core/upgrade/upgrade-2.0.11-to-2.1.0.md`；均不要求搬移实例资料，也不恢复自动连接 Agent。
 
 ## 用户看到的简单流程
 
