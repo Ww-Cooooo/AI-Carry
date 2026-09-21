@@ -28,8 +28,8 @@ app.whenReady().then(async()=>{
     try{
       const {createDesktopEntries}=require('./create-desktop-entries.cjs');
       const di=process.argv.indexOf('--desktop-dir');
-      const entries=createDesktopEntries({app,shell,root:initialRoot,stateDirectory,...(di>=0?{desktopDirectory:resolve(process.argv[di+1])}:{})});
-      require('node:fs').writeFileSync(join(stateDirectory,'installation-result.json'),JSON.stringify({status:'installed',entries},null,2));
+      const result=createDesktopEntries({app,shell,root:initialRoot,stateDirectory,...(di>=0?{desktopDirectory:resolve(process.argv[di+1])}:{})});
+      require('node:fs').writeFileSync(join(stateDirectory,'installation-result.json'),JSON.stringify({status:'installed',...result},null,2));
     }catch(error){require('node:fs').writeFileSync(join(stateDirectory,'installation-result.json'),JSON.stringify({status:'partial',error:error.message},null,2));process.exitCode=1;}
     app.quit();return;
   }
@@ -63,6 +63,15 @@ app.whenReady().then(async()=>{
           ?{title:'选择 Skill 文件夹',buttonLabel:'选择文件夹',properties:['openDirectory','dontAddToRecent']}
           :{title:'选择 Skill ZIP 文件',buttonLabel:'选择 ZIP 文件',properties:['openFile','dontAddToRecent'],filters:[{name:'ZIP 压缩包',extensions:['zip']}]});
         return{ok:true,value:result.canceled?null:result.filePaths[0]||null};
+      }
+      if(action==='open-web'){
+        const root=service?.getSelectedRoot?.()||initialRoot;
+        if(!root)throw new Error('还没有选定助手资料，网页版仍可从安装目录打开。');
+        const web=join(root,'dashboard.html');
+        if(!require('node:fs').existsSync(web))throw new Error('安装目录里暂时没有网页版入口。');
+        const opening=await shell.openPath(web);
+        if(opening)throw new Error(`网页版没有打开：${opening}`);
+        return{ok:true,value:web};
       }
       if(!service){
         throw new Error('本地资料暂时无法读取，仍可复制请求。'+(serviceError||''));

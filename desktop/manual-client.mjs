@@ -28,6 +28,9 @@ export function createManualClient({ stateDirectory, chooseDirectory, initialRoo
   }
   return {
     selectRoot,
+    getSelectedRoot() {
+      return selected()?.root || null;
+    },
     async command(action, input = {}) {
       if (action === 'assistant-data') return read(selected());
       if (action === 'assistant-entry') return readAssistantEntry(selected(), input.id, { localRead: true });

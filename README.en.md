@@ -31,11 +31,11 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.4.zip)**　Current version: `2.1.4`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.5.zip)**　Current version: `2.1.5`
 
-<sub>New in 2.1.4: the memory-engine upgrade guide is not ready for general use and has been withdrawn for further refinement. Everyday memory, learning, SOPs, and existing materials are unaffected.</sub>
+<sub>AI Carry 2.1.5 keeps the 2.1.4 memory-engine boundary: everyday memory, learning, SOPs, and existing materials are unaffected. Fresh installs now create the desktop client entry automatically.</sub>
 
-**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; 2.1.4 has explicitly withdrawn it. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.4. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.4 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
+**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.5. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.5 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -56,11 +56,11 @@ After installation, the Agent should tell you **where the dashboard is, whether 
 
 ### Two ways to open the same assistant
 
-The installer creates **web** and **desktop** entries. Both use the same saved materials; the desktop app adds a native folder/ZIP picker. It does not bind to an Agent or send requests automatically.
+The installer automatically installs **AI Carry (desktop)** and creates its Desktop entry; the web view stays in the installation folder as `dashboard.html`. Both use the same saved materials; the desktop app adds a native folder/ZIP picker and a Web fallback in its top bar. It does not bind to an Agent or send requests automatically.
 
 [Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
 
-This 2.1.4 release updates memory-engine upgrade guidance. The desktop program is unchanged, so the verified 2.1.2 app bundles remain the correct downloads.
+This 2.1.5 release closes the default client-install gap: a fresh install creates one desktop client entry, keeps the web dashboard in the installation folder, and lets the client open that same dashboard. The verified 2.1.2 app bundles remain the correct client downloads.
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 

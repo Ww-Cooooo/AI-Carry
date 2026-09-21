@@ -1,6 +1,6 @@
 import React,{Component,useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ArrowUpRight,ArrowRight,HelpCircle,Pause,Play,Settings} from 'lucide-react';
+import {ArrowUpRight,ArrowRight,ExternalLink,HelpCircle,Pause,Play,Settings} from 'lucide-react';
 import gsap from 'gsap';
 import {useGSAP} from '@gsap/react';
 import LibraryPage from './LibraryPage';
@@ -32,9 +32,9 @@ function Home({go,active}:{go:(r:Route)=>void;active:boolean}){
 class PageBoundary extends Component<{children:React.ReactNode;go:()=>void},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true};}render(){return this.state.failed?<div className="local-page-error"><h1>这一页没能打开</h1><p>助手资料还在。可以先用其他页面，再回来重试。</p><button className="primary-button" onClick={this.props.go}>返回总览<ArrowRight size={18}/></button></div>:this.props.children;}}
 function App(){
   const {locale,setLocale}=useDashboardLocale();
-  const {assistant,demo,source,dataLoading}=useClient();
+  const {assistant,demo,source,dataLoading,act}=useClient();
   const ask:Ask=request=>setRequest({...request,assistant:route==='create'&&assistant?.snapshot.meta.state!=='template'?undefined:source(request.itemId)});
-  const [route,setRoute]=useState<Route>(readRoute),[request,setRequest]=useState<Request|null>(null),[paused,setPaused]=useState(false),reduced=useReducedMotion();
+  const [route,setRoute]=useState<Route>(readRoute),[request,setRequest]=useState<Request|null>(null),[paused,setPaused]=useState(false),[webError,setWebError]=useState(''),reduced=useReducedMotion();
   useEffect(()=>{const update=()=>{setRoute(readRoute());setRequest(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
   const go=(r:Route)=>{if(location.hash===`#${r}`)setRoute(r);else location.hash=r;};
   const homeRoute=route==='home';
@@ -45,9 +45,10 @@ function App(){
       <div className="top-tools"><button className="top-icon" onClick={()=>setLocale(locale==='en'?'zh-Hans':'en')} title="中文 / English">{locale==='en'?'中':'EN'}</button>
         {demo?<span className="demo-badge" title="当前窗口展示虚构示例，不会修改你的助手">演示数据</span>:<span className="preview-label">{dataLoading?'正在读取资料':assistant?'本地资料 · 只读查看':(window.carryClient?'本地客户端':'本地网页版')}</span>}
         {homeRoute&&<button className="top-icon" onClick={()=>setPaused(!paused)} disabled={reduced} aria-label={reduced?'系统已减少动态':paused?'播放首屏动效':'暂停首屏动效'} title={reduced?'系统已减少动态':paused?'播放首屏动效':'暂停首屏动效'}>{paused||reduced?<Play size={17}/>:<Pause size={17}/>}</button>}
-        <button className="top-icon" onClick={()=>go('status')} aria-label="助手设置" title="助手设置"><Settings size={18}/></button><button className="manual-help" onClick={()=>go('system')} title="查看如何使用客户端"><HelpCircle size={18}/><span>使用说明</span></button>
+        <button className="top-icon" onClick={()=>go('status')} aria-label="助手设置" title="助手设置"><Settings size={18}/></button>{window.carryClient&&<button className="manual-help web-fallback" onClick={()=>void act('open-web').catch(error=>setWebError(error instanceof Error?error.message:'网页版暂时没有打开'))} title={locale==='en'?'If the app is inconvenient, open the web view':'客户端不好用时，打开安装文件夹里的网页版'}><ExternalLink size={17}/><span>{locale==='en'?'Web':'网页版'}</span></button>}<button className="manual-help" onClick={()=>go('system')} title="查看如何使用客户端"><HelpCircle size={18}/><span>使用说明</span></button>
       </div>
     </header>
+    {webError&&<p className="web-fallback-error" role="status">{webError}。网页版文件仍在安装目录里。</p>}
     <div className="client-body"><PageBoundary key={route} go={()=>go('home')}>
       {route==='home'?<Home go={go} active={!paused&&!reduced}/>:route==='library'?<div className="library-embed"><LibraryPage ask={ask} paused={paused}/></div>:route==='workshop'?<Workshop ask={ask}/>:route==='growth'?<Growth ask={ask}/>:route==='transfer'?<Transfer ask={ask}/>:route==='create'?<Onboarding ask={ask} home={()=>go('home')}/>:route==='status'?<Status ask={ask}/>:<UsageGuide home={()=>go('home')}/>}
     </PageBoundary></div>

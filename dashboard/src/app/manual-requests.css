@@ -1,5 +1,6 @@
 .manual-help{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;border:1px solid #cfdaee;border-radius:24px;color:#284dc0;background:#f4f7fe;font-size:14px;white-space:nowrap}
 .manual-help:hover{background:#e8efff}.manual-help:focus-visible{outline:2px solid #255de1;outline-offset:3px}
+.web-fallback{border-color:#b9d5f3;background:#f3f9ff;color:#1766a8}.web-fallback:hover{background:#e6f3ff}.web-fallback-error{position:fixed;right:28px;top:96px;z-index:40;margin:0;padding:9px 13px;border:1px solid #f0c7c1;border-radius:12px;background:#fff8f6;color:#a24f45;font-size:13px;box-shadow:0 8px 20px -16px #7b3d35}
 .assistant-data-actions{display:flex;flex-wrap:wrap;gap:12px;flex-shrink:0}
 .assistant-data-note details p{overflow-wrap:anywhere}
 .manual-request-dialog.request-dialog{width:min(620px,calc(100vw - 64px))}

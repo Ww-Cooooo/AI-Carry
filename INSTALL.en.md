@@ -20,7 +20,7 @@ The installation request allows the Agent to:
 
 - inspect the official repository or user-provided ZIP without executing its content;
 - place one complete copy in a new or confirmed-empty directory;
-- install the matching signed or clearly identified unsigned official desktop bundle into a new local application folder, and create the web and desktop entries;
+- install or reuse the matching signed or clearly identified unsigned official desktop bundle in a new local application folder, and create the desktop entry; keep the web view in the installation folder;
 - open the local Dashboard and perform proportionate verification;
 - continue into first-time assistant creation.
 
@@ -54,17 +54,17 @@ After copying, read back the root markers above and confirm that `instance/manif
 
 For a user-provided ZIP, check bounded size and entry count, reject absolute or `..` paths and link escapes, and use an independently supplied archive digest when one exists. Do not create a new per-file hash bureaucracy for an ordinary installation.
 
-## 4. Create both desktop entries
+## 4. Install the desktop app and create its entry
 
-For Windows and macOS, the normal installation provides **AI Carry (web)** and **AI Carry (desktop)**. Both open the same installed assistant. Neither launches an Agent or sends messages: the user still copies a request and sends it to their chosen Agent.
+The default one-sentence install result is: **the desktop app is installed and gets an “AI Carry (desktop)” shortcut; the web view stays in the installation folder as `dashboard.html`**. Users should not have to download the desktop app or type a CMD command themselves. Neither surface launches an Agent or sends messages: the user still copies a request and sends it to their chosen Agent.
 
-The 2.1.4 release has no desktop program change. Download the matching asset from the verified official v2.1.2 Release: `AI-Carry-2.1.2-win32-x64.zip`, `AI-Carry-2.1.2-darwin-arm64.zip`, or `AI-Carry-2.1.2-darwin-x64.zip`. Unpack to a new stable application folder. Do not overwrite an existing app or place user materials inside it. The desktop bundle includes its runtime; users need no npm installation or build.
+1. Read `desktop/client-release.json` and use the official package for the current platform and architecture. When the source-only release has no new desktop program, use the reviewed package named there (currently `v2.1.2`); never fetch a same-named file from another site. Downloading, unpacking and launching this package are part of the install, not a later user task.
+2. Unpack to a new versioned application folder. If an older app folder is non-empty, keep it and install the selected version alongside it; point this assistant's shortcut to the selected version. Do not put the app inside assistant data, and do not stop merely because an older version exists.
+3. After reviewing the packaged app, launch the real `AI Carry.exe` (or macOS `Contents/MacOS/AI Carry`) with `--install-shortcuts --assistant-root <installed-assistant-root>`. It uses the system Desktop location, creates or updates only the shortcut owned by this assistant, preserves unrelated same-name entries, and records the result under the app's local user data. On Windows the shortcut targets the real executable, not CMD. The web entry remains the complete installation's `dashboard.html`; do not copy a lone HTML file to the Desktop.
 
-After reviewing the packaged installer, launch the actual application with `--install-shortcuts --assistant-root <installed-assistant-root>`. It uses the system's Desktop location, creates two entries with the AI Carry icon, preserves unrelated same-name entries, and records the result under the app's local user data. On Windows the desktop shortcut targets the real EXE, not CMD. The web entry opens the complete installation's `dashboard.html`; English is available from the language toggle or `dashboard.en.html`. Do not copy a lone HTML file to the Desktop.
+Open the client shortcut and verify the assistant name and version. The client top bar includes **Web** so a user can open the same local web view if the desktop app is inconvenient. The app is currently unsigned: explain any system trust prompt; never disable system protection or change permissions to bypass it. Windows can be verified here; a cross-built macOS bundle is not a macOS real-machine pass.
 
-Open both entries and verify the same assistant name and version. The app is currently unsigned: explain any system trust prompt; never disable system protection or change permissions to bypass it. Windows can be verified here; a cross-built macOS bundle is not a macOS real-machine pass.
-
-For Linux, an explicit web-only choice, or an unavailable desktop bundle, keep the usable web installation and report the desktop entry as unavailable. A download or shortcut problem affects only that entry, not assistant creation, memory or normal work. No automatic startup, Agent binding, or background connection is installed.
+For Linux, an explicit web-only choice, an unavailable desktop bundle, or a download failure, keep the usable web installation and report the desktop entry as unavailable. This local gap does not stop assistant creation, memory or normal work. No automatic startup, Agent binding, or background connection is installed.
 
 ## 5. Continue into first-time creation
 
