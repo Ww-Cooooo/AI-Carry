@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "product": "AI Carry",
-  "release_tag": "v2.1.2",
-  "reason": "The desktop program is unchanged in later source-only releases; use this reviewed package until a newer client package is published.",
+  "release_tag": "v2.1.6",
+  "reason": "The 2.1.6 client bundles include the current desktop fallback and one-entry installation behavior; use the package for the current platform.",
   "assets": {
-    "win32-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip",
-    "darwin-arm64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip",
-    "darwin-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip"
+    "win32-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-win32-x64.zip",
+    "darwin-arm64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-arm64.zip",
+    "darwin-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-x64.zip"
   }
 }

@@ -31,11 +31,11 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.5.zip)**　Current version: `2.1.5`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.6.zip)**　Current version: `2.1.6`
 
-<sub>AI Carry 2.1.5 keeps the 2.1.4 memory-engine boundary: everyday memory, learning, SOPs, and existing materials are unaffected. Fresh installs now create the desktop client entry automatically.</sub>
+<sub>AI Carry 2.1.6 keeps the 2.1.4 memory-engine boundary and defaults same-computer Agent switches to an independent copy, leaving the original folder unchanged and preventing automatic cross-copy writes.</sub>
 
-**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.5. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.5 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
+**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.6. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.6 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -52,15 +52,15 @@ dashboard, and guide me to create my assistant. Do not overwrite anything.
 
 After installation, the Agent should tell you **where the dashboard is, whether your assistant has been created, and what to do next**, not merely that files were downloaded. Already have an assistant? Use [check and upgrade](#move), not a whole-folder ZIP overwrite.
 
-**How do you continue later?** Point a new conversation at the same AI Carry folder. If the host does not load its entry automatically, ask it to read `BOOTSTRAP.md` there. To use it alongside another work project, first have the Agent check access to both; you do not need to move all your work into AI Carry. Reopen the dashboard and check your assistant's direction under “Current status.” If it still shows an empty template, ask the Agent to check the saved setup or refresh the display instead of creating another assistant.
+**How do you continue later?** Point a new conversation at the same AI Carry folder. If the host does not load its entry automatically, ask it to read `BOOTSTRAP.md` there. To use it alongside another work project, first have the Agent check access to both; you do not need to move all your work into AI Carry. Reopen the dashboard and check your assistant's direction under “Current status.” If it still shows an empty template, ask the Agent to check the saved setup or refresh the display instead of creating another assistant. When switching Agents on the same computer, the Move & safety page now creates an independent copy by default: the original folder stays unchanged and the copies do not sync automatically. Choose the shared-folder route only when you intend to use the folder in turns and re-read affected files before writing.
 
 ### Two ways to open the same assistant
 
 The installer automatically installs **AI Carry (desktop)** and creates its Desktop entry; the web view stays in the installation folder as `dashboard.html`. Both use the same saved materials; the desktop app adds a native folder/ZIP picker and a Web fallback in its top bar. It does not bind to an Agent or send requests automatically.
 
-[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
+[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-x64.zip)
 
-This 2.1.5 release closes the default client-install gap: a fresh install creates one desktop client entry, keeps the web dashboard in the installation folder, and lets the client open that same dashboard. The verified 2.1.2 app bundles remain the correct client downloads.
+This 2.1.6 release keeps the default client-install path and adds a safer same-computer Agent switch: a fresh install still creates one desktop client entry, while the migration page creates an independent copy by default. The 2.1.6 app bundles include the current client fallback and installation behavior.
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 

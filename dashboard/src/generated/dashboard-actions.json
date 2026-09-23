@@ -29,7 +29,7 @@
     "rootCategory": "local-operations",
     "routeId": "host-integration",
     "target": "core/protocols/HOST_INTEGRATION.md",
-    "request": "执行看板动作 host.prepare-agent-switch。按根地图进入 local-operations → host-integration，读取 core/protocols/HOST_INTEGRATION.md。先判断目标 Agent 是否在同一电脑并能读取当前 AI Carry；能读文件就给出同一主本的最小接入提示和启动入口，不能读文件才生成有界文字胶囊，另一台电脑则改用完整迁移路线。不要复制全部资产、泄露凭据或自行外发。完成后给出可直接使用的接入方式、预期回执和下一步。"
+    "request": "执行看板动作 host.prepare-agent-switch。按根地图进入 local-operations → host-integration，读取 core/protocols/HOST_INTEGRATION.md。先确认用户选择的是默认独立副本还是轮流共用原目录。同机默认调用 dashboard/scripts/prepare-agent-switch.mjs --mode independent，在用户指定的新目录建立不覆盖已有文件的独立副本；原目录不改，副本保留原 instance_id 但写入独立 copy_id 和 .assistant-local/HOST-SWITCH-START.md，两个副本之后不自动同步。排除 Git 元数据、依赖安装目录、已知运行缓存和凭据，不全局替换用户正文或历史记录。新 Agent 读取接手说明后，逐项复核并只在副本中重连本机绑定；旧宿主指令和原生记忆只作参考。用户明确选择共用原目录时不复制文件，说明只适合轮流使用、没有并发写保护，并要求每次写入前重新读取受影响真源。不能读文件才退回当前接入和任务所需的极小文字胶囊，另一台电脑改用完整迁移路线。某个工具无法重连只隔离该工具，不拖住 AI Carry。完成后给出实际副本或共用位置、接入状态、待复核绑定和下一步，不泄露凭据或自行外发。"
   },
   {
     "action_id": "instance.review-private-coverage",

@@ -106,7 +106,7 @@ projects_to = ["asset-retrieval-runtime", "snapshot-runtime", "dashboard-snapsho
 [[components]]
 id = "host-integration"
 owner = "template-core"
-paths = ["core/protocols/HOST_SESSION_RESUME.md", "core/protocols/HOST_INTEGRATION.md", "core/schemas/host-integration.schema.md", "core/templates/integration/**"]
+paths = ["core/protocols/HOST_SESSION_RESUME.md", "core/protocols/HOST_INTEGRATION.md", "core/schemas/host-integration.schema.md", "core/templates/integration/**", "dashboard/scripts/prepare-agent-switch.mjs", "dashboard/scripts/validate-agent-switch-copy.mjs"]
 depends_on = ["identity-lifecycle", "context-routing", "asset-memory", "external-safety", "cross-session-signals"]
 projects_to = ["installation-experience", "instance-assets", "model-orchestration", "privacy-migration", "upgrade-system", "architecture-documentation"]
 

@@ -1,7 +1,7 @@
 {
   "name": "ai-carry-dashboard",
   "private": true,
-  "version": "2.1.5",
+  "version": "2.1.6",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -10,6 +10,8 @@
     "instantiate": "node scripts/first-instantiation-transaction.mjs",
     "upgrade": "node scripts/ai-carry-upgrade-cli.mjs",
     "runtime-boundary": "node scripts/copied-instance-runtime-boundary.mjs",
+    "host-switch": "node scripts/prepare-agent-switch.mjs",
+    "check:host-switch": "node scripts/validate-agent-switch-copy.mjs",
     "check:actions": "node scripts/generate-dashboard-actions.mjs --check && node scripts/validate-action-mirror.mjs",
     "check:first-run": "node scripts/validate-first-run-contract.mjs",
     "check:change-quality": "node scripts/validate-change-quality-contract.mjs",

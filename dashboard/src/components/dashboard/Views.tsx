@@ -996,7 +996,7 @@ export function TransferView({ onCopy, startComputerGuideRequest = 0 }: { onCopy
       <section className="transfer-essential__head" aria-labelledby="assistant-relocation-title">
         <div>
           <SectionEyebrow icon={PackageOpen}>迁移与安全</SectionEyebrow>
-          <div className="heading-with-hint"><h1 id="assistant-relocation-title">这次你要换 Agent，还是换电脑？</h1><InfoHint label="两种方式有什么区别" help="同一台电脑换 Agent 时直接接入现有 AI Carry；换电脑时生成包含助手主体、本地隐私分卷和恢复说明的迁移套件。" /></div>
+          <div className="heading-with-hint"><h1 id="assistant-relocation-title">这次你要换 Agent，还是换电脑？</h1><InfoHint label="两种方式有什么区别" help="同一台电脑换 Agent 时默认建立独立副本；明确选择共用原目录时才轮流使用。换电脑时生成包含助手主体、本地隐私分卷和恢复说明的迁移套件。" /></div>
         </div>
         <p>选一种去向，Agent 会继续引导。</p>
       </section>
@@ -1006,9 +1006,9 @@ export function TransferView({ onCopy, startComputerGuideRequest = 0 }: { onCopy
           <div className="transfer-choice__icon"><Cpu aria-hidden="true" /></div>
           <span className="transfer-choice__tag">同一台电脑</span>
           <h2>换 Agent</h2>
-          <p>直接接入这一份 AI Carry，不重复复制整套内容。</p>
-          <span className="transfer-choice__fact"><ShieldCheck aria-hidden="true" />只读取当前任务需要的内容</span>
-          {localAgentAction ? <Button className="action-button action-button--blue" onClick={() => onCopy(localAgentAction.request, localAgentAction.label)}><ClipboardCopy aria-hidden="true" />复制接入指令<ArrowRight aria-hidden="true" /></Button> : null}
+          <p>默认建立独立副本，原目录不动；也可以明确选择轮流共用。</p>
+          <span className="transfer-choice__fact"><ShieldCheck aria-hidden="true" />副本不带密钥与登录状态</span>
+          {localAgentAction ? <Button className="action-button action-button--blue" onClick={() => onCopy(localAgentAction.request, localAgentAction.label)}><ClipboardCopy aria-hidden="true" />复制独立副本请求<ArrowRight aria-hidden="true" /></Button> : null}
         </article>
 
         <article className="transfer-choice transfer-choice--computer">

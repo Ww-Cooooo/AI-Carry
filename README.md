@@ -30,11 +30,11 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.5.zip)**　当前版本：`2.1.5`
+**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.6.zip)**　当前版本：`2.1.6`
 
-<sub>2.1.5：延续 2.1.4 的记忆系统升级边界；日常记忆、学习、SOP 和已有资料不受影响，并补齐新安装的客户端入口。</sub>
+<sub>2.1.6：延续 2.1.4 的记忆系统升级边界，并让同一台电脑更换 Agent 时默认使用独立副本，原目录不动、两份积累不自动混写。</sub>
 
-**关于 2.1.3 的旧说明：** 2.1.3 曾公开过这套记忆系统升级方法；2.1.4 起已明确撤回。若你仍自行按 2.1.3 的旧说明安装、改造或接入 RAG／向量数据库，这属于未经 2.1.5 支持的自定义操作。由此产生的兼容、数据、隐私、资源或运行问题，需要你自行评估和承担；AI Carry 2.1.5 不为这条旧路线提供产品支持。普通记忆、学习、SOP 和现有资料不在这条边界内。
+**关于 2.1.3 的旧说明：** 2.1.3 曾公开过这套记忆系统升级方法；2.1.4 起已明确撤回。若你仍自行按 2.1.3 的旧说明安装、改造或接入 RAG／向量数据库，这属于未经 2.1.6 支持的自定义操作。由此产生的兼容、数据、隐私、资源或运行问题，需要你自行评估和承担；AI Carry 2.1.6 不为这条旧路线提供产品支持。普通记忆、学习、SOP 和现有资料不在这条边界内。
 
 这是 GitHub 的完整源码压缩包，**已带可直接打开的看板**，不是只下载一个网页。下载后，把 ZIP 的本地路径发给 Agent，并说：
 
@@ -50,15 +50,15 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 安装后，Agent 应告诉你**看板在哪、助手是否已创建、现在可以做什么**，而不只是说“文件已下载”。已有助手请走[检查与升级](#move)，不要用 ZIP 整包覆盖。
 
-**以后怎么接着用？** 新开对话时，仍指向这份 AI Carry 目录；若宿主没有自动读取入口，就让它先读其中的 `BOOTSTRAP.md`。在其他业务项目中使用时，先让 Agent 确认能同时访问这份积累，不必一律搬动业务资料。重新打开看板后，可以在“当前状态”核对自己的助手方向；若仍显示空模板，先让 Agent 检查保存或刷新显示，不要重复创建。
+**以后怎么接着用？** 新开对话时，仍指向这份 AI Carry 目录；若宿主没有自动读取入口，就让它先读其中的 `BOOTSTRAP.md`。在其他业务项目中使用时，先让 Agent 确认能同时访问这份积累，不必一律搬动业务资料。重新打开看板后，可以在“当前状态”核对自己的助手方向；若仍显示空模板，先让 Agent 检查保存或刷新显示，不要重复创建。若要在同一台电脑换 Agent，迁移页默认先建立一份独立副本：原目录不动，两个副本之后不自动同步；只有你明确选择轮流共用原目录时，才继续使用同一目录，并在每次写入前重新读取受影响内容。
 
 ### 同一份积累，两个打开方式
 
 安装时，Agent 会自动装好 **AI Carry（客户端）** 并在桌面创建入口；网页版留在安装文件夹里的 `dashboard.html`。两者读取同一份助手资料；客户端还能直接选择本地文件夹和 ZIP，右上角也能随时打开网页版。它不会自动连接 Agent，仍由你复制请求、粘贴发送。
 
-[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.2/AI-Carry-2.1.2-darwin-x64.zip)
+[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-x64.zip)
 
-本次 2.1.5 补齐默认客户端安装：新安装会自动创建一个客户端桌面入口，网页版仍留在安装目录，客户端也能回到同一份网页版；客户端程序继续复用已验收的 2.1.2 客户端包。
+本次 2.1.6 延续默认客户端安装：新安装会自动创建一个客户端桌面入口，网页版仍留在安装目录，客户端也能回到同一份网页版；同时，迁移页默认先建立独立副本，只有明确选择共用原目录时才轮流使用同一份积累。
 
 客户端包不代替完整助手目录。Mac 包未签名、尚未完成 Mac 实机验收；Linux 继续使用网页版。
 
