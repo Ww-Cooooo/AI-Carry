@@ -77,6 +77,22 @@ try {
   for (const [ref, bytes] of preserved) write(source, ref, bytes);
   for (const ref of ["instance/profile/approved-profile.md", "instance/maps/domain-map.toml", "instance/skills/requirements.toml"])
     preserved.set(ref, read(source, ref));
+  const olderReleaseSource = resolve(scene, "installed-older-official-release");
+  cpSync(source, olderReleaseSource, { recursive: true, errorOnExist: true, force: false });
+  const unknownLatestPreview = prepareUpgrade(olderReleaseSource, target, { verifyOfficial: false, releaseSelection: "unknown" });
+  assert(unknownLatestPreview.userPreview.includes("无法确认它是不是最新")
+    && unknownLatestPreview.userPreview.includes(`升级到 ${version}`));
+  assert.equal(confirmUpgrade(olderReleaseSource, target, unknownLatestPreview.confirmationRef, "升级").updated, false);
+  const olderReleasePreview = prepareUpgrade(olderReleaseSource, target, { verifyOfficial: false, releaseSelection: "other" });
+  assert.equal(olderReleasePreview.releaseSelection, "other");
+  assert(olderReleasePreview.userPreview.includes("不是当前最新正式版")
+    && olderReleasePreview.userPreview.includes(`升级到 ${version}`));
+  assert.equal(confirmUpgrade(olderReleaseSource, target, olderReleasePreview.confirmationRef, "升级").updated, false);
+  assert(read(olderReleaseSource, "instance/manifest.toml").toString("utf8").includes('product = "2.0.10"'));
+  const olderReleaseSwitch = confirmUpgrade(olderReleaseSource, target, olderReleasePreview.confirmationRef, `升级到 ${version}`);
+  assert.equal(olderReleaseSwitch.updated, true);
+  assert.equal(inspectStartupCapsule(olderReleaseSource).decision, "startup-capsule-valid");
+  for (const [ref, bytes] of preserved) assert(read(olderReleaseSource, ref).equals(Buffer.from(bytes)), `older release switch changed ${ref}`);
   const assertPreserved = () => {
     for (const [ref, bytes] of preserved) assert(read(source, ref).equals(Buffer.from(bytes)), `changed instance-owned ${ref}`);
   };
@@ -136,7 +152,7 @@ try {
   assert.throws(() => prepareUpgrade(source, target, { verifyOfficial: false }), /pure|private|target/i);
   assertPreserved();
   passed = true;
-  console.log("upgrade-local-containment-passed: real isolated switch, local content preserved, missing/broken snapshot reported, reentry available, idempotence, identity/private target rejection; no network authority tested");
+  console.log("upgrade-local-containment-passed: real isolated normal and explicitly selected older-release switches, local content preserved, missing/broken snapshot reported, reentry available, idempotence, identity/private target rejection; no network authority tested");
 } finally {
   if (passed) rmSync(scene, { recursive: true, force: true });
   else console.error(`Upgrade containment failure evidence kept at ${scene}`);

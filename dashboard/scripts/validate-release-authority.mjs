@@ -97,7 +97,7 @@ if (status === "published-release") {
   "an unreleased candidate authorizes publication or instance replacement");
 }
 includesEvery(arrayValue(boundary, "authority_requires"), [
-  `official-release-object-v${version}`, `official-lightweight-tag-v${version}`,
+  `official-release-object-v${version}`, `official-tag-commit-v${version}`,
   "manifest-and-extracted-tree-match-the-fixed-tag", "user-explicitly-authorized-this-upgrade",
 ], "release authority requirements");
 

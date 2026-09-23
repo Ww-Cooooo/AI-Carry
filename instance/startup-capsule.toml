@@ -1,7 +1,7 @@
 schema_version = 1
 capsule_id = "ai-carry-startup"
-source_manifest_digest = "sha256:ea90bb2df1e78d3d5b15f0790d479735f80838d389484f2f5892233f50593aa0"
-product_version = "2.1.6"
+source_manifest_digest = "sha256:b346cff6657ff9de68638051d7a479be82db133057cb46f089a625285be5474d"
+product_version = "2.1.7"
 instance_id = "template"
 state = "template"
 direction_type = "unselected"

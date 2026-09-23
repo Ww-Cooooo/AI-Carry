@@ -58,8 +58,9 @@ const MAX_OPERATION_ATTEMPTS = 32;
 const releaseVerifierPath = resolve(moduleDirectory, "verify-official-ai-carry-release.mjs");
 const snapshotPaths = new Set(["dashboard/public/snapshot.js", "dashboard/dist/snapshot.js"]);
 const windowsMetadataPreflightPath = resolve(moduleDirectory, "windows-upgrade-metadata-preflight.ps1");
-const confirmationPattern = /^ai-carry-upgrade\.([a-f0-9]{32})~([a-f0-9]{32})~([1-9][0-9]{0,2})$/u;
+const confirmationPattern = /^ai-carry-upgrade\.([a-f0-9]{32})~([a-f0-9]{32})~([1-9][0-9]{0,2})~(latest|other|unknown)$/u;
 const acceptedConfirmationReplies = new Set(["升级", "确认升级"]);
+const versionedConfirmationReplies = new Set([`升级到 ${TARGET_VERSION}`, `确认升级到 ${TARGET_VERSION}`]);
 const exactInstanceGuides = Object.freeze([
   "instance/profile/README.md",
   "instance/memory/README.md",
@@ -806,7 +807,8 @@ function validateOfficialReleaseLive(target, targetTree, releaseRef) {
     || !/^[a-f0-9]{40}$/u.test(record.commit_sha ?? "")
     || !/^[a-f0-9]{40}$/u.test(record.git_tree_sha ?? "")
     || !/^[1-9][0-9]*$/u.test(String(record.release_id ?? ""))
-    || record.latest_release_id !== record.release_id
+    || (record.latest_release_id !== null
+      && (!Number.isSafeInteger(record.latest_release_id) || record.latest_release_id < 1))
     || record.release_url !== `https://github.com/Ww-Cooooo/AI-Carry/releases/tag/v${TARGET_VERSION}`
     || record.draft !== false || record.prerelease !== false || record.fixture !== false
     || record.target_tree_sha256 !== `sha256:${targetTree.fingerprint}`
@@ -827,7 +829,9 @@ function validateOfficialReleaseLive(target, targetTree, releaseRef) {
     authorityFingerprint,
     authority: record.authority,
     releaseId: String(record.release_id),
-    latestReleaseId: String(record.latest_release_id),
+    latestReleaseId: record.latest_release_id,
+    releaseSelection: record.latest_release_id === null ? "unknown"
+      : record.latest_release_id === record.release_id ? "latest" : "other",
     commitSha: record.commit_sha,
     gitTreeSha: record.git_tree_sha,
     releaseUrl: record.release_url,
@@ -847,6 +851,7 @@ function buildUpgradeBinding({
   governanceBrandMigration = noGovernanceBrandMigration,
   instanceId,
   sourceVersion,
+  releaseSelection = "latest",
 }) {
   return sha256(Buffer.from([
     source,
@@ -860,10 +865,11 @@ function buildUpgradeBinding({
     instanceId,
     sourceVersion,
     TARGET_VERSION,
+    releaseSelection,
   ].join("\0"), "utf8"));
 }
 
-function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true } = {}) {
+function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true, releaseSelection = "latest" } = {}) {
   const source = resolvePhysicalDirectory(sourceArgument, "source");
   const target = resolvePhysicalDirectory(targetArgument, "target");
   if (pathIsInside(source, target) || pathIsInside(target, source)) fail("source and target must be separate trees");
@@ -873,6 +879,8 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
   const officialEvidence = verifyOfficial
     ? validateOfficialReleaseLive(target, targetTree, targetValidation.releaseRef)
     : null;
+  const selection = officialEvidence?.releaseSelection ?? releaseSelection;
+  if (!["latest", "other", "unknown"].includes(selection)) fail("release selection is invalid");
   const profileMigration = planLegacyProfileMigration(source, sourceState.instance);
   const governanceBrandMigration = sourceState.alreadyCurrent
     ? noGovernanceBrandMigration
@@ -927,9 +935,15 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
     governanceBrandMigration,
     instanceId: sourceState.instance.instanceId,
     sourceVersion: sourceState.instance.version,
+    releaseSelection: selection,
   });
   const token = binding.slice(0, 32); const nonce = binding.slice(32, 64); const paths = chooseOperationPaths(source, binding);
-  const confirmationRef = `ai-carry-upgrade.${token}~${nonce}~${paths.attempt}`;
+  const confirmationRef = `ai-carry-upgrade.${token}~${nonce}~${paths.attempt}~${selection}`;
+  const reply = selection === "latest" ? "升级" : `升级到 ${TARGET_VERSION}`;
+  const selectionNotice = selection === "latest" ? ""
+    : selection === "other"
+      ? `【版本提醒】AI Carry ${TARGET_VERSION} 是已核验的官方版本，但不是当前最新正式版。不会自动选择旧版；只有你明确选择本版才继续。`
+      : `【版本提醒】AI Carry ${TARGET_VERSION} 的官方来源已核验，但暂时无法确认它是不是最新。不会猜测或自动改选版本；你可以明确选择本版，也可以稍后重查。`;
   const changePreview = Object.freeze({
     replace: Object.freeze([`最多核对并切换 ${writePaths.length} 个发布清单拥有的产品路径`, `${exactInstanceGuides.length} 个目标版本实例目录说明`]),
     migrate: Object.freeze(sourceState.instance.state === "instance"
@@ -960,6 +974,7 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
     verifyOfficial
       ? `实例身份保持：${sourceState.instance.instanceId}。CLI 已通过 GitHub HTTPS API 现场核对正式 Release、固定标签和这棵目标树；目标包发布边界允许实例替换。`
       : `实例身份保持：${sourceState.instance.instanceId}。本次确认只复核预览已经绑定的本地来源和目标字节，不重复联网。`,
+    ...(selectionNotice ? [selectionNotice] : []),
     `【替换】最多核对并切换 ${writePaths.length} 个发布清单明确拥有的产品路径；实际相同字节不会重复写。`,
     sourceState.instance.state === "instance"
       ? `【迁移】更新 manifest 产品版本${profileMigration.required ? "；旧 profile/README.md 用户正文会逐字节迁到 approved-profile.md 并更新引用" : ""}${governanceBrandMigration.required ? "；内置记忆治理卡中仍代表当前产品的已知旧名短语会改为 AI Carry，其他正文和排期保持不变" : ""}；随后确定性重建启动胶囊和两份真实快照。`
@@ -970,8 +985,8 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
     "【删除】0 项。当前实例根路径不移动；只为实际变化的产品文件保留有清单的回滚前像，不复制整棵用户目录。",
     conflictText,
     extensionText,
-    "除刚才只读核对最新正式 Release、固定轻量标签、公开 main 与目标整树外，不会执行 Skill、组件或工作区脚本，不会安装依赖、继续联网、登录、改权限、删除旧实例或清理失败现场。",
-    reviewRequired ? "兼容预检尚未闭合；本次只保留预览，不提供切换确认，旧实例继续可用。" : "如果同意这份完整预览，请在下一条独立消息中回复“升级”。",
+    "除刚才只读核对目标版本的正式 Release、固定标签指向的提交与目标整树外，不会执行 Skill、组件或工作区脚本，不会安装依赖、继续联网、登录、改权限、删除旧实例或清理失败现场。",
+    reviewRequired ? "兼容预检尚未闭合；本次只保留预览，不提供切换确认，旧实例继续可用。" : `如果同意这份完整预览，请在下一条独立消息中回复“${reply}”。`,
   ].join("\n\n");
   const common = Object.freeze({
     source, target, sourceVersion: sourceState.instance.version, targetVersion: TARGET_VERSION,
@@ -980,7 +995,7 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
     preservationMethod: "not-in-product-write-set",
     targetFileCount: targetTree.fileCount, writePaths, sourceProductFingerprint: sourceProductState.fingerprint,
     profileMigration, governanceBrandMigration,
-    targetTreeFingerprint: targetTree.fingerprint, officialEvidence, platformMetadata,
+    targetTreeFingerprint: targetTree.fingerprint, officialEvidence, platformMetadata, releaseSelection: selection,
     targetReleaseBoundary: targetValidation.releaseBoundary,
     previewAuthority: verifyOfficial ? "live-github-release-and-exact-tag-tree-verified" : "previous-preview-bound-local-target", changePreview, userPreview,
     confirmationClaimLimit: "CLI 只核对本次预览引用和精确确认字符串，不具备聊天角色认证能力。承载对话的宿主必须只在用户看过本次预览、并在下一条独立消息明确确认后调用 confirm；这是一条产品交互边界，不伪装成对恶意 Agent 的权限沙箱。",
@@ -994,12 +1009,13 @@ function prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial = true 
     decision: "ai-carry-upgrade-confirmation-required", executable: false,
     ...common,
     candidate: paths.candidate, rollbackPackage: paths.rollbackPackage, attempt: paths.attempt, confirmationRef,
-    confirmCommand: `node ${q(fileURLToPath(import.meta.url))} confirm --source ${q(source)} --target ${q(target)} --confirmation-ref ${q(confirmationRef)} --user-reply ${q("升级")}`,
-    nextStep: "把 userPreview 单独展示给用户。只有用户在看过本次预览后的下一条独立消息明确回复“升级”或“确认升级”，Agent 才执行这条同次绑定命令；用户不需要操作终端。CLI 会重新核对本地来源、目标和引用，但不会重复联网；聊天消息角色由承载对话的宿主负责。",
+    confirmCommand: `node ${q(fileURLToPath(import.meta.url))} confirm --source ${q(source)} --target ${q(target)} --confirmation-ref ${q(confirmationRef)} --user-reply ${q(reply)}`,
+    nextStep: `把 userPreview 单独展示给用户。只有用户在看过本次预览后的下一条独立消息明确回复“${reply}”${selection === "latest" ? "或“确认升级”" : `或“确认升级到 ${TARGET_VERSION}”`}，Agent 才执行这条同次绑定命令；用户不需要操作终端。CLI 会重新核对本地来源、目标和引用，但不会重复联网；聊天消息角色由承载对话的宿主负责。`,
   });
 }
 
-function confirmationUnverified() {
+function confirmationUnverified(releaseSelection = "latest") {
+  const reply = releaseSelection === "latest" ? "升级" : `升级到 ${TARGET_VERSION}`;
   return Object.freeze({
     decision: "ai-carry-upgrade-confirmation-unverified",
     executable: false,
@@ -1007,20 +1023,25 @@ function confirmationUnverified() {
     userReplyStringMatched: false,
     authorityVerified: false,
     userSummary: "升级预览可以继续查看，但模型传入的普通字符串没有被当作用户授权，实例文件没有改变。",
-    nextStep: "先把本次绑定预览展示给用户；只有用户随后独立回复“升级”或“确认升级”时，宿主 Agent 才可执行同次 confirmCommand。",
+    nextStep: `先把本次绑定预览展示给用户；只有用户随后独立回复“${reply}”时，宿主 Agent 才可执行同次 confirmCommand。`,
   });
 }
 
 function confirmUpgrade(sourceArgument, targetArgument, confirmationRef, userReply) {
-  if (!acceptedConfirmationReplies.has(String(userReply ?? "").trim())) return confirmationUnverified();
+  const selection = confirmationPattern.exec(String(confirmationRef ?? ""))?.[4] ?? "latest";
+  const accepted = selection === "latest" ? acceptedConfirmationReplies : versionedConfirmationReplies;
+  if (!accepted.has(String(userReply ?? "").trim())) return confirmationUnverified(selection);
   return applyUpgradeWithHostConfirmation(sourceArgument, targetArgument, confirmationRef, String(userReply).trim());
 }
 
 function applyUpgradeWithHostConfirmation(sourceArgument, targetArgument, confirmationRef, userReply) {
-  if (!acceptedConfirmationReplies.has(String(userReply ?? "").trim())) fail("user reply must be ‘升级’ or ‘确认升级’");
   const match = confirmationPattern.exec(String(confirmationRef ?? ""));
   if (!match) fail("confirmation reference is invalid");
-  const prepared = prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial: false });
+  const selection = match[4];
+  if (!(selection === "latest" ? acceptedConfirmationReplies : versionedConfirmationReplies).has(String(userReply ?? "").trim())) {
+    return confirmationUnverified(selection);
+  }
+  const prepared = prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial: false, releaseSelection: selection });
   if (prepared.decision === "ai-carry-upgrade-already-current") return prepared;
   if (prepared.confirmationRef !== confirmationRef) fail("source or target changed after the preview; generate a fresh preview");
   const { source, target, candidate, rollbackPackage } = prepared;
@@ -1140,7 +1161,7 @@ function help() {
       "confirm --source <同一旧实例> --target <同一目标模板> --confirmation-ref <预览返回值> --user-reply <用户本次独立确认>（宿主只可在用户看过预览并回复后调用）",
       "reentry --source <已切换实例根> --transaction-ref <同次确认引用> --expected-instance-id <实例 ID> --expected-manifest-digest <confirm 返回摘要> --source-version <升级前版本>",
     ]),
-    boundary: `只支持 Agent Carry 1.4.8／本地 1.4.9／AI Carry 2.0.0 到 AI Carry ${TARGET_VERSION}；CLI 通过 GitHub HTTPS API 现场核对最新正式 Release、固定轻量标签、公开 main 和目标整树，不接受调用者自写来源 JSON。宿主只可在用户看过本次绑定预览并独立确认后调用 confirm；CLI 核对确认字符串但不冒充聊天角色认证器。只切换清单拥有的产品路径，未知路径原地不碰，变化文件保留回滚前像，不执行包内脚本。`,
+    boundary: `只支持目标发布清单列明的旧版本直接升级到 AI Carry ${TARGET_VERSION}；CLI 通过 GitHub HTTPS API 核对目标的正式 Release、固定标签提交和整树字节，不接受调用者自写来源 JSON。最新状态只影响提示和确认措辞：不是最新或无法确认时必须由用户明确选择目标版本，不自动回退。宿主只可在用户看过本次绑定预览并独立确认后调用 confirm；CLI 核对确认字符串但不冒充聊天角色认证器。只切换清单拥有的产品路径，未知路径原地不碰，变化文件保留回滚前像，不执行包内脚本。`,
   });
 }
 
@@ -1158,7 +1179,7 @@ if (invokedDirectly) {
       decision: "ai-carry-upgrade-denied", executable: false, updated: false,
       reason: String(error?.message ?? error),
       userSummary: "这次升级没有执行；原实例、普通对话和无关能力仍可继续。",
-      nextStep: "请让 Agent 只说明当前缺少或漂移的那一项，再重新生成升级预览。",
+      nextStep: "请让 Agent 说明当前缺少或漂移的那一项；旧实例仍可继续使用。若只是目标版本自身有问题，可以由你明确选择另一份受支持的官方版本再核验，不自动回退或绕过来源检查。",
     })}\n`);
     process.exitCode = 2;
   }

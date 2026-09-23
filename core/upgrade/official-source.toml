@@ -29,9 +29,9 @@ alternate_source = "label-as-nonofficial-and-require-user-choice-before-reading-
 [verification]
 release_kind = "published-non-draft-non-prerelease"
 required_inputs = ["target-release-manifest", "candidate-file-manifest-or-hashes"]
-archive_selection = "resolve-latest-release-tag-then-use-that-versioned-tag-archive; use-latest_archive-only-after-public-main-is-proven-equal-to-that-tag"
-branch_archive_invariant = "public-main-must-equal-latest-published-release-tag-before-a-release-is-complete"
+archive_selection = "default-to-the-latest-formal-release-tag; when-the-user-explicitly-selects-another-formal-version-use-its-fixed-tag-archive; use-latest_archive-only-for-a-verified-latest-release-when-public-main-equals-that-tag"
+branch_archive_invariant = "publication-only: public-main-must-equal-latest-published-release-tag-before-a-release-is-complete; historical-fixed-releases-remain-valid-after-main-moves"
 archive_root = "discover-project-root-by-required-files-and-ignore-one-github-generated-outer-directory"
 archive_integrity = "verify-extracted-file-set-and-file-bytes-against-the-approved-release-content-manifest; outer-zip-sha256-is-observational-only"
-checks = ["source-identity", "published-release-and-tag", "public-main-equals-latest-release-tag", "version-and-schema", "path-safety", "extracted-file-integrity", "upgrade-preview-before-write"]
+checks = ["source-identity", "published-release-and-fixed-tag-commit", "version-and-schema", "path-safety", "extracted-file-integrity", "upgrade-preview-before-write"]
 claim_limit = "integrity-and-source-checks-reduce-risk-but-do-not-promise-absolute-safety"

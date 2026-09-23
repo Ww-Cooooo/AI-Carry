@@ -243,7 +243,7 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
     && official.request_count > 0 && official.request_count <= OFFICIAL_RELEASE_REQUEST_BUDGET
     && official.request_budget === OFFICIAL_RELEASE_REQUEST_BUDGET
     && official.authority_fingerprint === officialAuthorityFingerprint(official),
-  "the official verifier did not bind the latest Release, lightweight tag, tree, and exact local bytes independently of main");
+  "the official verifier did not bind the latest Release, tag commit, tree, and exact local bytes independently of main");
   const officialLater = await verifyOfficialAiCarryRelease({
     target: releaseTarget,
     requestJson,
@@ -305,28 +305,69 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
     });
   } catch { draftRejected = true; }
   expect(draftRejected, "a draft Release was accepted as upgrade authority");
-  let annotatedTagRejected = false;
+  const annotatedTagSha = "e".repeat(40);
+  const annotatedRequestJson = async (path, label) => {
+    if (path === `/git/ref/tags/v${targetVersion}`) return { object: { type: "tag", sha: annotatedTagSha } };
+    if (path === `/git/tags/${annotatedTagSha}`) return {
+      sha: annotatedTagSha, tag: `v${targetVersion}`, object: { type: "commit", sha: commitSha },
+    };
+    return requestJson(path, label);
+  };
+  const annotated = await verifyOfficialAiCarryRelease({ target: releaseTarget, requestJson: annotatedRequestJson });
+  expect(annotated.commit_sha === commitSha
+    && annotated.authority_fingerprint === official.authority_fingerprint
+    && annotated.request_count === 6,
+  "a valid annotated release tag did not resolve to the same verified commit and target bytes");
+  let wrongAnnotatedTargetRejected = false;
   try {
     await verifyOfficialAiCarryRelease({
       target: releaseTarget,
-      requestJson: async (path, label) => path === `/git/ref/tags/v${targetVersion}`
-        ? { object: { type: "tag", sha: "e".repeat(40) } }
-        : requestJson(path, label),
+      requestJson: async (path, label) => path === `/git/tags/${annotatedTagSha}`
+        ? { sha: annotatedTagSha, tag: `v${targetVersion}`, object: { type: "tag", sha: "f".repeat(40) } }
+        : annotatedRequestJson(path, label),
     });
-  } catch { annotatedTagRejected = true; }
-  expect(annotatedTagRejected, "an annotated tag was accepted where the release contract requires a lightweight tag");
+  } catch { wrongAnnotatedTargetRejected = true; }
+  expect(wrongAnnotatedTargetRejected, "an annotated tag not pointing directly to a commit was accepted");
+  let wrongAnnotatedNameRejected = false;
+  try {
+    await verifyOfficialAiCarryRelease({
+      target: releaseTarget,
+      requestJson: async (path, label) => path === `/git/tags/${annotatedTagSha}`
+        ? { sha: annotatedTagSha, tag: "v0.0.0", object: { type: "commit", sha: commitSha } }
+        : annotatedRequestJson(path, label),
+    });
+  } catch { wrongAnnotatedNameRejected = true; }
+  expect(wrongAnnotatedNameRejected, "an annotated tag naming a different version was accepted");
   expect(officialAuthorityFingerprint({ ...official, main_commit_sha: "f".repeat(40), request_count: 6 })
     === official.authority_fingerprint, "moving main or diagnostic request counts changed immutable release authority");
-  let latestMismatchRejected = false;
-  try {
-    await verifyOfficialAiCarryRelease({
-      target: releaseTarget,
-      requestJson: async (path, label) => path === "/releases/latest"
-        ? { ...releaseObject, id: releaseObject.id + 1 }
-        : requestJson(path, label),
-    });
-  } catch { latestMismatchRejected = true; }
-  expect(latestMismatchRejected, "a different latest Release was accepted as the fixed-version authority");
+  const earlierOfficial = await verifyOfficialAiCarryRelease({
+    target: releaseTarget,
+    requestJson: async (path, label) => path === "/releases/latest"
+      ? { ...releaseObject, tag_name: "v9.9.9", id: releaseObject.id + 1,
+        html_url: "https://github.com/Ww-Cooooo/AI-Carry/releases/tag/v9.9.9" }
+      : requestJson(path, label),
+  });
+  expect(earlierOfficial.release_id === releaseObject.id && earlierOfficial.latest_release_id === releaseObject.id + 1
+    && earlierOfficial.authority_fingerprint !== official.authority_fingerprint,
+  "a verified older fixed Release was blocked or its freshness status was not bound to the preview evidence");
+  const freshnessUnavailable = await verifyOfficialAiCarryRelease({
+    target: releaseTarget,
+    requestJson: async (path, label) => path === "/releases/latest"
+      ? Promise.reject(new Error("latest lookup unavailable")) : requestJson(path, label),
+  });
+  expect(freshnessUnavailable.latest_release_id === null
+    && freshnessUnavailable.commit_sha === commitSha
+    && freshnessUnavailable.target_file_count === releaseFiles.size,
+  "an unavailable latest lookup invalidated a fully verified fixed Release or pretended it was latest");
+  const inconsistentLatest = await verifyOfficialAiCarryRelease({
+    target: releaseTarget,
+    requestJson: async (path, label) => path === "/releases/latest"
+      ? { ...releaseObject, tag_name: "v9.9.9",
+        html_url: "https://github.com/Ww-Cooooo/AI-Carry/releases/tag/v9.9.9" }
+      : requestJson(path, label),
+  });
+  expect(inconsistentLatest.latest_release_id === null,
+    "inconsistent latest metadata made the fixed target appear to be latest");
   let byteMismatchRejected = false;
   try {
     await verifyOfficialAiCarryRelease({
@@ -382,7 +423,7 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
   expect(prepareBody.indexOf("const targetValidation = validateTarget") < prepareBody.indexOf("if (sourceState.alreadyCurrent)")
     && prepareBody.includes("current AI Carry product path differs from the official Release")
     && prepareBody.includes("authorityVerified: verifyOfficial, networkUsed: verifyOfficial")
-    && cli.includes("prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial: false })")
+    && cli.includes("prepareUpgrade(sourceArgument, targetArgument, { verifyOfficial: false, releaseSelection: selection })")
     && cli.includes("copiedTargetTree.fingerprint !== prepared.targetTreeFingerprint")
     && cli.includes("target changed while the isolated candidate was being copied")
     && cli.includes('`.ai2-${token.slice(0, 6)}-a${attempt}-${index.toString(36)}.tmp`')
@@ -422,7 +463,7 @@ schedule_anchor_at = "2026-08-01T09:00:00+08:00"
   }
 
   passed = true;
-  console.log("AI Carry upgrade CLI passed focused cases for one-time preview authority, bounded built-in governance brand repair, offline confirmation binding, bounded API requests, recoverable network refusal, real authority drift, published boundary, official already-current closure, manifest-driven template/instance write sets, unlisted/private target rejection, copied-target drift, retry-safe staging, Windows hardlink review, zero inferred removals, numbered retry, host-confirmed reply boundaries, and no self-attested session authority.");
+  console.log("AI Carry upgrade CLI passed focused cases for fixed official release authority independent of latest status, bounded governance brand repair, offline confirmation binding, bounded API requests, recoverable freshness lookup, real authority drift, published boundary, official already-current closure, manifest-driven write sets, unlisted/private target rejection, copied-target drift, retry-safe staging, Windows hardlink review, zero inferred removals, numbered retry, host-confirmed reply boundaries, and no self-attested session authority.");
 } finally {
   if (passed) rmSync(fixture, { recursive: true, force: false });
 }

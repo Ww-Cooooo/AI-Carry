@@ -456,7 +456,8 @@ function loadGitPublicFiles(root) {
     stdio: ['ignore', 'pipe', 'pipe'],
   }).toString('utf8').trim()
   assert(isSamePath(gitRoot, root), 'Git metadata exists, but the AI Carry root is not the worktree root.')
-  return execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+  // The published source is projected from a fixed commit; unrelated untracked experiments are not distribution files.
+  return execFileSync('git', ['ls-files', '-z', '--cached'], {
     cwd: root,
     stdio: ['ignore', 'pipe', 'pipe'],
   }).toString('utf8').split('\0').filter(Boolean).filter(archivePathIsPublic).sort(compareOrdinal)

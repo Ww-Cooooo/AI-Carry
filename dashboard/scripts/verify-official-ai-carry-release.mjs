@@ -81,9 +81,16 @@ async function apiJson(path, label, fetchImpl = globalThis.fetch) {
 }
 
 async function resolveTagCommit(requestJson = apiJson) {
-  const object = (await requestJson(`/git/ref/tags/v${TARGET_VERSION}`, "fixed lightweight tag reference")).object;
-  if (object?.type !== "commit" || !/^[a-f0-9]{40}$/u.test(object.sha ?? "")) fail("fixed tag is not a lightweight tag pointing directly to one commit");
-  return object.sha;
+  const object = (await requestJson(`/git/ref/tags/v${TARGET_VERSION}`, "fixed tag reference")).object;
+  if (!/^[a-f0-9]{40}$/u.test(object?.sha ?? "")) fail("fixed tag reference has no valid Git object");
+  if (object.type === "commit") return object.sha;
+  if (object.type !== "tag") fail("fixed tag does not point to a commit or annotated tag");
+  const tag = await requestJson(`/git/tags/${object.sha}`, "fixed annotated tag");
+  if (tag?.sha !== object.sha || tag.tag !== `v${TARGET_VERSION}`
+    || tag.object?.type !== "commit" || !/^[a-f0-9]{40}$/u.test(tag.object.sha ?? "")) {
+    fail("fixed annotated tag does not directly name the expected commit");
+  }
+  return tag.object.sha;
 }
 
 function releaseMatchesFixedVersion(release) {
@@ -129,10 +136,18 @@ export async function verifyOfficialAiCarryRelease({ target: targetArgument, req
   if (!releaseMatchesFixedVersion(release)) {
     fail("Release object is draft, prerelease, or does not match the fixed version");
   }
-  const latestRelease = await boundedRequestJson("/releases/latest", "latest formal Release");
-  if (!releaseMatchesFixedVersion(latestRelease) || latestRelease.id !== release.id) {
-    fail("latest formal Release does not equal the fixed versioned Release");
-  }
+  // Freshness is useful to report, but it is not proof of this fixed release's identity.
+  let latestReleaseId = null;
+  try {
+    const latestRelease = await boundedRequestJson("/releases/latest", "latest formal Release");
+    if (latestRelease?.draft === false && latestRelease.prerelease === false
+      && Number.isSafeInteger(latestRelease.id) && latestRelease.id > 0
+      && /^v\d+\.\d+\.\d+$/u.test(latestRelease.tag_name ?? "")
+      && latestRelease.html_url === `https://github.com/${REPOSITORY}/releases/tag/${latestRelease.tag_name}`
+      && (latestRelease.id !== release.id || releaseMatchesFixedVersion(latestRelease))) {
+      latestReleaseId = latestRelease.id;
+    }
+  } catch { /* A failed freshness lookup cannot invalidate an independently verified fixed release. */ }
   const commitSha = await resolveTagCommit(boundedRequestJson);
   // A moving development branch does not invalidate an immutable published release.
   const commit = await boundedRequestJson(`/git/commits/${commitSha}`, "tag commit");
@@ -159,7 +174,7 @@ export async function verifyOfficialAiCarryRelease({ target: targetArgument, req
     repository: REPOSITORY,
     release_ref: `v${TARGET_VERSION}`,
     release_id: release.id,
-    latest_release_id: latestRelease.id,
+    latest_release_id: latestReleaseId,
     release_url: release.html_url,
     draft: false,
     prerelease: false,

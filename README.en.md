@@ -31,11 +31,11 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.6.zip)**　Current version: `2.1.6`
+**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.7.zip)**　Current version: `2.1.7`
 
-<sub>AI Carry 2.1.6 keeps the 2.1.4 memory-engine boundary and defaults same-computer Agent switches to an independent copy, leaving the original folder unchanged and preventing automatic cross-copy writes.</sub>
+<sub>AI Carry 2.1.7 fixes official upgrade verification: valid annotated tags work, and a verified formal release is not rejected solely because the Latest lookup differs or fails. This update does not rewrite your assistant materials.</sub>
 
-**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.6. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.6 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
+**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.7. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.7 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -60,7 +60,7 @@ The installer automatically installs **AI Carry (desktop)** and creates its Desk
 
 [Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-x64.zip)
 
-This 2.1.6 release keeps the default client-install path and adds a safer same-computer Agent switch: a fresh install still creates one desktop client entry, while the migration page creates an independent copy by default. The 2.1.6 app bundles include the current client fallback and installation behavior.
+2.1.7 changes upgrade verification in the assistant folder, not the desktop app. Installation therefore continues to use the published 2.1.6 client bundle. A fresh install still creates one desktop entry, and the migration page still creates an independent copy by default.
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 
