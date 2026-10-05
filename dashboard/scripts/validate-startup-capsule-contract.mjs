@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildStartupCapsule, inspectStartupCapsule } from "./startup-capsule-contract.mjs";
+import { buildStartupCapsule, inspectStartupCapsule, resolveStartupFile } from "./startup-capsule-contract.mjs";
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Startup capsule self-test failed: ${message}`); };
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -19,6 +19,13 @@ const manifest = (extra = "", learning = `[learning]\npolicy = "risk-tiered"\nlo
 try {
   write("core/manifest.toml", `schema_version = 1\ncore_id = "ai-carry-core"\nversion = "2.0.9"\n\n[entry]\nroot_map = "core/maps/root-map.toml"\n`);
   write("instance/manifest.toml", manifest());
+  assert(resolveStartupFile(root, "instance/missing.toml", { allowMissing: true }) === resolve(root, "instance/missing.toml"),
+    "a missing final file under a physical parent was rejected");
+  for (const ref of ["../outside.toml", "instance/../outside.toml", "instance\\manifest.toml", "instance/missing-parent/capsule.toml", "instance"]) {
+    let refused = false;
+    try { resolveStartupFile(root, ref, { allowMissing: true }); } catch { refused = true; }
+    assert(refused, "unsafe reference, absent parent, or directory leaf passed startup path validation");
+  }
   const capsule = buildStartupCapsule(root); write("instance/startup-capsule.toml", capsule.source);
   const valid = inspectStartupCapsule(root);
   assert(valid.decision === "startup-capsule-valid" && valid.instance_id === "ac.fixture" && !Object.hasOwn(valid, "mission"), "valid manifest did not produce a bounded low-sensitivity capsule");

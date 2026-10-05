@@ -7,7 +7,6 @@ import {
   openSync,
   readFileSync,
   readSync,
-  readdirSync,
   realpathSync,
   renameSync,
   writeFileSync,
@@ -16,7 +15,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inspectSkillPackage } from "./skill-workshop-contract.mjs";
+import { inspectSkillPackage, readBoundedSkillDirectory, SKILL_PACKAGE_LIMITS } from "./skill-workshop-contract.mjs";
+import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
 
 const MAX_FILES = 128;
 const MAX_FILE_BYTES = 512 * 1024;
@@ -24,7 +24,7 @@ const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
 const MAX_ARCHIVE_BYTES = 4 * 1024 * 1024;
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
-function fail(message) { throw new Error(`Skill package failed: ${message}`); }
+function fail(message) { throw new Error(`Skill package failed: ${locateHighConfidenceSecretCandidates(message).blocked ? "unsafe diagnostic content was redacted" : message}`); }
 function sha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function portableSegment(value) {
   if (typeof value !== "string" || !value || value === "." || value === ".." || value.normalize("NFC") !== value) return false;
@@ -67,9 +67,11 @@ function collectSkillFiles(packageRoot) {
     fail("source is not a readable physical directory");
   }
   const files = [];
-  let totalBytes = 0;
-  const walk = (directory) => {
-    const entries = readdirSync(directory, { withFileTypes: true });
+  let totalBytes = 0; let directoryCount = 0;
+  const walk = (directory, depth = 0) => {
+    directoryCount += 1;
+    if (directoryCount > SKILL_PACKAGE_LIMITS.directories || depth > SKILL_PACKAGE_LIMITS.depth) fail("source exceeds the directory-count or nesting-depth limit");
+    const entries = readBoundedSkillDirectory(directory);
     if (entries.length > MAX_FILES) fail("one directory exceeds the 128-entry limit");
     for (const entry of entries) {
       const path = resolve(directory, entry.name);
@@ -77,7 +79,7 @@ function collectSkillFiles(packageRoot) {
       if (!portableRef(ref)) fail(`source contains a non-portable path: ${ref}`);
       const info = lstatSync(path);
       if (info.isSymbolicLink()) fail(`source contains a link: ${ref}`);
-      if (info.isDirectory()) { walk(path); continue; }
+      if (info.isDirectory()) { walk(path, depth + 1); continue; }
       if (!info.isFile()) fail(`source contains a special file: ${ref}`);
       if (info.size > MAX_FILE_BYTES) fail(`source file exceeds 512 KiB: ${ref}`);
       totalBytes += info.size;
@@ -300,6 +302,13 @@ function readZipEntries(zipPath) {
     if (roots.size !== 1) fail("ZIP must contain SKILL.md at its root or inside one outer folder");
     rootPrefix = `${[...roots][0]}/`;
     if (!fileRefs.has(`${rootPrefix}SKILL.md`)) fail("ZIP does not contain a discoverable SKILL.md");
+  }
+  const directories = new Set([""]);
+  for (const file of files) {
+    const parts = file.ref.slice(rootPrefix.length).split("/");
+    if (parts.length - 1 > SKILL_PACKAGE_LIMITS.depth) fail("ZIP exceeds the nesting-depth limit");
+    for (let index = 1; index < parts.length; index += 1) directories.add(parts.slice(0, index).join("/"));
+    if (directories.size > SKILL_PACKAGE_LIMITS.directories) fail("ZIP exceeds the directory-count limit");
   }
   return { files, rootPrefix, archiveDigest: `sha256:${sha256(bytes)}` };
 }

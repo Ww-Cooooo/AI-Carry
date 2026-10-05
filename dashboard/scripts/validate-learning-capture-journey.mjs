@@ -3,11 +3,12 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { inspectShortlistedFormalAsset, loadTrustedDomainEnvelope, parseMarkdownFrontmatterHead,
-  queryFormalAssetShortlist, validateProposedFormalAsset } from "./asset-route-contract.mjs";
+  parseSectionedToml, queryFormalAssetShortlist, validateInstanceManifestStructure, validateProposedFormalAsset } from "./asset-route-contract.mjs";
 import { buildSnapshotCandidate } from "./snapshot-source-builder.mjs";
 import { executeFirstInstantiation } from "./first-instantiation-transaction.mjs";
+import { prepareAgentSwitch } from "./prepare-agent-switch.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(scriptDirectory, "../..");
@@ -23,17 +24,38 @@ function digest(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
-function copyTemplate(target) {
-  cpSync(repository, target, {
+function copyTemplate(target, source = repository) {
+  const manifest = validateInstanceManifestStructure(parseSectionedToml(readFileSync(resolve(source, "instance/manifest.toml"), "utf8"), "journey source"));
+  assert(manifest.root.state === "template" && manifest.root.instance_id === "template", "journey source must be a blank template, not a real instance");
+  cpSync(source, target, {
     recursive: true,
     errorOnExist: true,
     filter(path) {
-      const ref = relative(repository, path).split(sep).join("/");
-      const top = ref.split("/")[0];
-      return ![".git", ".planning", ".assistant-local", "maintainer-private", "node_modules"].includes(top)
-        && ref !== "dashboard/node_modules" && !ref.startsWith("dashboard/node_modules/");
+      const parts = relative(source, path).split(sep);
+      return ![".git", ".planning", ".assistant-local", ".assistant-private", ".agents", ".claude",
+        "maintainer-private", "AGENTS.override.md", "workspace", "skills-lock.json"].includes(parts[0])
+        && !parts.includes("node_modules");
     },
   });
+}
+
+function testTemplateCopyExclusions() {
+  const source = resolve(root, "copy-source"); const target = resolve(root, "copy-target");
+  mkdirSync(resolve(source, "instance"), { recursive: true });
+  const manifest = readFileSync(resolve(repository, "instance/manifest.toml"), "utf8");
+  writeFileSync(resolve(source, "instance/manifest.toml"), manifest);
+  const denied = [".assistant-local/value.txt", ".assistant-private/value.txt", ".agents/value.txt", ".claude/worktrees/value.txt",
+    "AGENTS.override.md", "workspace/value.txt", "skills-lock.json", "node_modules/value.txt",
+    "dashboard/deep/node_modules/value.txt", "core/tools/nested/node_modules/value.txt"];
+  for (const ref of [...denied, "core/retained.txt"]) {
+    const path = resolve(source, ref); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, "synthetic fixture marker");
+  }
+  copyTemplate(target, source);
+  assert(denied.every((ref) => !existsSync(resolve(target, ref))) && existsSync(resolve(target, "core/retained.txt")),
+    "journey template copy included private/local/host/workspace or nested dependencies");
+  writeFileSync(resolve(source, "instance/manifest.toml"), manifest.replace('state = "template"', 'state = "instance"'));
+  let refused = false; try { copyTemplate(resolve(root, "must-not-copy-instance"), source); } catch { refused = true; }
+  assert(refused && !existsSync(resolve(root, "must-not-copy-instance")), "journey copied a real instance as template data");
 }
 
 function instanceRequest() {
@@ -89,6 +111,7 @@ function runCli(args, expectedStatus = 0) {
 }
 
 try {
+  testTemplateCopyExclusions();
   const live = resolve(root, "instance");
   copyTemplate(live);
   const created = executeFirstInstantiation(live, instanceRequest(), {
@@ -183,6 +206,24 @@ try {
   assert(habitSnapshot === readFileSync(resolve(live, "dashboard/dist/snapshot.js"), "utf8")
     && habitSnapshot.includes(habitRequest.title),
   "work habit did not reach the byte-identical dashboard snapshot pair");
+
+  // 使用副本自己的运行工具，验证创建、保存、召回与换宿主不是互不相干的夹具。
+  const switched = resolve(root, "换 Agent 独立副本");
+  const switchedResult = prepareAgentSwitch({ sourceRoot: live, destinationRoot: switched });
+  assert(switchedResult.decision === "independent-copy-ready" && switchedResult.syncPolicy === "none"
+    && digest(resolve(switched, saved.target)) === assetDigest
+    && digest(resolve(switched, habitSaved.target)) === habitDigest,
+  "host switch lost saved assets or claimed automatic synchronization");
+  const copiedRecall = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    import { queryFormalAssetShortlist, inspectShortlistedFormalAsset } from ${JSON.stringify(pathToFileURL(resolve(switched, "dashboard/scripts/asset-route-contract.mjs")).href)};
+    const root = ${JSON.stringify(switched)};
+    const result = queryFormalAssetShortlist(root, { queryText: "按我平时那样整理资料" });
+    const loaded = inspectShortlistedFormalAsset(root, result, ${JSON.stringify(habitSaved.assetId)});
+    if (loaded.decision !== "load-bounded-body" || !loaded.body.includes("先按项目分类，保留原始资料")) process.exit(2);
+  `], { encoding: "utf8", windowsHide: true, timeout: 30000 });
+  assert(copiedRecall.status === 0, "copied runtime could not independently recall the saved habit");
+  writeFileSync(resolve(switched, habitSaved.target), `${habitSource}\n独立副本的合成修改。\n`);
+  assert(digest(habitAssetPath) === habitDigest, "independent copy modified the original learned asset");
 
   // Ordinary reads tolerate harmless metadata drift without modifying source
   // bytes; strict writes still reject unknown fields and authorization loss.

@@ -3,7 +3,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inspectSkillPackage } from "./skill-workshop-contract.mjs";
+import { inspectSkillPackage, readBoundedSkillDirectory, SKILL_PACKAGE_LIMITS } from "./skill-workshop-contract.mjs";
 import { createSkillDelivery, inspectSkillSource } from "./skill-package.mjs";
 import { recommendForSkillWorkshop } from "../src/lib/skill-workshop.ts";
 
@@ -133,8 +133,52 @@ try {
   } });
   assert(unstableResult.decision === "isolated" && unstableResult.issues.some((item) => item.code === "directory-read-failed"), "nested read fault escaped package isolation");
 
+  // A blocked source must not echo its detected credential through metadata,
+  // CLI JSON, or a diagnostic path. Only synthetic values are used here.
+  const syntheticSecret = ["sk-", "a".repeat(25)].join("");
+  for (const field of ["name", "description", "skill_id", "version"]) {
+    const secretRoot = resolve(root, `secret-${field}`);
+    const metadata = { name: "safe-checklist", description: "Use this bounded workflow on request.", skill_id: "skill.safe-checklist", version: "1.0.0", [field]: syntheticSecret };
+    write(secretRoot, "SKILL.md", `---\n${Object.entries(metadata).map(([key, value]) => `${key}: ${value}`).join("\n")}\n---\n# Workflow\nCheck supplied facts.\n`);
+    const inspected = inspectSkillSource(secretRoot);
+    assert(inspected.decision === "isolated" && inspected.issues.some((item) => item.code === "secret-detected"), `secret ${field} not isolated`);
+    assert(!JSON.stringify(inspected).includes(syntheticSecret), `secret ${field} leaked from API`);
+    const cli = spawnSync(process.execPath, [resolve(repository, "dashboard/scripts/skill-package.mjs"), "inspect", "--source", secretRoot], { encoding: "utf8", windowsHide: true });
+    assert(!`${cli.stdout}${cli.stderr}`.includes(syntheticSecret) && JSON.parse(cli.stdout).decision === "isolated", `secret ${field} leaked from CLI`);
+  }
+  const secretFilenameRoot = resolve(root, "secret-filename");
+  write(secretFilenameRoot, "SKILL.md", readFileSync(resolve(clean, "SKILL.md"), "utf8"));
+  write(secretFilenameRoot, `scripts/${syntheticSecret}.mjs`, "// inert fixture\n");
+  const secretFilename = inspectSkillSource(secretFilenameRoot);
+  assert(secretFilename.decision === "isolated" && !JSON.stringify(secretFilename).includes(syntheticSecret), "secret filename leaked through diagnostics or script list");
+
+  // Count directories globally, including empty ones, and stop before reading
+  // a tree beyond the shared budget. The payload remains only one tiny file.
+  const crowded = resolve(root, "crowded-directory");
+  write(crowded, "SKILL.md", readFileSync(resolve(clean, "SKILL.md"), "utf8"));
+  for (let index = 0; index < 160; index += 1) mkdirSync(resolve(crowded, `d${index}`));
+  assert(readBoundedSkillDirectory(crowded).length === 129 && inspectSkillPackage(crowded).decision === "isolated", "directory enumeration materialized entries beyond its sentinel budget");
+  const wide = resolve(root, "wide-empty-tree");
+  write(wide, "SKILL.md", readFileSync(resolve(clean, "SKILL.md"), "utf8"));
+  for (let a = 0; a < 16; a += 1) for (let b = 0; b < 16; b += 1) mkdirSync(resolve(wide, "assets", `a${a}`, `b${b}`), { recursive: true });
+  let directoriesRead = 0;
+  const wideResult = inspectSkillPackage(wide, { fileSystem: { lstatSync, readdirSync(directory, options) { directoriesRead += 1; return readdirSync(directory, options); } } });
+  assert(wideResult.decision === "isolated" && wideResult.issues.some((item) => item.code === "directory-walk-limit")
+    && directoriesRead <= SKILL_PACKAGE_LIMITS.directories, "empty directories escaped global traversal budget");
+  let wideStopped = false;
+  try { inspectSkillSource(wide); } catch { wideStopped = true; }
+  assert(wideStopped, "package collector ignored global directory budget");
+  const deep = resolve(root, "deep-empty-tree");
+  write(deep, "SKILL.md", readFileSync(resolve(clean, "SKILL.md"), "utf8"));
+  mkdirSync(resolve(deep, "assets", ...Array.from({ length: SKILL_PACKAGE_LIMITS.depth }, () => "d")), { recursive: true });
+  const deepResult = inspectSkillPackage(deep);
+  assert(deepResult.decision === "isolated" && deepResult.issues.some((item) => item.code === "directory-walk-limit"), "empty tree escaped depth budget");
+  let deepStopped = false;
+  try { inspectSkillSource(deep); } catch { deepStopped = true; }
+  assert(deepStopped && inspectSkillPackage(clean).decision === "ready", "bounded failure broke unrelated clean package");
+
   passed = true;
-  console.log("Skill workshop journey passed recommendations, standard and legacy identity reading, single-package conflict isolation, ZIP/folder delivery, and local package fault isolation without running scripts. UI copy and tooltip appearance are not covered by this check.");
+  console.log("Skill workshop journey passed metadata secret redaction, global directory/depth budgets, standard and legacy identity, ZIP/folder delivery, and local package fault isolation without running scripts. UI appearance is not covered by this check.");
 } finally {
   if (passed) {
     try { rmSync(root, { recursive: true, force: false }); }

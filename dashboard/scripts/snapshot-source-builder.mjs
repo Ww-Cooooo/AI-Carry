@@ -221,8 +221,8 @@ function projectSupportDirectory(repository, directory, expectedKind, { mode = "
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isFile() || entry.name === "README.md" || !entry.name.endsWith(".md")) continue;
     const ref = `instance/${directory}/${entry.name}`;
-    const source = readStructured(repository, ref);
     try {
+      const source = readStructured(repository, ref);
       const parsed = parseMarkdownFrontmatterHead(source, `${directory}/${entry.name}`);
       const asset = parsed.values; const body = source.slice(parsed.bodyOffset);
       const allowed = supportFields[expectedKind];
@@ -398,7 +398,11 @@ function projectSkills(repository, instanceId, { mode = "strict", requiredSource
     const source = readStructured(repository, ref, 32 * 1024);
     if (locateHighConfidenceSecretCandidates(source).blocked || containsForbiddenLocationReference(source)) fail("skill requirements contain unsafe content");
     const parsed = parseArrayTableDocument(source, "skills", "skill requirements");
-    if (parsed.root.schema_version !== 1 || parsed.root.instance_id !== instanceId || parsed.entries.length > 256) fail("skill requirements identity or count is invalid");
+    const emptyTemplate = mode === "operational" && !requiredSourceRefs.has(ref)
+      && parsed.root.instance_id === "template" && parsed.entries.length === 0
+      && parsed.root.generated_at === "" && parsed.root.status === "scan-after-instantiation"
+      && Object.keys(parsed.root).every((field) => ["schema_version", "instance_id", "generated_at", "status"].includes(field));
+    if (parsed.root.schema_version !== 1 || (!emptyTemplate && parsed.root.instance_id !== instanceId) || parsed.entries.length > 256) fail("skill requirements identity or count is invalid");
     const counts = new Map();
     for (const item of parsed.entries) counts.set(item.id, (counts.get(item.id) ?? 0) + 1);
     for (const item of parsed.entries) {
@@ -414,7 +418,7 @@ function projectSkills(repository, instanceId, { mode = "strict", requiredSource
     }
     items.sort((left, right) => compareOrdinal(left.id, right.id));
     status = items.length < parsed.entries.length ? "部分 Skill 登记暂时隔离，其他条目仍可使用"
-      : parsed.root.status ?? (items.length ? "已登记，按任务需要加载" : "尚未登记 Skill");
+      : emptyTemplate ? "尚未登记 Skill" : parsed.root.status ?? (items.length ? "已登记，按任务需要加载" : "尚未登记 Skill");
   } catch (error) {
     isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-index-invalid", error.message);
     status = "部分 Skill 登记暂时隔离，其他功能仍可使用";

@@ -9,7 +9,7 @@ const legacyDashed = ["Agent", "Carry"].join("-");
 const legacyPattern = new RegExp(`${legacyDisplay}|${legacyDashed}|agent-carry|AGENT_CARRY|AgentCarry|agentCarry|agent_carry`, "gu");
 const legacyPathPattern = new RegExp(`${legacyDisplay}|${legacyDashed}|agent-carry|AGENT_CARRY|AgentCarry|agent_carry`, "u");
 const textExtensions = new Set(["", ".md", ".toml", ".mjs", ".js", ".ts", ".tsx", ".json", ".html", ".txt", ".py", ".yml", ".yaml"]);
-const skippedRoots = new Set([".git", ".planning", ".assistant-local", ".assistant-private", "maintainer-private", "node_modules", "workspace", "instance"]);
+const skippedRoots = new Set([".git", ".planning", ".assistant-local", ".assistant-private", ".agents", ".claude", "maintainer-private", "node_modules", "workspace", "instance"]);
 
 const compatibilityFiles = new Set([
   "assistant.toml", "BOOTSTRAP.md", "README.md", "README.en.md", "INSTALL.md", "INSTALL.en.md",
@@ -23,7 +23,7 @@ const compatibilityFiles = new Set([
   "dashboard/scripts/snapshot-envelope.mjs", "dashboard/scripts/validate-product-identity-contract.mjs",
   "dashboard/scripts/validate-snapshot-source-builder.mjs", "dashboard/scripts/validate-startup-capsule-contract.mjs",
   "dashboard/public/snapshot.js", "dashboard/dist/snapshot.js", "dashboard/dist/index.html",
-  "dashboard/src/Dashboard.tsx", "dashboard/src/lib/data.ts", "dashboard/src/lib/i18n.tsx",
+  "dashboard/src/Dashboard.tsx", "dashboard/src/app/client-state.tsx", "dashboard/src/lib/data.ts", "dashboard/src/lib/i18n.tsx",
   "_data/example-snapshot.js", "dashboard.html", "dashboard.en.html",
 ]);
 
@@ -68,6 +68,8 @@ function synthetic(ref, line, value, expected) {
 }
 synthetic("START-HERE.txt", "Agent Carry", legacyDisplay, "");
 synthetic("BOOTSTRAP.md", "Agent Carry 是 AI Carry 的旧名", legacyDisplay, "documented-compatibility");
+synthetic("dashboard/src/app/client-state.tsx", "window.AGENT_CARRY_SNAPSHOT", "AGENT_CARRY", "machine-alias");
+synthetic("dashboard/src/app/client-state.tsx", "Agent Carry", legacyDisplay, "");
 synthetic("assistant.toml", "legacy repository https://github.com/Ww-Cooooo/Agent-Carry", legacyDashed, "repository-location");
 synthetic("core/schemas/migration-kit.schema.md", "new Agent-Carry-Migration-demo", legacyDashed, "invalid-new-output");
 synthetic("core/schemas/migration-kit.schema.md", "旧版 Agent-Carry-Migration-demo 只读兼容", legacyDashed, "legacy-output-read-only");

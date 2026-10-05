@@ -1,5 +1,8 @@
 import {
-  cpSync,
+  closeSync,
+  fstatSync,
+  openSync,
+  readSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -28,6 +31,14 @@ function fail(message) {
 function absoluteDirectory(value, label, { mustExist = true } = {}) {
   if (typeof value !== "string" || !value.trim()) fail(`${label} is missing`);
   const resolved = resolve(value);
+  // 尚不存在的目标也必须核对现有祖先，不能经目录别名绕回源目录。
+  for (let current = resolved; ; current = dirname(current)) {
+    let info;
+    try { info = lstatSync(current); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+    if (info && (!info.isDirectory() || info.isSymbolicLink() || info.isReparsePoint?.())) fail(`${label} has a non-physical ancestor`);
+    if (current === dirname(current)) break;
+  }
   if (!mustExist) return resolved;
   let info;
   try { info = lstatSync(resolved); } catch { fail(`${label} does not exist`); }
@@ -43,6 +54,7 @@ function inside(candidate, owner) {
 function rejectLinks(root, current = root) {
   for (const entry of readdirSync(current, { withFileTypes: true })) {
     const path = join(current, entry.name);
+    if (shouldSkip(relative(root, path), entry)) continue;
     const info = lstatSync(path);
     if (info.isSymbolicLink() || info.isReparsePoint?.()) fail(`source contains a link or reparse point: ${relative(root, path)}`);
     if (entry.isDirectory()) rejectLinks(root, path);
@@ -52,8 +64,45 @@ function rejectLinks(root, current = root) {
 function shouldSkip(relativePath, entry) {
   if (!entry.isDirectory()) return false;
   if (SKIP_ANYWHERE.has(entry.name)) return true;
-  if (!relativePath.includes("\\") && SKIP_ROOT_DIRECTORIES.has(entry.name)) return true;
+  if (!relativePath.includes(sep) && SKIP_ROOT_DIRECTORIES.has(entry.name)) return true;
   return LOCAL_RUNTIME_SKIP.has(relativePath.replaceAll("\\", "/"));
+}
+
+function copyCheckedFile(sourcePath, targetPath) {
+  const before = lstatSync(sourcePath);
+  if (!before.isFile() || before.isSymbolicLink()) fail("source file is not a physical file");
+  const input = openSync(sourcePath, "r");
+  let output;
+  let blocked = false;
+  try {
+    const opened = fstatSync(input);
+    if (opened.dev !== before.dev || opened.ino !== before.ino) fail("source file changed before copying");
+    mkdirSync(dirname(targetPath), { recursive: true });
+    output = openSync(targetPath, "wx", before.mode & 0o777);
+    const buffer = Buffer.alloc(64 * 1024);
+    let overlap = Buffer.alloc(0);
+    let count;
+    while ((count = readSync(input, buffer, 0, buffer.length, null)) > 0) {
+      const bytes = buffer.subarray(0, count);
+      const window = Buffer.concat([overlap, bytes]);
+      // 不因文件大小或 NUL 跳过扫描；UTF-16 与跨块凭据同样检查。
+      const swapped = Buffer.from(window.subarray(0, window.length - window.length % 2));
+      swapped.swap16();
+      blocked = [window.toString("utf8"), window.toString("utf16le"), swapped.toString("utf16le")]
+        .some(text => locateHighConfidenceSecretCandidates(text).blocked);
+      if (blocked) break;
+      writeFileSync(output, bytes);
+      overlap = Buffer.from(window.subarray(Math.max(0, window.length - 4096)));
+    }
+    const after = fstatSync(input), current = lstatSync(sourcePath);
+    if (current.isSymbolicLink() || current.dev !== before.dev || current.ino !== before.ino
+      || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) fail("source file changed while copying");
+  } finally {
+    closeSync(input);
+    if (output !== undefined) closeSync(output);
+    if (blocked) rmSync(targetPath, { force: true });
+  }
+  return !blocked;
 }
 
 function copySource(source, stage, skippedFiles, relativePath = "") {
@@ -69,16 +118,9 @@ function copySource(source, stage, skippedFiles, relativePath = "") {
     }
     if (!entry.isFile()) fail(`unsupported source entry: ${childRelative}`);
     const normalized = childRelative.replaceAll("\\", "/");
-    const sourceBytes = readFileSync(sourcePath);
-    const text = sourceBytes.includes(0) || sourceBytes.length > 1024 * 1024 ? null : sourceBytes.toString("utf8");
-    const hasSecret = SECRET_FILE_NAME.test(normalized)
-      || (text !== null && locateHighConfidenceSecretCandidates(text).blocked);
-    if (hasSecret) {
+    if (SECRET_FILE_NAME.test(normalized) || !copyCheckedFile(sourcePath, targetPath)) {
       skippedFiles.push(normalized);
-      continue;
     }
-    mkdirSync(dirname(targetPath), { recursive: true });
-    cpSync(sourcePath, targetPath, { force: false, errorOnExist: true });
   }
 }
 

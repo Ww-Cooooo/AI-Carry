@@ -6,7 +6,7 @@
 // process never accepts a bare stable ID as a body-read capability and never
 // treats a caller's model-level claim as an authorization ticket.
 
-import { readFileSync } from "node:fs";
+import { readSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspectShortlistedFormalAsset, queryFormalAssetShortlist, stableAssetId } from "./asset-route-contract.mjs";
@@ -73,7 +73,16 @@ function buildBoundedQuery(input, controls) {
 }
 
 let inputBytes;
-try { inputBytes = readFileSync(0); } catch { stop("request-failed-closed"); }
+try {
+  const boundedInput = Buffer.alloc(8193);
+  let size = 0;
+  while (size < boundedInput.length) {
+    const count = readSync(0, boundedInput, size, boundedInput.length - size, null);
+    if (count === 0) break;
+    size += count;
+  }
+  inputBytes = boundedInput.subarray(0, size);
+} catch { stop("request-failed-closed"); }
 if (process.exitCode) process.exit();
 if (inputBytes.length === 0 || inputBytes.length > 8192) stop("input-size-invalid");
 if (process.exitCode) process.exit();

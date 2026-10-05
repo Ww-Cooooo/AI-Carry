@@ -22,9 +22,10 @@ import tomllib
 import unicodedata
 import uuid
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable, Iterator
 
 
 TOOL_VERSION = "1.2.1"
@@ -64,7 +65,7 @@ SECRET_PATTERNS = [
     ("openai-style-token", re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b")),
     ("google-api-key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
     ("aws-access-key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("aws-secret-access-key", re.compile(r"(?i)\baws[_-]?secret[_-]?access[_-]?key\b\s*[:=]\s*[\"']?[A-Za-z0-9+/=]{24,}")),
+    ("aws-secret-access-key", re.compile(r"(?i)\baws[_-]?secret[_-]?access[_-]?key\b[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9+/=]{24,}")),
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")),
     ("authorization-header", re.compile(r"(?im)(?:^|[\r\n,{])\s*[\"']?(?:proxy-)?authorization[\"']?\s*[:=]\s*[\"']?bearer\s+[A-Za-z0-9._~+\/-]{12,}")),
     ("basic-authorization-header", re.compile(r"(?im)(?:^|[\r\n,{])\s*[\"']?(?:proxy-)?authorization[\"']?\s*[:=]\s*[\"']?basic\s+[A-Za-z0-9+/]{4,}={0,2}")),
@@ -76,12 +77,12 @@ SECRET_PATTERNS = [
     ("stripe-live-token", re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b")),
     ("stripe-test-token", re.compile(r"\b(?:sk|rk)_test_[A-Za-z0-9]{16,}\b")),
     ("credential-url", re.compile(r"(?i)\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|amqps?|https?)://[^\s/:@]*:[^\s/]{4,}@[A-Za-z0-9.-]+(?::\d+)?(?:[/?#\s]|$)")),
-    ("client-secret", re.compile(r"(?i)\bclient[_-]?secret\b\s*[:=]\s*[\"']?[^\s\"'`;]{8,}")),
+    ("client-secret", re.compile(r"(?i)\bclient[_-]?secret\b[\"']?\s*[:=]\s*[\"']?[^\s\"'`;]{8,}")),
     (
         "secret-assignment",
         re.compile(
             r"(?im)\b(?:api[_-]?key|access[_-]?token|auth[_-]?token|password|passwd|session[_-]?(?:id|token)|secret|private[_-]?key|recovery[_-]?code)\b"
-            r"\s*[:=]\s*[\"']?[A-Za-z0-9/+_.=-]{8,}"
+            r"[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9/+_.=-]{8,}"
         ),
     ),
 ]
@@ -130,7 +131,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def copy_file_atomic(source: Path, target: Path, *, expected_sha256: str) -> None:
+def copy_file_atomic(source: Path, target: Path, *, expected_sha256: str, before_replace: Callable[[], None] | None = None) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=".ac-", suffix=".tmp", dir=target.parent)
     digest = hashlib.sha256()
@@ -143,6 +144,8 @@ def copy_file_atomic(source: Path, target: Path, *, expected_sha256: str) -> Non
             os.fsync(writer.fileno())
         if digest.hexdigest() != expected_sha256:
             raise MigrationError("copy-source-changed", "复制期间源文件摘要发生变化。")
+        if before_replace is not None:
+            before_replace()
         os.replace(temp_name, target)
     finally:
         Path(temp_name).unlink(missing_ok=True)
@@ -203,7 +206,7 @@ def read_toml(path: Path) -> dict[str, Any]:
         raise MigrationError("invalid-toml", "必要 TOML 文件无法解析。", details={"path": path.name, "category": type(exc).__name__}) from exc
 
 
-def read_json_no_duplicates(data: bytes, *, label: str) -> dict[str, Any]:
+def read_json_no_duplicates(data: bytes, *, label: str, object_only: bool = True) -> Any:
     def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
@@ -218,7 +221,7 @@ def read_json_no_duplicates(data: bytes, *, label: str) -> dict[str, Any]:
         raise MigrationError("invalid-json-encoding", "JSON 必须使用 UTF-8。", details={"path": label}) from exc
     except json.JSONDecodeError as exc:
         raise MigrationError("invalid-json", "JSON 无法解析。", details={"path": label, "line": exc.lineno}) from exc
-    if not isinstance(value, dict):
+    if object_only and not isinstance(value, dict):
         raise MigrationError("invalid-json-root", "JSON 根节点必须是对象。", details={"path": label})
     return value
 
@@ -495,6 +498,11 @@ def content_findings(data: bytes, *, relative_path: str) -> list[dict[str, Any]]
     if Path(relative_path).suffix.casefold() not in TEXT_EXTENSIONS:
         return []
     text = data.decode("utf-8", errors="ignore")
+    is_json = Path(relative_path).suffix.casefold() == ".json"
+    if is_json:
+        # Inspect decoded keys and values too: JSON escaping is not redaction.
+        value = read_json_no_duplicates(data, label=relative_path, object_only=False)
+        text = json.dumps(value, ensure_ascii=False)
     findings: list[dict[str, Any]] = []
     for category, pattern in SECRET_PATTERNS:
         matches = list(pattern.finditer(text))
@@ -502,7 +510,8 @@ def content_findings(data: bytes, *, relative_path: str) -> list[dict[str, Any]]
             continue
         first = matches[0]
         line = text.count("\n", 0, first.start()) + 1
-        findings.append({"path": relative_path, "location": f"line:{line}", "category": category, "count": len(matches)})
+        location = "decoded-json" if is_json else f"line:{line}"
+        findings.append({"path": relative_path, "location": location, "category": category, "count": len(matches)})
     return findings
 
 
@@ -1042,6 +1051,53 @@ def atomic_write_bytes(target: Path, data: bytes) -> None:
         Path(temp_name).unlink(missing_ok=True)
 
 
+@contextmanager
+def import_instance_lock(target_root: Path) -> Iterator[None]:
+    """Serialize import and recovery; OS locks are released on process death."""
+    lock_path = target_root / ".assistant-local" / "migration-import.lock"
+    ensure_no_link_components(target_root, lock_path, field="migration-import-lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    # Never unlink the lock file: another importer may already have it open.
+    with lock_path.open("a+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+            if lock_path.stat().st_size == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            try:
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as exc:
+                raise MigrationError("import-busy", "此实例已有迁移导入或恢复正在运行；没有启动另一轮写入，请稍后重试。") from exc
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                raise MigrationError("import-busy", "此实例已有迁移导入或恢复正在运行；没有启动另一轮写入，请稍后重试。") from exc
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def import_target_state(target: Path) -> str | None:
+    if not target.exists():
+        return None
+    return sha256_file(target) if target.is_file() else "non-regular"
+
+
+def require_import_target_state(target_root: Path, restore_path: str, expected: str | None) -> None:
+    target = destination_path(target_root, restore_path)
+    if import_target_state(target) != expected:
+        raise MigrationError("import-concurrent-target-change", "迁移目标在预览或恢复期间被其他操作改变；新内容和事务现场已保留。", details={"path": restore_path})
+
+
 def import_transaction_root(target_root: Path) -> Path:
     root = target_root / ".assistant-local" / "migration-transactions"
     ensure_no_link_components(target_root, root, field="migration-transaction-root")
@@ -1049,7 +1105,7 @@ def import_transaction_root(target_root: Path) -> Path:
 
 
 def finish_import_transaction(transaction_dir: Path, cleanup_warnings: list[str]) -> None:
-    # Mark a verified commit before best-effort deletion. Even partial cleanup
+    # Mark a verified commit or rollback before best-effort deletion. Even partial cleanup
     # must never be interpreted on the next run as an interrupted data write.
     completed = transaction_dir.with_name("completed-" + transaction_dir.name)
     try:
@@ -1079,29 +1135,40 @@ def recover_import_transaction(transaction_dir: Path, target_root: Path, cleanup
         backup = transaction_dir / "backups" / str(item.get("backup_name", ""))
         entries.append((item, target, backup))
 
-    all_installed = all(
-        target.is_file() and sha256_file(target) == str(item.get("after_sha256", ""))
-        for item, target, _ in entries
-    )
+    states = {str(item["restore_path"]): import_target_state(target) for item, target, _ in entries}
+    # Inspect the entire write set before rolling anything back. A later user
+    # edit is neither our before-image nor our after-image and must be preserved.
+    for item, _, _ in entries:
+        before_sha = str(item.get("before_sha256") or "") if item.get("existed") is True else None
+        after_sha = str(item.get("after_sha256", ""))
+        if states[str(item["restore_path"])] not in {before_sha, after_sha}:
+            raise MigrationError("import-concurrent-target-change", "迁移写入恢复时发现目标被其他操作改变；新内容和事务现场已保留。", details={"path": str(item["restore_path"])})
+    all_installed = all(states[str(item["restore_path"])] == str(item.get("after_sha256", "")) for item, _, _ in entries)
     if all_installed:
         finish_import_transaction(transaction_dir, cleanup_warnings if cleanup_warnings is not None else [])
         return "completed"
 
-    for item, target, backup in entries:
-        existed = item.get("existed") is True
-        before_sha = str(item.get("before_sha256") or "")
-        after_sha = str(item.get("after_sha256") or "")
-        if existed:
-            if not backup.is_file() or sha256_file(backup) != before_sha:
+    for item, _, backup in entries:
+        if item.get("existed") is True and states[str(item["restore_path"])] != str(item.get("before_sha256") or ""):
+            if not backup.is_file() or sha256_file(backup) != str(item.get("before_sha256") or ""):
                 raise MigrationError("import-backup-invalid", "迁移写入事务备份缺失或摘要不一致；已保留现场。")
-            copy_file_atomic(backup, target, expected_sha256=before_sha)
+    for item, target, backup in entries:
+        restore = str(item["restore_path"])
+        existed = item.get("existed") is True
+        before_sha = str(item.get("before_sha256") or "") if existed else None
+        after_sha = str(item.get("after_sha256") or "")
+        if states[restore] == before_sha:
+            require_import_target_state(target_root, restore, before_sha)
+            continue
+        if existed:
+            copy_file_atomic(backup, target, expected_sha256=before_sha,
+                             before_replace=lambda: require_import_target_state(target_root, restore, after_sha))
             if sha256_file(target) != before_sha:
                 raise MigrationError("import-rollback-verification-failed", "迁移写入回滚后摘要不一致；已保留现场。")
-        elif target.exists():
-            if not target.is_file() or sha256_file(target) != after_sha:
-                raise MigrationError("import-concurrent-target-change", "迁移写入恢复时发现目标被其他操作改变；已保留现场。")
+        else:
+            require_import_target_state(target_root, restore, after_sha)
             target.unlink()
-    shutil.rmtree(transaction_dir)
+    finish_import_transaction(transaction_dir, cleanup_warnings if cleanup_warnings is not None else [])
     return "rolled-back"
 
 
@@ -1115,8 +1182,9 @@ def recover_import_transactions(target_root: Path, cleanup_warnings: list[str] |
         ensure_no_link_components(target_root, transaction, field="migration-transaction")
         if not transaction.is_dir():
             raise MigrationError("import-transaction-root-invalid", "迁移事务目录包含非目录对象；已保留现场。")
-        if re.fullmatch(r"completed-import-[0-9a-f]{32}", transaction.name):
-            # No recovery reads/writes to user data after a verified commit.
+        if re.fullmatch(r"(?:completed|preparing)-import-[0-9a-f]{32}", transaction.name):
+            # The import lock excludes live preparation. Preparing directories
+            # have never written targets; completed ones must never replay writes.
             try:
                 shutil.rmtree(transaction)
             except OSError:
@@ -1129,7 +1197,7 @@ def recover_import_transactions(target_root: Path, cleanup_warnings: list[str] |
     return recovered
 
 
-def preview_import(package_path: Path, target_root: Path, *, policy_path: Path | None = None) -> dict[str, Any]:
+def preview_import(package_path: Path, target_root: Path, *, policy_path: Path | None = None, _target_states: dict[str, str | None] | None = None) -> dict[str, Any]:
     target_root = require_root(target_root)
     verification = verify_package(package_path, expected_root=target_root, policy_path=policy_path)
     manifest = package_manifest(package_path)
@@ -1138,9 +1206,12 @@ def preview_import(package_path: Path, target_root: Path, *, policy_path: Path |
     for item in manifest["entries"]:
         restore = str(item["restore_path"])
         target = destination_path(target_root, restore)
-        if not target.exists():
+        state = import_target_state(target)
+        if _target_states is not None:
+            _target_states[restore] = state
+        if state is None:
             groups["new"].append(restore)
-        elif target.is_file() and sha256_file(target) == item["sha256"]:
+        elif state == item["sha256"]:
             groups["same"].append(restore)
         else:
             groups["conflict"].append(restore)
@@ -1163,38 +1234,51 @@ def preview_import(package_path: Path, target_root: Path, *, policy_path: Path |
 
 def import_package(package_path: Path, target_root: Path, *, policy_path: Path | None = None, overwrite_conflicts: bool = False, confirmed_package_id: str | None = None) -> dict[str, Any]:
     target_root = require_root(target_root)
+    with import_instance_lock(target_root):
+        return _import_package_locked(package_path, target_root, policy_path=policy_path,
+                                     overwrite_conflicts=overwrite_conflicts, confirmed_package_id=confirmed_package_id)
+
+
+def _import_package_locked(package_path: Path, target_root: Path, *, policy_path: Path | None, overwrite_conflicts: bool, confirmed_package_id: str | None) -> dict[str, Any]:
     cleanup_warnings: list[str] = []
     recovered_transactions = recover_import_transactions(target_root, cleanup_warnings)
-    preview = preview_import(package_path, target_root, policy_path=policy_path)
+    target_states: dict[str, str | None] = {}
+    preview = preview_import(package_path, target_root, policy_path=policy_path, _target_states=target_states)
     manifest = package_manifest(package_path)
     if preview["counts"]["conflict"] and not overwrite_conflicts:
         raise MigrationError("conflicts-require-confirmation", "存在冲突，尚未写入任何文件。", details={"package_id": manifest["package_id"], "conflict_count": preview["counts"]["conflict"], "paths": preview["paths"]["conflict"]})
     if overwrite_conflicts and confirmed_package_id != manifest["package_id"]:
         raise MigrationError("overwrite-confirmation-missing", "覆盖冲突需要明确确认当前包 ID。", details={"package_id": manifest["package_id"]})
 
+    for restore, state in target_states.items():
+        require_import_target_state(target_root, restore, state)
+        if state == "non-regular":
+            raise MigrationError("import-target-not-file", "迁移目标不是普通文件；原对象保持不变。", details={"path": restore})
     target_root = target_root.resolve()
     backup_path: Path | None = None
     conflicts = set(preview["paths"]["conflict"])
     if conflicts:
         backup_dir = target_root / ".assistant-local" / "migration-backups"
+        ensure_no_link_components(target_root, backup_dir, field="migration-backup-root")
         backup_dir.mkdir(parents=True, exist_ok=True)
-        backup_path = backup_dir / f"private-import-backup-{manifest['package_id']}.zip"
-        if backup_path.exists():
-            raise MigrationError("backup-conflict", "冲突备份文件已经存在，未覆盖目标。", details={"path": str(backup_path)})
-        with zipfile.ZipFile(backup_path, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as backup:
+        # Each attempt owns a fresh backup, including retries after a rollback.
+        # Do not use an untrusted package ID as part of a filesystem path.
+        backup_path = backup_dir / f"private-import-backup-{uuid.uuid4().hex}.zip"
+        with zipfile.ZipFile(backup_path, "x", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as backup:
             for restore in sorted(conflicts):
                 target = destination_path(target_root, restore)
-                if target.is_file():
-                    backup.write(target, f"backup/{restore}")
+                require_import_target_state(target_root, restore, target_states[restore])
+                zip_write_file(backup, f"backup/{restore}", target, expected_sha256=target_states[restore])
 
     skipped_same = len(preview["paths"]["same"])
     planned: list[dict[str, Any]] = []
     for index, item in enumerate(manifest["entries"]):
         restore = str(item["restore_path"])
         target = destination_path(target_root, restore)
+        require_import_target_state(target_root, restore, target_states[restore])
         if restore in preview["paths"]["same"]:
             continue
-        existed = target.is_file()
+        existed = target_states[restore] is not None
         stem = hashlib.sha256(restore.encode("utf-8")).hexdigest()[:20]
         planned.append({
             "index": index,
@@ -1202,19 +1286,20 @@ def import_package(package_path: Path, target_root: Path, *, policy_path: Path |
             "archive_path": item.get("archive_path") or f"{PRIVATE_ARCHIVE_ROOT}/{item['relative_path']}",
             "target": target,
             "existed": existed,
-            "before_sha256": sha256_file(target) if existed else None,
+            "before_sha256": target_states[restore],
             "after_sha256": item["sha256"],
             "backup_name": f"{index:04d}-{stem}.bak",
             "staged_name": f"{index:04d}-{stem}.next",
         })
 
     if planned:
-        transaction_dir = import_transaction_root(target_root) / f"import-{uuid.uuid4().hex}"
+        transaction_name = f"import-{uuid.uuid4().hex}"
+        transaction_dir = import_transaction_root(target_root) / f"preparing-{transaction_name}"
         backup_dir = transaction_dir / "backups"
         staged_dir = transaction_dir / "staged"
-        backup_dir.mkdir(parents=True)
-        staged_dir.mkdir(parents=True)
         try:
+            backup_dir.mkdir(parents=True)
+            staged_dir.mkdir(parents=True)
             with zipfile.ZipFile(package_path, "r") as archive:
                 for plan in planned:
                     staged = staged_dir / plan["staged_name"]
@@ -1248,8 +1333,15 @@ def import_package(package_path: Path, target_root: Path, *, policy_path: Path |
                 transaction_dir / "transaction.json",
                 (json.dumps(transaction_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8"),
             )
+            # Publishing the complete journal is the boundary before any target
+            # mutation. A killed preparation can always be discarded on retry.
+            active_dir = transaction_dir.with_name(transaction_name)
+            transaction_dir.rename(active_dir)
+            transaction_dir = active_dir
+            staged_dir = transaction_dir / "staged"
         except Exception:
-            shutil.rmtree(transaction_dir)
+            if transaction_dir.exists():
+                shutil.rmtree(transaction_dir)
             raise
 
         installed = 0
@@ -1258,7 +1350,8 @@ def import_package(package_path: Path, target_root: Path, *, policy_path: Path |
                 staged = staged_dir / plan["staged_name"]
                 if sha256_file(staged) != plan["after_sha256"]:
                     raise MigrationError("staged-entry-changed", "迁移暂存条目摘要发生变化。", details={"path": plan["restore_path"]})
-                copy_file_atomic(staged, plan["target"], expected_sha256=plan["after_sha256"])
+                copy_file_atomic(staged, plan["target"], expected_sha256=plan["after_sha256"],
+                                 before_replace=lambda: require_import_target_state(target_root, plan["restore_path"], plan["before_sha256"]))
                 installed += 1
                 if os.environ.get("AI_CARRY_TEST_IMPORT_FAIL_AFTER") == str(installed):
                     raise RuntimeError("synthetic import interruption")

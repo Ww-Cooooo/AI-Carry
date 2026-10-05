@@ -52,6 +52,48 @@ CONTRACT = {
 
 
 class PrivateDataMigrationTests(unittest.TestCase):
+    def load_tool(self):
+        spec = importlib.util.spec_from_file_location("migration_regression_fixture", SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def interrupt_import(self, package: Path, target: Path, package_id: str, phase: str) -> None:
+        # Terminate a real importer, bypassing Python exception cleanup. All
+        # inputs are synthetic and the child releases its OS lock on exit.
+        code = '''
+import importlib.util, os, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("migration_crash_fixture", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = m
+spec.loader.exec_module(m)
+phase = sys.argv[5]
+write = m.atomic_write_bytes
+copy = m.copy_file_atomic
+def interrupted_write(target, data):
+    if target.name == "transaction.json" and phase == "before-journal":
+        os._exit(23)
+    write(target, data)
+    if target.name == "transaction.json" and phase == "after-journal":
+        os._exit(23)
+def interrupted_copy(source, target, **kwargs):
+    copy(source, target, **kwargs)
+    if source.suffix == ".next" and phase == "after-first-write":
+        os._exit(23)
+m.atomic_write_bytes = interrupted_write
+m.copy_file_atomic = interrupted_copy
+m.import_package(Path(sys.argv[2]), Path(sys.argv[3]), policy_path=Path(sys.argv[6]),
+                 overwrite_conflicts=True, confirmed_package_id=sys.argv[4])
+sys.exit(99)
+'''
+        result = subprocess.run(
+            [sys.executable, "-B", "-c", code, str(SCRIPT), str(package), str(target), package_id, phase, POLICY_REL.as_posix()],
+            capture_output=True, text=True, encoding="utf-8", timeout=30,
+        )
+        self.assertEqual(result.returncode, 23, result.stdout + result.stderr)
+
     def test_completed_import_cleanup_failure_does_not_block_use_or_retry(self) -> None:
         spec = importlib.util.spec_from_file_location("migration_cleanup_fixture", SCRIPT)
         module = importlib.util.module_from_spec(spec)
@@ -212,7 +254,8 @@ class PrivateDataMigrationTests(unittest.TestCase):
             self.make_instance(source)
             synthetic = "sk-" + ("A" * 32)
             target = source / LOCAL_DATA_REL / "feedback" / "index.json"
-            target.write_text(json.dumps({"api_key": synthetic}), encoding="utf-8")
+            # 在运行时构造合成赋值，避免源码中的变量名被误当作凭据值。
+            target.write_text(json.dumps(dict([("api_key", synthetic)])), encoding="utf-8")
             result = self.run_tool("export", "--root", str(source), "--output-dir", str(output), "--policy", POLICY_REL.as_posix())
             self.assertEqual(result.returncode, 2)
             self.assertNotIn(synthetic, result.stdout)
@@ -361,6 +404,208 @@ class PrivateDataMigrationTests(unittest.TestCase):
             result = json.loads(restored.stdout)
             self.assertEqual(result["post_import_mismatches"], 0)
             self.assertEqual(result["transaction_artifacts_remaining"], 0)
+
+    def test_json_credentials_and_escaped_values_block_export_and_verification(self) -> None:
+        module = self.load_tool()
+        synthetic = "SyntheticOnly0123456789ABCDE"
+        cases = [json.dumps({"nested": [{field: synthetic}]}).encode() for field in
+                 ("password", "client_secret", "api_key", "access_token", "aws_secret_access_key")]
+        escaped = "".join(f"\\u{ord(char):04x}" for char in synthetic)
+        cases.append(('{"pass\\u0077ord":"' + escaped + '"}').encode())
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source, output = base / "source", base / "output"
+            self.make_instance(source)
+            for index, data in enumerate(cases):
+                with self.subTest(case=index):
+                    (source / LOCAL_DATA_REL / "feedback/index.json").write_bytes(data)
+                    exported = self.run_tool("export", "--root", str(source), "--output-dir", str(output), "--policy", POLICY_REL.as_posix())
+                    self.assertEqual(exported.returncode, 2, exported.stderr)
+                    self.assertEqual(json.loads(exported.stdout)["error"], "secret-scan-blocked")
+                    self.assertNotIn(synthetic, exported.stdout + exported.stderr)
+                    self.assertEqual(list(output.iterdir()), [])
+                    package = base / "synthetic-secret.zip"
+                    archive_ref = "private-package/assets/private.example.json"
+                    manifest = {
+                        "schema_version": 3, "package_type": "ai-carry-private-migration",
+                        "package_id": "pvt-synthetic-secret", "source_instance_id": "ac.test.instance",
+                        "credentials_included": False,
+                        "entries": [{"entry_kind": "private-asset", "relative_path": "private.example.json",
+                                     "restore_path": ".assistant-private/assets/private.example.json", "archive_path": archive_ref,
+                                     "asset_ref": "private.example", "size": len(data), "sha256": module.sha256_bytes(data),
+                                     "conflict_policy": "preview-before-overwrite"}],
+                    }
+                    with zipfile.ZipFile(package, "w") as archive:
+                        archive.writestr(module.MANIFEST_PATH, json.dumps(manifest))
+                        archive.writestr(archive_ref, data)
+                    verified = self.run_tool("verify", "--package", str(package))
+                    self.assertEqual(verified.returncode, 2, verified.stderr)
+                    self.assertEqual(json.loads(verified.stdout)["error"], "secret-scan-blocked")
+                    self.assertNotIn(synthetic, verified.stdout + verified.stderr)
+
+    def test_import_rejects_target_drift_since_internal_preview(self) -> None:
+        module = self.load_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = base / "source"
+            self.make_instance(source)
+            exported = module.export_package(source, base / "output", POLICY_REL)
+            package = Path(exported["package_path"])
+            for initial in ("missing", "same", "conflict"):
+                with self.subTest(initial=initial):
+                    target = base / initial
+                    self.make_instance(target)
+                    destination = target / ".assistant-private/assets/private.profile.example.md"
+                    if initial == "missing":
+                        destination.unlink()
+                    elif initial == "conflict":
+                        destination.write_bytes(b"confirmed old preference\n")
+                    changed = b"new user work after internal preview\n"
+                    real_preview = module.preview_import
+                    def changed_after_preview(*args, **kwargs):
+                        result = real_preview(*args, **kwargs)
+                        destination.write_bytes(changed)
+                        return result
+                    with mock.patch.object(module, "preview_import", side_effect=changed_after_preview):
+                        with self.assertRaises(module.MigrationError) as caught:
+                            module.import_package(package, target, policy_path=POLICY_REL,
+                                                  overwrite_conflicts=initial == "conflict", confirmed_package_id=exported["package_id"])
+                    self.assertEqual(caught.exception.code, "import-concurrent-target-change")
+                    self.assertEqual(destination.read_bytes(), changed)
+                    self.assertFalse((target / ".assistant-local/migration-transactions").exists())
+
+    def test_import_rechecks_destination_after_staging_before_replace(self) -> None:
+        module = self.load_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = base / "source"
+            self.make_instance(source)
+            exported = module.export_package(source, base / "output", POLICY_REL)
+            for initial in ("missing", "existing"):
+                with self.subTest(initial=initial):
+                    target = base / initial
+                    self.make_instance(target)
+                    destination = target / ".assistant-private/assets/private.profile.example.md"
+                    if initial == "missing":
+                        destination.unlink()
+                    else:
+                        destination.write_bytes(b"confirmed old preference\n")
+                    changed = b"new user work immediately before replacement\n"
+                    real_copy = module.copy_file_atomic
+                    def changed_before_replace(source_file, target_file, **kwargs):
+                        if source_file.suffix == ".next":
+                            guard = kwargs["before_replace"]
+                            def changed_guard():
+                                destination.write_bytes(changed)
+                                guard()
+                            kwargs["before_replace"] = changed_guard
+                        return real_copy(source_file, target_file, **kwargs)
+                    with mock.patch.object(module, "copy_file_atomic", side_effect=changed_before_replace):
+                        with self.assertRaises(module.MigrationError) as caught:
+                            module.import_package(Path(exported["package_path"]), target, policy_path=POLICY_REL,
+                                                  overwrite_conflicts=initial == "existing", confirmed_package_id=exported["package_id"])
+                    self.assertEqual(caught.exception.code, "import-concurrent-target-change")
+                    self.assertEqual(destination.read_bytes(), changed)
+                    self.assertEqual(len(list((target / ".assistant-local/migration-transactions").glob("import-*/transaction.json"))), 1)
+
+    def test_preparation_process_death_is_retryable_without_target_writes(self) -> None:
+        module = self.load_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = base / "source"
+            self.make_instance(source)
+            exported = module.export_package(source, base / "output", POLICY_REL)
+            for phase in ("before-journal", "after-journal"):
+                with self.subTest(phase=phase):
+                    target = base / phase
+                    self.make_instance(target)
+                    destination = target / ".assistant-private/assets/private.profile.example.md"
+                    destination.unlink()
+                    package = Path(exported["package_path"])
+                    self.interrupt_import(package, target, exported["package_id"], phase)
+                    transactions = target / ".assistant-local/migration-transactions"
+                    self.assertTrue(all(path.name.startswith("preparing-import-") for path in transactions.iterdir()))
+                    self.assertFalse(destination.exists())
+                    result = module.import_package(package, target, policy_path=POLICY_REL)
+                    self.assertEqual(result["status"], "validated")
+                    self.assertEqual(destination.read_bytes(), (source / ".assistant-private/assets/private.profile.example.md").read_bytes())
+                    self.assertEqual(list(transactions.iterdir()), [])
+
+    def test_recovery_preserves_user_edit_after_real_process_interruption(self) -> None:
+        module = self.load_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source, target = base / "source", base / "target"
+            self.make_instance(source)
+            self.make_instance(target)
+            first = target / ".assistant-private/assets/private.profile.example.md"
+            later = target / LOCAL_DATA_REL / "watchlist.json"
+            first.write_bytes(b"old preference\n")
+            later.write_bytes(b'{"old":true}\n')
+            exported = module.export_package(source, base / "output", POLICY_REL)
+            package = Path(exported["package_path"])
+            self.interrupt_import(package, target, exported["package_id"], "after-first-write")
+            installed_first = first.read_bytes()
+            changed = b'{"new_user_work":true}\n'
+            later.write_bytes(changed)
+            transaction = next((target / ".assistant-local/migration-transactions").glob("import-*"))
+            journal = (transaction / "transaction.json").read_bytes()
+            with self.assertRaises(module.MigrationError) as caught:
+                module.import_package(package, target, policy_path=POLICY_REL)
+            self.assertEqual(caught.exception.code, "import-concurrent-target-change")
+            self.assertEqual(later.read_bytes(), changed)
+            self.assertEqual(first.read_bytes(), installed_first, "recovery changed an earlier target before detecting later drift")
+            self.assertEqual((transaction / "transaction.json").read_bytes(), journal)
+
+    def test_conflicting_import_can_retry_after_verified_rollback(self) -> None:
+        module = self.load_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source, target = base / "source", base / "target"
+            self.make_instance(source)
+            self.make_instance(target)
+            destinations = [target / ".assistant-private/assets/private.profile.example.md", target / LOCAL_DATA_REL / "watchlist.json"]
+            before = [b"old preference\n", b'{"old":true}\n']
+            for path, content in zip(destinations, before):
+                path.write_bytes(content)
+            exported = module.export_package(source, base / "output", POLICY_REL)
+            args = (Path(exported["package_path"]), target)
+            kwargs = {"policy_path": POLICY_REL, "overwrite_conflicts": True, "confirmed_package_id": exported["package_id"]}
+            with mock.patch.dict(os.environ, {"AI_CARRY_TEST_IMPORT_FAIL_AFTER": "1"}):
+                with self.assertRaises(module.MigrationError) as caught:
+                    module.import_package(*args, **kwargs)
+            self.assertEqual(caught.exception.code, "import-transaction-rolled-back")
+            self.assertEqual([path.read_bytes() for path in destinations], before)
+            backups = target / ".assistant-local/migration-backups"
+            original = next(backups.glob("*.zip"))
+            original_bytes = original.read_bytes()
+            result = module.import_package(*args, **kwargs)
+            self.assertEqual(result["status"], "validated")
+            self.assertNotEqual(Path(result["backup_path"]), original)
+            self.assertEqual(original.read_bytes(), original_bytes)
+            self.assertEqual(len(list(backups.glob("*.zip"))), 2)
+            self.assertEqual(module.import_package(*args, **kwargs)["written"], 0)
+
+    def test_another_importer_cannot_recover_live_preparation(self) -> None:
+        module = self.load_tool()
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source, target = base / "source", base / "target"
+            self.make_instance(source)
+            self.make_instance(target)
+            exported = module.export_package(source, base / "output", POLICY_REL)
+            preparing = target / ".assistant-local/migration-transactions" / ("preparing-import-" + "a" * 32)
+            preparing.mkdir(parents=True)
+            marker = preparing / "live-stage"
+            marker.write_bytes(b"staging is still in progress")
+            with module.import_instance_lock(target):
+                result = self.run_tool("import", "--package", exported["package_path"], "--target-root", str(target), "--policy", POLICY_REL.as_posix())
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["error"], "import-busy")
+                self.assertTrue(marker.exists())
+            result = module.import_package(Path(exported["package_path"]), target, policy_path=POLICY_REL)
+            self.assertEqual(result["status"], "validated")
+            self.assertFalse(preparing.exists())
 
 
 if __name__ == "__main__":

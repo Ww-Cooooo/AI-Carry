@@ -118,6 +118,36 @@ try {
     && valid.components[0].tree.localFingerprints.length === 1,
   "portable, derived and device-local fingerprints are incomplete");
 
+  const nestedComponent = component()
+    .replace('"config.toml"', '"config/user/settings.toml"')
+    .replace('["generated"]', '["config/cache"]');
+  remove("instance/components/audio-transcriber/config.toml");
+  remove("instance/components/audio-transcriber/generated");
+  write("instance/components/audio-transcriber/component.toml", nestedComponent);
+  write("instance/components/audio-transcriber/config/user/settings.toml", 'language = "zh-CN"\n');
+  write("instance/components/audio-transcriber/config/cache/state.json", '{"derived":true}\n');
+  assert(inspectInstanceComponents(fixture).decision === "instance-components-valid"
+    && inspectInstanceComponentCompatibility(fixture).componentCount === 1
+    && planInstanceComponentUpgrade(fixture, { targetInterfaces: ["ai-carry.instance-component@1"] }).decision === "instance-upgrade-compatible",
+  "ancestor directories of declared nested files were treated as unclassified ownership");
+  assert(classifyInstanceMutation(fixture, { componentId: "audio-transcriber",
+    paths: ["instance/components/audio-transcriber/config/user/settings.toml"] }).decision === "instance-mutation-compatible",
+  "declared nested file ownership did not remain writable");
+  write("instance/components/audio-transcriber/config/unowned.txt", "unowned sibling must remain isolated\n");
+  expectFailure(() => inspectInstanceComponents(fixture), "unclassified paths", "allowing ancestor directories also allowed an undeclared sibling");
+  assert(inspectInstanceComponentCompatibility(fixture).componentCount === 0,
+    "an undeclared sibling of a nested file was not locally isolated");
+  remove("instance/components/audio-transcriber/config/unowned.txt");
+  remove("instance/components/audio-transcriber/config/cache");
+  write("instance/components/audio-transcriber/component.toml", nestedComponent.replace('["config/cache"]', '["blocked/cache"]'));
+  write("instance/components/audio-transcriber/blocked", "not a directory\n");
+  expectFailure(() => inspectInstanceComponents(fixture), "unclassified paths", "a regular file was accepted as the ancestor of a missing derived path");
+  remove("instance/components/audio-transcriber/blocked");
+  remove("instance/components/audio-transcriber/config");
+  write("instance/components/audio-transcriber/component.toml", component());
+  write("instance/components/audio-transcriber/config.toml", 'language = "zh-CN"\n');
+  write("instance/components/audio-transcriber/generated/status.json", '{"state":"ready"}\n');
+
   const legacyRegistry = registry().replace('record_type = "ai-carry-instance-component-registry"', 'record_type = "agent-carry-instance-component-registry"');
   const legacyComponent = component()
     .replace('record_type = "ai-carry-instance-component"', 'record_type = "agent-carry-instance-component"')

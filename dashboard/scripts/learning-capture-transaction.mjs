@@ -1,3 +1,4 @@
+import { withInstanceWriteLock } from "./instance-write-lock.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync, existsSync, fstatSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync,
@@ -171,6 +172,58 @@ function deepFreeze(value) {
     for (const child of Object.values(value)) deepFreeze(child);
   }
   return value;
+}
+
+function captureWrite(repository, operation, deniedDecision, callback) {
+  try { return withInstanceWriteLock(repository, operation, callback); }
+  catch (error) {
+    return deepFreeze({ decision: deniedDecision, reason: error.message, executable: false,
+      affectedScope: "only-this-learning-item", ordinaryTasksContinue: true,
+      ...(error.code ? { errorCode: error.code } : {}) });
+  }
+}
+
+// Recovery reads may rename/delete transaction artifacts. Hold the shared
+// instance lease before loading a plan or deciding that residue is abandoned.
+export function cleanupExpiredPersistentLearningCaptureChallenges(repository, ...args) {
+  return captureWrite(repository, "learning-capture-cleanup", "persistent-learning-capture-cleanup-denied",
+    () => cleanupExpiredPersistentLearningCaptureChallengesUnlocked(repository, ...args));
+}
+export function preparePersistentLearningCaptureChallenge(repository, ...args) {
+  return captureWrite(repository, "learning-capture-prepare", "persistent-learning-capture-prepare-denied",
+    () => preparePersistentLearningCaptureChallengeUnlocked(repository, ...args));
+}
+export function confirmPersistentLearningCaptureChallenge(repository, ...args) {
+  return captureWrite(repository, "learning-capture-confirm", "persistent-learning-capture-confirm-denied",
+    () => confirmPersistentLearningCaptureChallengeUnlocked(repository, ...args));
+}
+export function closePersistentLearningCaptureChallenge(repository, ...args) {
+  return captureWrite(repository, "learning-capture-close", "persistent-learning-capture-close-denied",
+    () => closePersistentLearningCaptureChallengeUnlocked(repository, ...args));
+}
+export function loadPersistentLearningCapturePlan(repository, ...args) {
+  return captureWrite(repository, "learning-capture-load", "persistent-learning-capture-plan-load-denied",
+    () => loadPersistentLearningCapturePlanUnlocked(repository, ...args));
+}
+export function buildLearningCaptureTransactionPlan(repository, ...args) {
+  return captureWrite(repository, "learning-capture-plan", "learning-capture-plan-denied",
+    () => buildLearningCaptureTransactionPlanUnlocked(repository, ...args));
+}
+export function inspectLearningCaptureTransactionState(repository, ...args) {
+  return captureWrite(repository, "learning-capture-inspect-plan", "learning-capture-recovery-required",
+    () => inspectLearningCaptureTransactionStateUnlocked(repository, ...args));
+}
+export function inspectPersistentLearningCaptureTransaction(repository, ...args) {
+  return captureWrite(repository, "learning-capture-inspect", "persistent-learning-capture-inspect-denied",
+    () => inspectPersistentLearningCaptureTransactionUnlocked(repository, ...args));
+}
+export function executePersistentLearningCaptureTransaction(repository, ...args) {
+  return captureWrite(repository, "learning-capture-execute", "persistent-learning-capture-execution-denied",
+    () => executePersistentLearningCaptureTransactionUnlocked(repository, ...args));
+}
+export function rollbackPersistentLearningCaptureTransaction(repository, ...args) {
+  return captureWrite(repository, "learning-capture-rollback", "persistent-learning-capture-rollback-denied",
+    () => rollbackPersistentLearningCaptureTransactionUnlocked(repository, ...args));
 }
 
 function clean(value, max, allowEmpty = true) {
@@ -1143,7 +1196,7 @@ function readBoundPersistentPlan(repositoryReal, record) {
   return plan;
 }
 
-export function cleanupExpiredPersistentLearningCaptureChallenges(repository, _options = {}) {
+function cleanupExpiredPersistentLearningCaptureChallengesUnlocked(repository, _options = {}) {
   try {
     const repositoryReal = realpathSync(repository); const root = persistentRoot(repositoryReal);
     let removed = 0; let inspected = 0;
@@ -1195,7 +1248,7 @@ export function cleanupExpiredPersistentLearningCaptureChallenges(repository, _o
   }
 }
 
-export function preparePersistentLearningCaptureChallenge(repository, proposal, observationAssertion, {
+function preparePersistentLearningCaptureChallengeUnlocked(repository, proposal, observationAssertion, {
   levelEvidence = undefined, allowPromptOnlyLowRiskKeep = false,
 } = {}) {
   try {
@@ -1251,7 +1304,7 @@ export function preparePersistentLearningCaptureChallenge(repository, proposal, 
   }
 }
 
-export function confirmPersistentLearningCaptureChallenge(repository, { challengeId, proposal, observationAssertion, receipt,
+function confirmPersistentLearningCaptureChallengeUnlocked(repository, { challengeId, proposal, observationAssertion, receipt,
   levelEvidence = undefined, allowPromptOnlyLowRiskKeep = false } = {}) {
   try {
     const repositoryReal = realpathSync(repository); const target = persistentRecordPath(repositoryReal, challengeId);
@@ -1334,7 +1387,7 @@ export function confirmPersistentLearningCaptureChallenge(repository, { challeng
   }
 }
 
-export function closePersistentLearningCaptureChallenge(repository, { challengeId, challengeNonce } = {}) {
+function closePersistentLearningCaptureChallengeUnlocked(repository, { challengeId, challengeNonce } = {}) {
   try {
     const repositoryReal = realpathSync(repository); const target = persistentRecordPath(repositoryReal, challengeId);
     const record = readPersistentJson(target, 32 * 1024, "persistent challenge record");
@@ -1369,7 +1422,7 @@ export function closePersistentLearningCaptureChallenge(repository, { challengeI
   }
 }
 
-export function loadPersistentLearningCapturePlan(repository, { challengeId, challengeNonce } = {}) {
+function loadPersistentLearningCapturePlanUnlocked(repository, { challengeId, challengeNonce } = {}) {
   try {
     const repositoryReal = realpathSync(repository); const target = persistentRecordPath(repositoryReal, challengeId);
     const record = readPersistentJson(target, 32 * 1024, "persistent challenge record");
@@ -1908,7 +1961,7 @@ function buildDirectKeepPlan(repositoryReal, trust) {
   });
 }
 
-export function buildLearningCaptureTransactionPlan(repository, selection) {
+function buildLearningCaptureTransactionPlanUnlocked(repository, selection) {
   const trust = trustedSelections.get(selection);
   let repositoryReal;
   try { repositoryReal = realpathSync(repository); } catch { return deepFreeze({ decision: "learning-capture-plan-denied", reason: "repository-unavailable", executable: false }); }
@@ -2330,7 +2383,7 @@ function digestAt(repositoryReal, preimage) {
   return stableRead(repositoryReal, preimage.target, limit, { allowMissing: true })?.digest ?? "absent";
 }
 
-export function inspectLearningCaptureTransactionState(repository, plan) {
+function inspectLearningCaptureTransactionStateUnlocked(repository, plan) {
   const trust = trustedPlans.get(plan);
   let repositoryReal;
   try { repositoryReal = realpathSync(repository); } catch { return deepFreeze({ decision: "learning-capture-recovery-required", reason: "repository-unavailable", executable: false }); }
@@ -2388,7 +2441,7 @@ function loadPersistentAction(repository, challengeId, challengeNonce) {
   return { repositoryReal, recordTarget, record, plan, state };
 }
 
-export function inspectPersistentLearningCaptureTransaction(repository, { challengeId, challengeNonce } = {}) {
+function inspectPersistentLearningCaptureTransactionUnlocked(repository, { challengeId, challengeNonce } = {}) {
   try {
     const loaded = loadPersistentAction(repository, challengeId, challengeNonce);
     return deepFreeze({ decision: loaded.state.decision, executable: false, persistentChallengeId: challengeId,
@@ -2525,6 +2578,9 @@ function atomicPlanStep(repositoryReal, step, planDigest) {
   }
   writeFileSync(stage, content, { flag: "wx" });
   try {
+    if (digestAt(repositoryReal, { target: step.target }) !== step.preconditionDigest) {
+      throw new Error(`transaction precondition changed while staging step ${step.ordinal}`);
+    }
     if (existsSync(target)) renameSync(target, backup);
     renameSync(stage, target);
     if (digestAt(repositoryReal, { target: step.target }) !== step.proposedDigest) {
@@ -2532,7 +2588,22 @@ function atomicPlanStep(repositoryReal, step, planDigest) {
     }
     if (existsSync(backup)) unlinkSync(backup);
   } catch (error) {
-    if (existsSync(stage)) unlinkSync(stage);
+    // Editors or writers outside the coordinated API may still change bytes.
+    // A failed readback is not permission to delete their replacement and
+    // restore an older snapshot. Preserve the full scene on unknown drift.
+    if (existsSync(backup)) {
+      const actual = digestAt(repositoryReal, { target: step.target });
+      const prior = readOwnedAtomicArtifact(backup, limits.snapshot, "transaction backup artifact");
+      if (prior.digest !== step.preconditionDigest || !["absent", step.proposedDigest].includes(actual)) {
+        throw new Error(`transaction rollback preserved externally changed content at step ${step.ordinal}`);
+      }
+    }
+    if (existsSync(stage)) {
+      if (readOwnedAtomicArtifact(stage, limits.snapshot, "transaction stage artifact").digest !== step.proposedDigest) {
+        throw new Error(`transaction rollback preserved externally changed stage at step ${step.ordinal}`);
+      }
+      unlinkSync(stage);
+    }
     if (existsSync(backup)) {
       if (existsSync(target)) unlinkSync(target);
       renameSync(backup, target);
@@ -2558,17 +2629,17 @@ function applyBestEffortProjections(repositoryReal, plan) {
   let reason = pending.length > 0 ? "projection-could-not-be-prepared" : "";
   for (let index = 0; index < steps.length; index += 1) {
     const step = steps[index];
-    const current = digestAt(repositoryReal, { target: step.target });
-    if (current === step.proposedDigest) {
-      applied += 1;
-      continue;
-    }
-    if (current !== step.preconditionDigest) {
-      reason = "projection-source-drifted";
-      pending.push(...steps.slice(index).map((item) => item.phase));
-      break;
-    }
     try {
+      const current = digestAt(repositoryReal, { target: step.target });
+      if (current === step.proposedDigest) {
+        applied += 1;
+        continue;
+      }
+      if (current !== step.preconditionDigest) {
+        reason = "projection-source-drifted";
+        pending.push(...steps.slice(index).map((item) => item.phase));
+        break;
+      }
       atomicPlanStep(repositoryReal, step, plan.planDigest);
       applied += 1;
     } catch {
@@ -2605,7 +2676,7 @@ function finishPersistentExecution(loaded, { idempotent, writeCount }) {
   });
 }
 
-export function executePersistentLearningCaptureTransaction(repository, { challengeId, challengeNonce } = {}) {
+function executePersistentLearningCaptureTransactionUnlocked(repository, { challengeId, challengeNonce } = {}) {
   let loaded;
   try {
     loaded = loadPersistentAction(repository, challengeId, challengeNonce);
@@ -2644,7 +2715,7 @@ function cleanupKnownEmptyTransactionDirectories(repositoryReal) {
   }
 }
 
-export function rollbackPersistentLearningCaptureTransaction(repository, { challengeId, challengeNonce } = {}) {
+function rollbackPersistentLearningCaptureTransactionUnlocked(repository, { challengeId, challengeNonce } = {}) {
   let loaded;
   try {
     loaded = loadPersistentAction(repository, challengeId, challengeNonce);
@@ -2655,11 +2726,18 @@ export function rollbackPersistentLearningCaptureTransaction(repository, { chall
     }
     for (const item of loaded.plan.rollback) {
       const target = physicalPlanTarget(loaded.repositoryReal, item.target);
+      const current = digestAt(loaded.repositoryReal, { target: item.target });
+      const ownedStates = new Set([
+        ...loaded.plan.preimages.filter((entry) => entry.target === item.target).map((entry) => entry.digest),
+        ...loaded.plan.steps.filter((entry) => entry.target === item.target).map((entry) => entry.proposedDigest),
+      ]);
+      if (!ownedStates.has(current)) throw new Error(`rollback preserved externally changed content at ${item.target}`);
+      if (current === item.restoreDigest) continue;
       if (item.restoreDigest === "absent") {
         if (existsSync(target)) unlinkSync(target);
       } else {
         atomicPlanStep(loaded.repositoryReal, {
-          ordinal: 0, target: item.target, preconditionDigest: digestAt(loaded.repositoryReal, { target: item.target }),
+          ordinal: 0, target: item.target, preconditionDigest: current,
           proposedDigest: item.restoreDigest, proposedByteLength: Buffer.from(item.contentBase64, "base64").length,
           contentBase64: item.contentBase64,
         }, loaded.plan.planDigest);

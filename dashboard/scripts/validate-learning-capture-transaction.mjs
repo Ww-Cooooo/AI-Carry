@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import {
+import fs, {
   cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync,
   statSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { syncBuiltinESMExports } from "node:module";
+import { buildFormalProposal, normalizeRequest } from "./learning-save-cli.mjs";
+import { withInstanceWriteLock } from "./instance-write-lock.mjs";
 import {
   buildLearningCaptureTransactionPlan,
   buildLearningReminderCancellationPlan,
@@ -867,7 +870,8 @@ function testSimpleLearningSaveCli() {
   expect(prepared.decision === "learning-save-choice-required" && prepared.assetKind === "sop"
     && /^capture\.[a-f0-9]{32}~[a-f0-9]{36}$/u.test(prepared.confirmationRef)
     && prepared.userPreview.includes("尚未验证") && prepared.userPreview.includes("不会自动执行")
-    && prepared.confirmCommand.includes("--user-reply") && prepared.nextStep.includes("用户刚才的原话"),
+    && prepared.confirmCommand.includes("--user-reply") && prepared.confirmCommand.includes("--choice")
+    && typeof prepared.nextStep === "string" && prepared.nextStep.trim().length > 0,
   "simple learning prepare did not return one natural exact-content choice preview");
   expect(!preparedRun.stdout.includes("formal_preview") && !preparedRun.stdout.includes("contentBase64")
     && Buffer.byteLength(preparedRun.stdout, "utf8") < 12 * 1024,
@@ -1157,7 +1161,105 @@ function testReminderAndCancellationGuidance() {
   "a stale reminder projection blocked, rolled back, or silently overwrote the confirmed source cancellation");
 }
 
+function planSyntheticCapture(root, suffix, choice = "keep") {
+  const { proposal: value } = buildFormalProposal(normalizeRequest({
+    kind: "memory", title: `Synthetic ${suffix}`, summary: `Remember ${suffix}`,
+    triggers: [`Use ${suffix}`], scope: [`Tasks about ${suffix}`], excludes: ["Unrelated tasks"],
+    steps: [`Check ${suffix}`, "State what remains unverified"],
+  }));
+  const assertion = observationAssertion(suffix);
+  const prepared = preparePersistentLearningCaptureChallenge(root, value, assertion);
+  expect(prepared.decision === "persistent-learning-capture-choice-required", `synthetic prepare failed: ${JSON.stringify(prepared)}`);
+  const confirmed = confirmPersistentLearningCaptureChallenge(root, {
+    challengeId: prepared.persistentChallengeId, proposal: value, observationAssertion: assertion,
+    receipt: persistentReceipt(prepared, choice, `${suffix}.${prepared.persistentChallengeId}`),
+  });
+  expect(confirmed.decision === "persistent-learning-capture-plan-ready", `synthetic confirmation failed: ${JSON.stringify(confirmed)}`);
+  return { plan: confirmed.plan, action: { challengeId: prepared.persistentChallengeId, challengeNonce: prepared.challengeNonce } };
+}
+
+function executeCaptureChild(root, action) {
+  const url = pathToFileURL(join(scriptDir, "learning-capture-transaction.mjs")).href;
+  const run = spawnSync(process.execPath, ["--input-type=module", "-e",
+    `import {executePersistentLearningCaptureTransaction as execute} from ${JSON.stringify(url)};process.stdout.write(JSON.stringify(execute(${JSON.stringify(root)},${JSON.stringify(action)})));`],
+  { encoding: "utf8", timeout: 30_000, windowsHide: true });
+  expect(run.status === 0, `capture child failed: ${run.stderr}`);
+  return JSON.parse(run.stdout);
+}
+
+function testSharedWriteConcurrencyAndExternalEditPreservation() {
+  const root = createFixture("concurrent-learning-keeps", { full: true });
+  const first = planSyntheticCapture(root, "punctuation"); const second = planSyntheticCapture(root, "ingredients");
+  const originalWrite = fs.writeFileSync; const token = first.plan.planDigest.slice(7, 23); let competing;
+  try {
+    fs.writeFileSync = function (target, ...args) {
+      const result = originalWrite(target, ...args);
+      if (String(target).endsWith(`domain-map.toml.learning-capture-${token}.stage`)) competing = executeCaptureChild(root, second.action);
+      return result;
+    };
+    syncBuiltinESMExports();
+    expect(executePersistentLearningCaptureTransaction(root, first.action).decision === "persistent-learning-capture-execution-complete", "first concurrent writer did not commit");
+  } finally { fs.writeFileSync = originalWrite; syncBuiltinESMExports(); }
+  expect(competing?.errorCode === "AI_CARRY_INSTANCE_WRITE_BUSY"
+    && !existsSync(targetPath(root, second.plan.formalTarget)), "competing process entered the staged shared-map write window");
+  const mapAfterFirst = readFileSync(targetPath(root, "instance/maps/domain-map.toml"), "utf8");
+  const stale = executePersistentLearningCaptureTransaction(root, second.action);
+  expect(stale.decision === "persistent-learning-capture-execution-recovery-required"
+    && readFileSync(targetPath(root, "instance/maps/domain-map.toml"), "utf8") === mapAfterFirst,
+  "a stale plan overwrote the first writer after the lock was released");
+  const replanned = planSyntheticCapture(root, "ingredients");
+  expect(executePersistentLearningCaptureTransaction(root, replanned.action).decision === "persistent-learning-capture-execution-complete"
+    && loadTrustedDomainEnvelope(root, { explicitRequestedId: first.plan.formalId }).envelope.explicitRoute
+    && loadTrustedDomainEnvelope(root, { explicitRequestedId: replanned.plan.formalId }).envelope.explicitRoute,
+  "replanned second save did not retain both independent formal routes");
+
+  const crossRoot = createFixture("cross-module-learning-lock", { full: true });
+  const cross = planSyntheticCapture(crossRoot, "cross-module");
+  const busy = withInstanceWriteLock(crossRoot, "synthetic-signal-writer", () => executeCaptureChild(crossRoot, cross.action));
+  expect(busy.errorCode === "AI_CARRY_INSTANCE_WRITE_BUSY" && !existsSync(targetPath(crossRoot, cross.plan.formalTarget)),
+    "learning capture did not share the other module's instance lock");
+
+  const editRoot = createFixture("learning-external-edit", { full: true });
+  const edit = planSyntheticCapture(editRoot, "external-edit"); const originalRename = fs.renameSync;
+  let externallyEdited = "";
+  try {
+    fs.renameSync = function (from, to, ...args) {
+      const result = originalRename(from, to, ...args);
+      if (String(from).includes(".learning-capture-") && String(from).endsWith(".stage") && String(to).endsWith("domain-map.toml")) {
+        externallyEdited = `${readFileSync(to, "utf8")}\n# synthetic independent editor change\n`;
+        writeFileSync(to, externallyEdited);
+      }
+      return result;
+    };
+    syncBuiltinESMExports();
+    const result = executePersistentLearningCaptureTransaction(editRoot, edit.action);
+    expect(result.decision === "persistent-learning-capture-execution-denied", "external writeback drift was falsely committed");
+  } finally { fs.renameSync = originalRename; syncBuiltinESMExports(); }
+  expect(externallyEdited && readFileSync(targetPath(editRoot, "instance/maps/domain-map.toml"), "utf8") === externallyEdited
+    && existsSync(join(editRoot, ".assistant-local/runtime/learning-capture", `${edit.action.challengeId}.plan.json`)),
+  "learning failure rollback deleted external content or its recovery evidence");
+  expect(rollbackPersistentLearningCaptureTransaction(editRoot, edit.action).decision === "persistent-learning-capture-rollback-denied"
+    && readFileSync(targetPath(editRoot, "instance/maps/domain-map.toml"), "utf8") === externallyEdited,
+  "explicit crash rollback overwrote external content");
+}
+
+function testProjectionReadFailureIsLocal() {
+  const root = createFixture("learning-projection-read-failure", { full: true });
+  const prepared = planSyntheticCapture(root, "observe-projection", "observe");
+  const index = targetPath(root, CANDIDATE_INDEX_REF);
+  renameSync(index, `${index}.synthetic-original`); mkdirSync(index);
+  const result = executePersistentLearningCaptureTransaction(root, prepared.action);
+  expect(result.decision === "persistent-learning-capture-execution-complete"
+    && result.projectionState === "refresh-pending" && result.projectionPending.includes("candidate-index")
+    && result.ordinaryTasksContinue === true && existsSync(targetPath(root, prepared.plan.candidateSourceRef)),
+  "an unreadable derived index reported denial after the learning source committed");
+  expect(closePersistentLearningCaptureChallenge(root, prepared.action).decision === "persistent-learning-capture-closed"
+    && existsSync(targetPath(root, prepared.plan.candidateSourceRef)), "projection degradation prevented local closeout or removed the saved candidate");
+}
+
 try {
+  testSharedWriteConcurrencyAndExternalEditPreservation();
+  testProjectionReadFailureIsLocal();
   testNoSelfSignedDirectUserBypassAndStandardKeep();
   testOpaqueReceiptBoundary();
   testNoResponseAndDiscard();

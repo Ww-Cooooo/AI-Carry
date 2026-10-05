@@ -1,5 +1,6 @@
-import { cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmdirSync,
+import fs, { cpSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmdirSync,
   rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -37,6 +38,8 @@ const assert = (condition, message) => { if (!condition) throw new Error(`Cross-
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const sourceRoot = resolve(scriptDir, "../..");
 const cliPath = resolve(scriptDir, "cross-session-signal-cli.mjs");
+const skipJunctionFixtures = process.argv.includes("--skip-junction-fixtures");
+if (skipJunctionFixtures) console.log("SKIPPED: OS junction projection fixture (--skip-junction-fixtures).");
 let fixture = mkdtempSync(join(tmpdir(), "ai-carry-signal-transaction-"));
 const candidateRef = "instance/evolution/grade-workflow.md";
 const signalRef = "instance/signals/count/signal.grade-workflow.toml";
@@ -619,15 +622,17 @@ function runCaptureSignalInteropFixture() {
     const unique = repositoryHex.slice(16, 28);
     nonOwnedProjection = resolve(projectionParent, `.ai-carry-cross-session-snapshot-foreign-${unique}`);
     mkdirSync(nonOwnedProjection); writeFileSync(resolve(nonOwnedProjection, "sentinel.txt"), "preserve", "utf8");
-    forgedProjectionTarget = mkdtempSync(join(tmpdir(), `ai-carry-forged-projection-${unique}-`));
-    writeFileSync(resolve(forgedProjectionTarget, "sentinel.txt"), "do-not-follow", "utf8");
-    forgedProjectionLink = resolve(projectionParent, `${projectionPrefix}linked-fixture`);
-    symlinkSync(forgedProjectionTarget, forgedProjectionLink, "junction");
+    if (!skipJunctionFixtures) {
+      forgedProjectionTarget = mkdtempSync(join(tmpdir(), `ai-carry-forged-projection-${unique}-`));
+      writeFileSync(resolve(forgedProjectionTarget, "sentinel.txt"), "do-not-follow", "utf8");
+      forgedProjectionLink = resolve(projectionParent, `${projectionPrefix}linked-fixture`);
+      symlinkSync(forgedProjectionTarget, forgedProjectionLink, "junction");
+    }
     const projectionCleanup = cleanupExpiredPersistentCrossSessionSignalTransactions(root);
     assert(projectionCleanup.decision === "persistent-cross-session-signal-cleanup-complete" && !existsSync(staleProjection),
       "dead marker-bound sibling hardlink projection was not cleaned by explicit maintenance");
-    assert(existsSync(resolve(nonOwnedProjection, "sentinel.txt")) && existsSync(forgedProjectionLink)
-      && existsSync(resolve(forgedProjectionTarget, "sentinel.txt")),
+    assert(existsSync(resolve(nonOwnedProjection, "sentinel.txt")) && (skipJunctionFixtures
+      || (existsSync(forgedProjectionLink) && existsSync(resolve(forgedProjectionTarget, "sentinel.txt")))),
     "projection cleanup deleted a non-owned sibling or followed a forged link");
   } finally {
     if (forgedProjectionLink && existsSync(forgedProjectionLink)) unlinkSync(forgedProjectionLink);
@@ -983,6 +988,97 @@ try {
   assert(secondExecution.decision === "transaction-noop" && secondExecution.reason === "event-already-applied",
     "second execution accumulated the same source-plus-event identity twice");
 
+  // Rollback has its own bounded swap ordinals. Reproduce exact disk states
+  // at each hard-stop boundary, including a retry after prior targets restored.
+  for (const [stopAfter, restoredBeforeCrash] of [[3, 0], [3, 1], [8, 7]]) {
+    for (const phase of ["stage-written", "backup-moved", "preimage-installed"]) {
+      writeInitial();
+      executeCrossSessionSignalTransaction(fixture, plan, { hooks: {
+        afterStep: ({ ordinal }) => { if (ordinal === stopAfter) throw new Error("rollback-crash-fixture"); },
+      } });
+      const bundle = resolve(fixture, ".assistant-local/runtime/cross-session-signals", plan.operationId);
+      const record = JSON.parse(readFileSync(resolve(bundle, "record.json"), "utf8"));
+      const changed = plan.rollback.filter((item) => plan.steps.find((step) => step.target === item.target).ordinal <= stopAfter);
+      const preimageFile = (item) => resolve(bundle, record.preimages.find((entry) => entry.target === item.target).file);
+      for (const item of changed.slice(0, restoredBeforeCrash)) cpSync(preimageFile(item), resolve(fixture, item.target));
+      const item = changed[restoredBeforeCrash]; const target = resolve(fixture, item.target);
+      const token = `${plan.planDigest.slice("sha256:".length, "sha256:".length + 16)}-${90 + restoredBeforeCrash}`;
+      const stage = `${target}.cross-session-${token}.stage`; const backup = `${target}.cross-session-${token}.backup`;
+      cpSync(preimageFile(item), stage);
+      if (phase !== "stage-written") renameSync(target, backup);
+      if (phase === "preimage-installed") renameSync(stage, target);
+      if (stopAfter === 3 && restoredBeforeCrash === 0 && phase === "stage-written") {
+        const exactStage = readFileSync(stage); writeFileSync(stage, "unbound rollback stage\n");
+        const corrupted = runCli("rollback", plan.operationId);
+        assert(corrupted.parsed.decision === "persistent-cross-session-signal-rollback-recovery-required"
+          && readFileSync(stage, "utf8") === "unbound rollback stage\n",
+        "rollback guessed through or deleted an unbound swap carrier");
+        writeFileSync(stage, exactStage);
+      }
+      const crashed = runCli("inspect", plan.operationId);
+      assert(crashed.parsed.state === "prefix" && crashed.parsed.atomicRepairRequired === true
+        && crashed.parsed.checkpoint === stopAfter - restoredBeforeCrash - (phase === "preimage-installed" ? 1 : 0),
+      `rollback ${phase} at ordinal ${90 + restoredBeforeCrash} was not recognized as a bound swap`);
+      assert(runCli("rollback", plan.operationId).parsed.decision === "persistent-cross-session-signal-rollback-complete"
+        && runCli("inspect", plan.operationId).parsed.state === "preimage" && !existsSync(stage) && !existsSync(backup),
+      `fresh-process rollback could not recover ${phase} at ordinal ${90 + restoredBeforeCrash}`);
+      assert(runCli("rollback", plan.operationId).parsed.idempotent === true,
+        "rollback recovery did not remain idempotent");
+      assert(runCli("close", plan.operationId).parsed.decision === "persistent-cross-session-signal-closed",
+        "recovered rollback bundle did not close from its exact preimage state");
+    }
+  }
+
+  // Stop after the precondition read but before even publishing a stage file:
+  // no carrier exists yet that could incidentally make the contender see drift.
+  // A different operation must not commit into this shared-control race window.
+  writeInitial();
+  const contenderChallenge = mintChallenge({ taskBasis: "task-grade-contender", observationBasis: "message-grade-contender" }).challenge;
+  const contenderReceipt = confirmCrossSessionSignalEvent(contenderChallenge,
+    confirmationFor(contenderChallenge, { messageRef: "message.confirm-grade-contender" }));
+  const contenderRequest = requestForReceipt(contenderReceipt, { independent: true, distinctContextDelta: 0 });
+  const contenderPlan = buildCrossSessionSignalTransactionPlan(fixture, contenderRequest.request);
+  assert(contenderPlan.decision === "transaction-preview" && contenderPlan.operationId !== plan.operationId,
+    "concurrency fixture did not create two valid, distinct operation IDs");
+  executeCrossSessionSignalTransaction(fixture, contenderPlan, { hooks: {
+    afterStep: ({ ordinal }) => { if (ordinal === 1) throw new Error("persist-contender-bundle"); },
+  } });
+  assert(rollbackPersistentCrossSessionSignalTransaction(fixture, { operationId: contenderPlan.operationId }).decision
+    === "persistent-cross-session-signal-rollback-complete", "contender bundle did not return to the common preimage");
+  const ordinaryOpen = fs.openSync; let raceWindowReached = false; let writerResult;
+  const sharedControl = resolve(realpathSync(fixture), "instance/signals/control.toml");
+  const controlStage = `${sharedControl}.cross-session-${plan.planDigest.slice("sha256:".length, "sha256:".length + 16)}-01.stage`;
+  try {
+    fs.openSync = (path, flags, ...options) => {
+      if (!raceWindowReached && flags === "wx" && typeof path === "string" && resolve(path) === controlStage) {
+        raceWindowReached = true;
+        const before = readFileSync(sharedControl);
+        for (const command of ["resume", "rollback", "close", "cleanup"]) {
+          const contender = runCli(command, command === "cleanup" ? "" : contenderPlan.operationId);
+          assert(contender.status === 2 && contender.parsed.reason === "instance-write-busy",
+            `different-operation ${command} bypassed the instance write lock`);
+        }
+        assert(runCli("inspect", contenderPlan.operationId).parsed.decision === "persistent-cross-session-signal-transaction-inspected"
+          && readFileSync(sharedControl).equals(before),
+        "write contention blocked a read-only inspection or changed shared control bytes");
+      }
+      return ordinaryOpen(path, flags, ...options);
+    };
+    syncBuiltinESMExports();
+    writerResult = executeCrossSessionSignalTransaction(fixture, plan);
+  } finally {
+    fs.openSync = ordinaryOpen;
+    syncBuiltinESMExports();
+  }
+  assert(raceWindowReached && writerResult.decision === "persistent-cross-session-signal-resume-complete"
+    && inspectPersistentCrossSessionSignalTransaction(fixture, { operationId: plan.operationId }).state === "final",
+  `competing operation corrupted the winning transaction or the race seam was not exercised: ${JSON.stringify({ raceWindowReached, decision: writerResult?.decision, reason: writerResult?.reason })}`);
+  assert(runCli("close", plan.operationId).parsed.decision === "persistent-cross-session-signal-closed",
+    "winner could not close after distinct-operation contention");
+  writeInitial();
+  assert(runCli("close", contenderPlan.operationId).parsed.decision === "persistent-cross-session-signal-closed",
+    "preserved contender bundle could not close after exact preimage restoration");
+
   // TTL cleanup removes only exact preimage/final bundles and preserves prefix/drift evidence.
   const expiredAt = new Date(Date.parse(plan.expiresAt) + 1);
   writeInitial();
@@ -1181,7 +1277,7 @@ try {
 
   runCaptureSignalInteropFixture();
 
-  console.log("Cross-session signal transaction passed opaque host receipts, canonical capture-to-signal accumulation and legacy alias migration, bounded dead sibling-projection cleanup without link following, honest review-only evidence, 100-retry zero growth, bounded same-task relation replacement, private exact-byte persistence, 1/2/3/8-step cross-process resume and rollback, TTL/close/drift preservation, merged-truth byte-identical snapshots, bounded CLI output, minimal startup, recovery, corruption, and idempotence checks.");
+  console.log("Cross-session signal transaction passed opaque host receipts, canonical capture-to-signal accumulation and legacy alias migration, bounded dead sibling-projection cleanup, honest review-only evidence, 100-retry zero growth, bounded same-task relation replacement, private exact-byte persistence, 1/2/3/8-step cross-process recovery, rollback swap crashes at ordinals 90/91/97, competing-operation serialization, TTL/close/drift preservation, merged-truth byte-identical snapshots, bounded CLI output, minimal startup, recovery, corruption, and idempotence checks.");
 } finally {
   rmSync(fixture, { recursive: true, force: true });
 }

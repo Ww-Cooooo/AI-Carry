@@ -2,7 +2,7 @@ import { lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
+import { locateHighConfidenceSecretCandidates, SECRET_JSON_SCAN_LIMITS } from "./secret-content-boundary.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const assert = (condition, message) => { if (!condition) throw new Error(`Secret boundary vector failed: ${message}`); };
@@ -13,8 +13,30 @@ function validateVectors() {
   for (const vector of vectors.blocked) {
     const result = locateHighConfidenceSecretCandidates(vector.parts.join(""));
     assert(result.blocked && result.findings.some((finding) => finding.category === vector.category), `missed ${vector.category}`);
+    if (vector.decoded_json) assert(result.findings.some((finding) => finding.location === "decoded-json" && finding.line === 0), `decoded JSON location missing for ${vector.category}`);
   }
   for (const value of vectors.allowed) assert(!locateHighConfidenceSecretCandidates(value).blocked, `false positive: ${value}`);
+  // Exercise actual JSON serialization, not just unquoted assignment syntax.
+  for (const key of ["password", "passwd", "client_secret", "api_key", "access_token", "auth_token", "session_id", "recovery_code"]) {
+    const synthetic = ["SyntheticValue", "ForReview123"].join("");
+    const text = JSON.stringify({ credentials: { [key]: synthetic } }, null, 2);
+    const result = locateHighConfidenceSecretCandidates(text);
+    assert(result.blocked && result.findings.some((finding) => finding.line === 3), `missed JSON field ${key}`);
+    assert(!JSON.stringify(result).includes(synthetic), `JSON field ${key} leaked into diagnostics`);
+    assert(!locateHighConfidenceSecretCandidates(JSON.stringify({ [key]: "" })).blocked, `empty JSON field ${key}`);
+  }
+  for (const text of [
+    JSON.stringify({ value: "x".repeat(SECRET_JSON_SCAN_LIMITS.bytes) }),
+    `${"[".repeat(SECRET_JSON_SCAN_LIMITS.depth + 1)}0${"]".repeat(SECRET_JSON_SCAN_LIMITS.depth + 1)}`,
+    JSON.stringify(Array.from({ length: SECRET_JSON_SCAN_LIMITS.tokens + 2 }, () => 0)),
+  ]) {
+    const limited = locateHighConfidenceSecretCandidates(text);
+    assert(limited.blocked && limited.findings.some((finding) => finding.category === "json-inspection-limit"), "unbounded JSON was not locally stopped");
+  }
+  const escapedKey = ["pass", "\\", "u0077ord"].join("");
+  const duplicate = `{"${escapedKey}":"${["SyntheticValue", "ForReview123"].join("")}","password":""}`;
+  assert(locateHighConfidenceSecretCandidates(duplicate).blocked, "JSON duplicate key discarded a hidden earlier credential");
+  assert(!locateHighConfidenceSecretCandidates('The word "password" describes a field, not a supplied credential.').blocked, "ordinary prose was treated as JSON");
   validateReviewedImageVectors(vectors);
   return vectors;
 }

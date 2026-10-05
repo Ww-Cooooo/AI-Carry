@@ -19,10 +19,15 @@ function requireFragments(text, label, fragments) {
 
 // Editorial headings may change. Language, install and download destinations
 // must still lead to the intended product, not an old version or missing page.
-function requireReadmeEntries(text, label, { counterpart, guide, versionPrefix }, version, source) {
+function requireReadmeEntries(text, label, { counterpart, guide, versionPrefix, unreleasedNotice }, version, source, releaseStatus = 'published-release') {
+  assert(['published-release', 'local-unreleased-candidate'].includes(releaseStatus), 'unknown release boundary')
   const links = new Set([...text.matchAll(/\]\(<?([^\s)>]+)>?\)/gu)].map(match => match[1]))
-  for (const target of [counterpart, source.releases, source.versioned_archive_template.replace('{tag}', `v${version}`)]) {
+  const downloads = releaseStatus === 'published-release' ? [source.versioned_archive_template.replace('{tag}', `v${version}`)] : []
+  for (const target of [counterpart, source.releases, ...downloads]) {
     if (!links.has(target)) throw new Error(`${label} is missing required destination: ${target}`)
+  }
+  if (releaseStatus === 'local-unreleased-candidate' && !unreleasedNotice.test(text)) {
+    throw new Error(`${label} must disclose its unpublished status`)
   }
   if (!text.includes(`${source.repository}/blob/main/${guide}`)) {
     throw new Error(`${label} is missing the official ${guide} installation request`)
@@ -56,10 +61,14 @@ const [readmeZh, readmeEn, installEn, startEn, entryZh, entryEn, i18n, catalog, 
 const version = parseSectionedToml(await read('assistant.toml'), 'assistant.toml')[''].product_version
 const officialSource = parseSectionedToml(await read('core/upgrade/official-source.toml'), 'official-source.toml')['']
 assert.match(version, /^\d+\.\d+\.\d+$/u)
-const zhEntry = { counterpart: 'README.en.md', guide: 'INSTALL.md', versionPrefix: '当前版本：' }
-const enEntry = { counterpart: 'README.md', guide: 'INSTALL.en.md', versionPrefix: 'Current version:' }
-requireReadmeEntries(readmeZh, 'Chinese README', zhEntry, version, officialSource)
-requireReadmeEntries(readmeEn, 'English README', enEntry, version, officialSource)
+const releaseManifest = await read(`core/upgrade/release-manifest-${version}.toml`)
+const boundarySource = releaseManifest.split(/^\[release_boundary\]\s*$/mu)[1]?.split(/^\[/mu)[0]
+assert(boundarySource, 'current release manifest is missing its release boundary')
+const releaseStatus = parseSectionedToml(boundarySource, 'current release boundary')[''].status
+const zhEntry = { counterpart: 'README.en.md', guide: 'INSTALL.md', versionPrefix: '(?:当前版本|当前源码)：', unreleasedNotice: /(?:尚未发布|未发布候选)/u }
+const enEntry = { counterpart: 'README.md', guide: 'INSTALL.en.md', versionPrefix: 'Current (?:version|source):', unreleasedNotice: /\bunpublished\b/iu }
+requireReadmeEntries(readmeZh, 'Chinese README', zhEntry, version, officialSource, releaseStatus)
+requireReadmeEntries(readmeEn, 'English README', enEntry, version, officialSource, releaseStatus)
 
 // A rewrite without old headings is valid; broken entrypoints are not.
 const archive = officialSource.versioned_archive_template.replace('{tag}', `v${version}`)
@@ -71,6 +80,11 @@ for (const [before, after, error] of [
   ['blob/main/INSTALL.en.md', 'blob/main/wrong-install.md', /installation request/u],
   [`Current version: \`${version}\``, 'Current version: `0.0.0`', /version differs/u],
 ]) assert.throws(() => requireReadmeEntries(sample.replace(before, after), 'fixture', enEntry, version, officialSource), error)
+// 本地候选不制造尚不存在的下载；正式发布仍必须指向本版标签。
+const localSample = sample.replace(`[ZIP](${archive})`, 'Unpublished local candidate.')
+assert.doesNotThrow(() => requireReadmeEntries(localSample, 'local fixture', enEntry, version, officialSource, 'local-unreleased-candidate'))
+assert.throws(() => requireReadmeEntries(localSample.replace('Unpublished', 'Draft'), 'local fixture', enEntry, version, officialSource, 'local-unreleased-candidate'), /unpublished status/u)
+assert.throws(() => requireReadmeEntries(localSample, 'published fixture', enEntry, version, officialSource), /required destination/u)
 requireFragments(installEn, 'English installer', [
   'dashboard.en.html',
   'first-use-execution-gates.md',

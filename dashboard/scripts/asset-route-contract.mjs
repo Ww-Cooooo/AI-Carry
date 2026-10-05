@@ -409,7 +409,7 @@ function validPrivateReference(ref) {
 
 const validationRootFields = new Set(["schema_version", "index_id", "instance_id", "state", "source_revision", "generated_at", "budget_bytes", "overflow", "record_count"]);
 const validationRecordFields = new Set(["id", "asset_id", "outcome", "task_event_id", "context_id", "host_experience_ref", "environment_ref", "validated_at", "result_protocol", "source_revision"]);
-function loadResultValidationEvidence(repository, context) {
+function loadResultValidationEvidence(repository, context, { allowEmptyTemplate = false } = {}) {
   const contextTrust = trustedInstanceContexts.get(context);
   if (!contextTrust || !instanceContextFresh(context)) return null;
   let read;
@@ -419,8 +419,10 @@ function loadResultValidationEvidence(repository, context) {
   try { parsed = parseArrayTableDocument(read.text, "validations", "result validation evidence index"); }
   catch { return null; }
   const root = parsed.root; const records = parsed.entries;
+  const emptyTemplate = allowEmptyTemplate && root.instance_id === "template" && root.state === "empty"
+    && root.source_revision === 0 && root.generated_at === "" && records.length === 0;
   const rootValid = Object.keys(root).every((field) => validationRootFields.has(field))
-    && root.schema_version === 1 && root.index_id === "result-validations" && root.instance_id === context.instanceId
+    && root.schema_version === 1 && root.index_id === "result-validations" && (root.instance_id === context.instanceId || emptyTemplate)
     && ["empty", "current"].includes(root.state) && Number.isSafeInteger(root.source_revision) && root.source_revision >= 0
     && root.budget_bytes === 262144 && root.overflow === false && root.record_count === records.length && records.length <= 1024
     && (context.manifestState !== "template" || root.state === "empty")
@@ -1181,7 +1183,9 @@ export function projectFormalAssetsForOperationalSnapshot(repository, {
   const { envelope } = loadTrustedDomainEnvelope(repository);
   const trust = trustedEnvelopes.get(envelope);
   if (!trust || !envelopeFresh(trust)) fail("operational formal projection lacks a fresh trusted maintenance envelope");
-  let evidenceRegistry = loadResultValidationEvidence(repository, trust.expected);
+  let evidenceRegistry = loadResultValidationEvidence(repository, trust.expected, {
+    allowEmptyTemplate: !requiredSourceRefs.has(trust.expected.validationEvidenceIndexRef),
+  });
   if (!evidenceRegistry) {
     const evidenceRef = trust.expected.validationEvidenceIndexRef;
     if (requiredSourceRefs.has(evidenceRef)) fail("required result-validation evidence index is unavailable or invalid");

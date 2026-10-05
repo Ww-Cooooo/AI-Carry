@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import fs, { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { getInstanceWriteLockCleanup, withInstanceWriteLock } from "./instance-write-lock.mjs";
 import {
   executeFirstInstantiation,
   firstInstantiationWriteSet,
@@ -37,17 +40,37 @@ function request() {
   };
 }
 
-function copyTemplate(target) {
-  cpSync(repository, target, {
+function copyTemplate(target, source = repository) {
+  const manifest = validateInstanceManifestStructure(parseSectionedToml(read(source, "instance/manifest.toml"), "fixture source"));
+  assert(manifest.root.state === "template" && manifest.root.instance_id === "template", "fixture source must be a blank template, not a real instance");
+  cpSync(source, target, {
     recursive: true,
     errorOnExist: true,
     filter(path) {
-      const ref = relative(repository, path).split(sep).join("/");
-      const top = ref.split("/")[0];
-      return ![".git", ".planning", "maintainer-private", "node_modules"].includes(top)
-        && ref !== "dashboard/node_modules" && !ref.startsWith("dashboard/node_modules/");
+      const parts = relative(source, path).split(sep);
+      return ![".git", ".planning", ".assistant-local", ".assistant-private", ".agents", ".claude",
+        "maintainer-private", "AGENTS.override.md", "workspace", "skills-lock.json"].includes(parts[0])
+        && !parts.includes("node_modules");
     },
   });
+}
+
+function testTemplateCopyExclusions(parent) {
+  const source = resolve(parent, "copy-source"); const target = resolve(parent, "copy-target");
+  mkdirSync(resolve(source, "instance"), { recursive: true });
+  writeFileSync(resolve(source, "instance/manifest.toml"), read(repository, "instance/manifest.toml"));
+  const denied = [".assistant-local/value.txt", ".assistant-private/value.txt", ".agents/value.txt", ".claude/worktrees/value.txt",
+    "AGENTS.override.md", "workspace/value.txt", "skills-lock.json", "node_modules/value.txt",
+    "dashboard/deep/node_modules/value.txt", "core/tools/nested/node_modules/value.txt"];
+  for (const ref of [...denied, "core/retained.txt"]) {
+    const path = resolve(source, ref); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, "synthetic fixture marker");
+  }
+  copyTemplate(target, source);
+  assert(denied.every((ref) => !existsSync(resolve(target, ref))) && existsSync(resolve(target, "core/retained.txt")),
+    "template fixture copy included private/local/host/workspace or nested dependency content");
+  writeFileSync(resolve(source, "instance/manifest.toml"), read(source, "instance/manifest.toml").replace('state = "template"', 'state = "instance"'));
+  let refused = false; try { copyTemplate(resolve(parent, "must-not-copy-instance"), source); } catch { refused = true; }
+  assert(refused && !existsSync(resolve(parent, "must-not-copy-instance")), "fixture copy read a real instance as template data");
 }
 
 function read(root, ref) { return readFileSync(resolve(root, ...ref.split("/")), "utf8"); }
@@ -100,9 +123,160 @@ function verifyUsableInstance(root, expectedId) {
   "new instance snapshot contains invented assets");
 }
 
+const lockModule = pathToFileURL(resolve(scriptDirectory, "instance-write-lock.mjs")).href;
+const creationModule = pathToFileURL(resolve(scriptDirectory, "first-instantiation-transaction.mjs")).href;
+function child(source) {
+  return spawnSync(process.execPath, ["--input-type=module", "-e", source], { encoding: "utf8", timeout: 30_000, windowsHide: true });
+}
+function deadLock(root) {
+  const run = child(`import {withInstanceWriteLock as lock} from ${JSON.stringify(lockModule)}; lock(${JSON.stringify(root)}, 'crash-owner', () => process.exit(71));`);
+  assert(run.status === 71, `dead lock fixture failed: ${run.stderr}`);
+}
+
+async function testSharedInstanceWriteLock(parent) {
+  const root = resolve(parent, "lock-tests"); mkdirSync(root);
+  assert(withInstanceWriteLock(root, "outer", () => withInstanceWriteLock(root, "inner", () => 17)) === 17,
+    "synchronous nested lock changed return value");
+  let release;
+  const held = withInstanceWriteLock(root, "async-holder", () => new Promise((done) => { release = done; }));
+  let busy;
+  try { withInstanceWriteLock(root, "independent-call", () => assert(false, "independent async caller entered")); } catch (error) { busy = error; }
+  assert(busy?.code === "AI_CARRY_INSTANCE_WRITE_BUSY", "independent call in the same process bypassed the async holder");
+  release(23); assert(await held === 23, "Promise lock changed return value");
+
+  const noHardlinks = fs.linkSync;
+  try {
+    fs.linkSync = () => { const error = new Error("synthetic unsupported hardlinks"); error.code = "ENOTSUP"; throw error; };
+    syncBuiltinESMExports();
+    assert(withInstanceWriteLock(root, "portable-volume", () => 29) === 29, "lock depends on hardlink support");
+    const portable = resolve(parent, "portable-creation"); copyTemplate(portable);
+    const created = executeFirstInstantiation(portable, request(), { testFaultAfterCapsule: true, testFaultBeforeSnapshot: true });
+    assert(created.decision === "first-instantiation-complete", "first creation journal depends on hardlink support");
+  } finally { fs.linkSync = noHardlinks; syncBuiltinESMExports(); }
+
+  const initCrash = child(`import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+    const write=fs.writeFileSync; fs.writeFileSync=function(p,...args){const r=write(p,...args); if(String(p).includes('.lock.publish-'))process.exit(72);return r;};syncBuiltinESMExports();
+    const {withInstanceWriteLock:lock}=await import(${JSON.stringify(lockModule)});lock(${JSON.stringify(root)},'initialize-crash',()=>{});`);
+  assert(initCrash.status === 72 && !existsSync(resolve(root, ".assistant-local/runtime/instance-write.lock")), "initialization crash published an ownerless lock");
+  assert(withInstanceWriteLock(root, "after-init-crash", () => 31) === 31, "initialization residue blocked a new writer");
+
+  deadLock(root);
+  const reaperCrash = child(`import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+    const rename=fs.renameSync;fs.renameSync=function(a,b){const r=rename(a,b);if(/instance-write\\.lock\\.recover-[a-f0-9]{32}$/.test(String(b)))process.exit(73);return r;};syncBuiltinESMExports();
+    const {withInstanceWriteLock:lock}=await import(${JSON.stringify(lockModule)});lock(${JSON.stringify(root)},'reaper-crash',()=>{});`);
+  assert(reaperCrash.status === 73, `reaper interruption was not reached: ${reaperCrash.stderr}`);
+  assert(withInstanceWriteLock(root, "recover-dead-reaper", () => 37) === 37, "dead reaper made the dead lock unrecoverable");
+
+  const beforeMove = resolve(parent, "lock-before-move"); const afterMove = resolve(parent, "lock-after-move");
+  mkdirSync(beforeMove); deadLock(beforeMove); renameSync(beforeMove, afterMove);
+  assert(withInstanceWriteLock(afterMove, "moved-root", () => 41) === 41, "a moved root could not reclaim a provably dead local lock");
+
+  for (const foreign of [true, false]) {
+    const foreignRoot = resolve(parent, foreign ? "foreign-host-lock" : "unknown-host-lock"); mkdirSync(foreignRoot); deadLock(foreignRoot);
+    const ownerPath = resolve(foreignRoot, ".assistant-local/runtime/instance-write.lock/owner.json");
+    const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+    if (foreign) owner.host_binding = "0".repeat(64); else delete owner.host_binding;
+    const before = JSON.stringify(owner); writeFileSync(ownerPath, before);
+    let denied;
+    try { withInstanceWriteLock(foreignRoot, "foreign-recovery", () => assert(false, "foreign lock was entered")); } catch (error) { denied = error; }
+    assert(denied?.code === "AI_CARRY_INSTANCE_WRITE_BUSY" && denied.message.includes("another computer")
+      && readFileSync(ownerPath, "utf8") === before, "a foreign/unknown host lock was reaped using a local dead-PID probe");
+  }
+
+  deadLock(root);
+  const race = () => new Promise((done, reject) => {
+    const worker = spawn(process.execPath, ["--input-type=module", "-e", `import fs from 'node:fs';import {withInstanceWriteLock as lock} from ${JSON.stringify(lockModule)};
+      try{lock(${JSON.stringify(root)},'racing-reaper',()=>{const p=${JSON.stringify(resolve(root, "critical"))};fs.writeFileSync(p,'held',{flag:'wx'});Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,80);fs.unlinkSync(p);});process.stdout.write('acquired');}
+      catch(e){if(e.code==='AI_CARRY_INSTANCE_WRITE_BUSY')process.stdout.write('busy');else{process.stderr.write(e.stack);process.exitCode=1;}}`], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = ""; let stderr = "";
+    worker.stdout.on("data", (bytes) => { stdout += bytes; }); worker.stderr.on("data", (bytes) => { stderr += bytes; });
+    worker.on("error", reject); worker.on("exit", (code) => done({ code, stdout, stderr }));
+  });
+  const races = await Promise.all([race(), race(), race(), race()]);
+  assert(races.every((run) => run.code === 0 && ["acquired", "busy"].includes(run.stdout)) && races.some((run) => run.stdout === "acquired"),
+    `concurrent dead-owner recovery entered two critical sections: ${JSON.stringify(races)}`);
+
+  const cleanupRoot = resolve(parent, "cleanup-lock"); mkdirSync(cleanupRoot);
+  const originalRename = fs.renameSync;
+  const result = Object.freeze({ decision: "business-committed" });
+  let returned;
+  try {
+    fs.renameSync = function (from, to, ...args) {
+      if (String(from).endsWith("instance-write.lock") && String(to).includes(".retired-")) {
+        const error = new Error("synthetic cleanup failure"); error.code = "EACCES"; throw error;
+      }
+      return originalRename(from, to, ...args);
+    };
+    syncBuiltinESMExports(); returned = withInstanceWriteLock(cleanupRoot, "cleanup-failure", () => result);
+  } finally { fs.renameSync = originalRename; syncBuiltinESMExports(); }
+  assert(returned === result && getInstanceWriteLockCleanup(result)?.state === "pending"
+    && existsSync(resolve(cleanupRoot, ".assistant-local/runtime/instance-write.lock")), "lock cleanup changed a committed result or its capability identity");
+  assert(withInstanceWriteLock(cleanupRoot, "retry-own-cleanup", () => 43) === 43
+    && !existsSync(resolve(cleanupRoot, ".assistant-local/runtime/instance-write.lock")), "a transient cleanup failure stranded the live process's later writes");
+
+  const replacementRoot = resolve(parent, "replacement-lock"); mkdirSync(replacementRoot);
+  const replacementResult = Object.freeze({ decision: "business-committed" });
+  let replacementNonce;
+  const preservedResult = withInstanceWriteLock(replacementRoot, "replacement-preservation", () => {
+    const path = resolve(replacementRoot, ".assistant-local/runtime/instance-write.lock/owner.json");
+    const replacement = JSON.parse(readFileSync(path, "utf8")); replacement.nonce = "f".repeat(32); replacementNonce = replacement.nonce;
+    writeFileSync(path, JSON.stringify(replacement));
+    return replacementResult;
+  });
+  assert(preservedResult === replacementResult && getInstanceWriteLockCleanup(preservedResult)?.state === "pending"
+    && JSON.parse(readFileSync(resolve(replacementRoot, ".assistant-local/runtime/instance-write.lock/owner.json"), "utf8")).nonce === replacementNonce,
+  "lock release removed a replacement generation");
+
+  const junctionRoot = resolve(parent, "linked-lock-parent"); const outside = resolve(parent, "lock-outside");
+  mkdirSync(junctionRoot); mkdirSync(outside);
+  symlinkSync(outside, resolve(junctionRoot, ".assistant-local"), process.platform === "win32" ? "junction" : "dir");
+  let linkedDenied = false; try { withInstanceWriteLock(junctionRoot, "linked-parent", () => assert(false, "linked lock callback ran")); } catch { linkedDenied = true; }
+  assert(linkedDenied && readdirSync(outside).length === 0, "lock created state through a linked parent");
+}
+
+function testHardCreationInterruptions(parent) {
+  const contended = resolve(parent, "creation-contention"); copyTemplate(contended);
+  const beforeContention = treeFingerprint(contended);
+  const competing = withInstanceWriteLock(contended, "another-core-writer", () => child(`
+    import {executeFirstInstantiation} from ${JSON.stringify(creationModule)};
+    try{executeFirstInstantiation(${JSON.stringify(contended)},${JSON.stringify(request())});process.exitCode=1;}
+    catch(e){process.stdout.write(e.code??'unexpected');}`));
+  assert(competing.status === 0 && competing.stdout === "AI_CARRY_INSTANCE_WRITE_BUSY"
+    && treeFingerprint(contended) === beforeContention, "first creation bypassed another process's core write lease");
+  for (const stopAfter of [0, 1, 2, 3]) {
+    const root = resolve(parent, `hard-crash-${stopAfter}`); copyTemplate(root);
+    const identity = { instanceId: `ac-hard-crash-${stopAfter}`, createdAt };
+    const run = child(`import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+      const rename=fs.renameSync;let installed=0;fs.renameSync=function(a,b){const r=rename(a,b);
+        if(${stopAfter}===0&&String(b).endsWith('first-instantiation.json'))process.exit(77);
+        if(String(a).includes('.ai-carry-stage-')&&++installed===${stopAfter})process.exit(77);return r;};syncBuiltinESMExports();
+      const {executeFirstInstantiation}=await import(${JSON.stringify(creationModule)});executeFirstInstantiation(${JSON.stringify(root)},${JSON.stringify(request())},{testIdentity:${JSON.stringify(identity)},testFaultBeforeSnapshot:true});`);
+    assert(run.status === 77, `hard stop ${stopAfter} failed: ${run.stderr}`);
+    assert(inspectFirstInstantiationRequest(root, request()).decision === "first-instantiation-recovery-ready", "read-only preview hid an interrupted core transaction");
+    const resumed = executeFirstInstantiation(root, request(), { testFaultBeforeSnapshot: true });
+    assert(resumed.decision === "first-instantiation-complete" && resumed.recovered_interrupted_creation === true
+      && resumed.instance_id === identity.instanceId && read(root, "instance/profile/approved-profile.md").includes(identity.instanceId)
+      && read(root, "instance/maps/domain-map.toml").includes(identity.instanceId)
+      && !existsSync(resolve(root, ".assistant-local/runtime/first-instantiation.json")), "hard stop did not resume one consistent original identity");
+  }
+  const drift = resolve(parent, "creation-drift"); copyTemplate(drift);
+  const stopped = child(`import fs from 'node:fs';import {syncBuiltinESMExports} from 'node:module';const rename=fs.renameSync;
+    fs.renameSync=function(a,b){const r=rename(a,b);if(String(a).includes('manifest.toml.ai-carry-stage-'))process.exit(77);return r;};syncBuiltinESMExports();
+    const {executeFirstInstantiation}=await import(${JSON.stringify(creationModule)});executeFirstInstantiation(${JSON.stringify(drift)},${JSON.stringify(request())});`);
+  assert(stopped.status === 77, "external drift setup did not stop after first core write");
+  const changed = `${read(drift, "instance/maps/domain-map.toml")}\n# external editor change\n`;
+  writeFileSync(resolve(drift, "instance/maps/domain-map.toml"), changed);
+  let preserved = false; try { executeFirstInstantiation(drift, request()); } catch (error) { preserved = error.message.includes("changed externally"); }
+  assert(preserved && read(drift, "instance/maps/domain-map.toml") === changed
+    && existsSync(resolve(drift, ".assistant-local/runtime/first-instantiation.json")), "creation recovery overwrote an external edit or discarded its evidence");
+}
+
 const integrationRoot = mkdtempSync(resolve(tmpdir(), "ai-carry-first-run-"));
 let completed = false;
 try {
+  testTemplateCopyExclusions(integrationRoot);
+  await testSharedInstanceWriteLock(integrationRoot);
+  testHardCreationInterruptions(integrationRoot);
   const normalized = normalizeFirstInstantiationRequest(request());
   assert(normalized.host.modelName === "" && normalized.warnings.some((item) => item.includes("unverified")), "unverified model alias was promoted");
   assert(JSON.stringify(firstInstantiationWriteSet) === JSON.stringify(["instance/manifest.toml", "instance/profile/approved-profile.md", "instance/maps/domain-map.toml"]), "core write set expanded");
@@ -141,7 +315,8 @@ try {
 
   completed = true;
   process.stdout.write(JSON.stringify({ decision: "first-run-journey-passed", core_write_count: 3, lazy_optional_state: true,
-    idempotent: true, core_rollback: true, capsule_failure_local: true, snapshot_failure_local: true }) + "\n");
+    idempotent: true, core_rollback: true, durable_core_recovery: true, shared_write_lock: true,
+    hardlink_independent: true, template_copy_exclusions: true, capsule_failure_local: true, snapshot_failure_local: true }) + "\n");
 } finally {
   if (completed) rmSync(integrationRoot, { recursive: true, force: true });
   else process.stderr.write("First-run failure scene preserved at " + integrationRoot + "\n");

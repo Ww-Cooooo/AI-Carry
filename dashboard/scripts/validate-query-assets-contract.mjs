@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -101,5 +101,23 @@ for (const [name, request] of [
   const rejected = run(request);
   assert(rejected.status !== 0 && rejected.output.decision === "request-rejected" && !hasLocation(rejected.output), `${name} was not rejected without a location leak`);
 }
+
+await new Promise((resolveTest, reject) => {
+  const child = spawn(process.execPath, [cli], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  let output = '';
+  const timer = setTimeout(() => { child.kill(); reject(new Error('超限输入仍等待 EOF')); }, 5000);
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stdin.on('error', () => {});
+  child.once('error', error => { clearTimeout(timer); reject(error); });
+  child.once('close', code => {
+    clearTimeout(timer);
+    try {
+      assert(code === 2 && JSON.parse(output).reason === 'input-size-invalid', '超限输入没有及时拒绝');
+      resolveTest();
+    } catch (error) { reject(error); }
+  });
+  // 不发送 EOF：读取应在第 8193 字节就停止，而不是等待流结束。
+  child.stdin.write(Buffer.alloc(8193, 32));
+});
 
 console.log("Asset query CLI passed fixed-root, bounded shortlist, stateless explicit selection, non-blocking model guidance, caller-grounded learning review, multiline language, and no-location-output checks.");

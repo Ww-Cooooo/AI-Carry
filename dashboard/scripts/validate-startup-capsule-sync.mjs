@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import fs, { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { buildStartupCapsule, inspectStartupCapsule } from "./startup-capsule-contract.mjs";
@@ -63,5 +64,40 @@ try {
   const repairedMissing = buildVerifiedStartupProjection(root, { repairDerived: true });
   assert(repairedMissing.decision === "startup-capsule-valid" && repairedMissing.repair?.state === "repaired"
     && existsSync(resolve(root, "instance/startup-capsule.toml")), "startup did not repair and retry a missing derived capsule");
-  console.log("Startup capsule sync passed one-attempt CRLF/stale/missing auto-repair, valid-source degraded fallback, invalid-manifest persistent-action isolation, clean retry, natural-language reporting, and idempotence checks.");
+  // No OS links are created here. Synthetic lstat metadata exercises refusal
+  // of both linked ancestors before either the query or direct sync can write.
+  const ordinaryLstat = fs.lstatSync;
+  for (const ancestor of ["instance", "core"]) {
+    for (const kind of ["symbolic-link", "reparse-point"]) {
+      unlinkSync(resolve(root, "instance/startup-capsule.toml"));
+      const manifestBefore = readFileSync(resolve(root, "instance/manifest.toml"));
+      try {
+        fs.lstatSync = (path, ...options) => {
+          const info = ordinaryLstat(path, ...options);
+          if (resolve(path) !== resolve(root, ancestor)) return info;
+          return Object.assign(Object.create(Object.getPrototypeOf(info)), info, {
+            isSymbolicLink: () => kind === "symbolic-link",
+            isReparsePoint: () => kind === "reparse-point",
+          });
+        };
+        syncBuiltinESMExports();
+        const refused = buildVerifiedStartupProjection(root, { repairDerived: true });
+        assert(refused.decision === "startup-repair-required" && refused.repairable === false
+          && refused.ordinary_work_allowed === true && !existsSync(resolve(root, "instance/startup-capsule.toml")),
+        `${ancestor} ${kind} was trusted by startup auto-repair`);
+        let directRefused = false;
+        try { syncStartupCapsule(root, { write: true }); } catch { directRefused = true; }
+        assert(directRefused && !existsSync(resolve(root, "instance/startup-capsule.toml")),
+          `${ancestor} ${kind} was followed by the direct capsule writer`);
+      } finally {
+        fs.lstatSync = ordinaryLstat;
+        syncBuiltinESMExports();
+      }
+      assert(readFileSync(resolve(root, "instance/manifest.toml")).equals(manifestBefore),
+        "ancestor refusal modified the instance manifest");
+      assert(syncStartupCapsule(root, { write: true }).decision === "startup-capsule-updated",
+        "physical-path capsule repair did not remain available after local refusal");
+    }
+  }
+  console.log("Startup capsule sync passed one-attempt repairs, fallback, source preservation, synthetic linked-ancestor refusal, and idempotence checks (no OS link creation).");
 } finally { rmSync(root, { recursive: true, force: true }); }

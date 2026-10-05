@@ -302,6 +302,42 @@ confirmation = "none"
     }
     console.log(`Accumulation preview fixture: ${preview}`);
   }
+  // 只读投影识别按需初始化的空模板索引，不改身份或掩盖真实坏内容。
+  const templateRoot = fileURLToPath(new URL("../../", import.meta.url));
+  const lazyRefs = ["instance/validations/index.toml", "instance/evolution/index.toml", "instance/skills/requirements.toml"];
+  const originalIndexes = new Map(lazyRefs.map((ref) => [ref, readFileSync(resolve(root, ref))]));
+  const lazyIndexes = new Map(lazyRefs.map((ref) => [ref, readFileSync(resolve(templateRoot, ref), "utf8")]));
+  for (const [ref, source] of lazyIndexes) write(ref, source);
+  const lazy = buildSnapshotCandidate(root, { mode: "operational" });
+  assert(lazy.diagnostics.length === 0 && !lazy.snapshot.health && lazy.snapshot.sops.length === 1
+    && lazy.snapshot.sops[0].maturity === "unvalidated" && lazy.snapshot.skills.count === 0
+    && lazy.snapshot.skills.status === "尚未登记 Skill", "empty lazy indexes produced a false fault or validation claim");
+  for (const [ref, source] of lazyIndexes) {
+    assert(readFileSync(resolve(root, ref), "utf8") === source, "read-only lazy projection rewrote an index");
+    let rejected = false;
+    try { buildSnapshotCandidate(root, { mode: "operational", requiredSourceRefs: [ref] }); } catch { rejected = true; }
+    assert(rejected, "required index accepted an uninitialized template identity");
+    const invalidVariants = [source.replace('instance_id = "template"', 'instance_id = "ac-foreign"'),
+      source + '\nunknown_state = "not-a-template"\n',
+      source.includes("record_count") ? source.replace("record_count = 0", "record_count = 1")
+        : source.includes("candidate_count") ? source.replace("candidate_count = 0", "candidate_count = 1")
+          : source + '\n[[skills]]\nid = "skill.foreign"\nsummary = "不得投影的条目"\nstate = "available"\n'];
+    for (const invalid of invalidVariants) {
+      write(ref, invalid);
+      const isolated = buildSnapshotCandidate(root, { mode: "operational" });
+      assert(isolated.diagnostics.length === 1 && isolated.snapshot.health?.isolated_item_count === 1,
+        "foreign, nonempty or invalid template index was silently treated as empty");
+      write(ref, source);
+    }
+  }
+  const badLazyTodo = "instance/todo/lazy-invalid.md";
+  writeFileSync(resolve(root, badLazyTodo), Buffer.from([0xff, 0xfe, 0xff]));
+  const lazyFault = buildSnapshotCandidate(root, { mode: "operational" });
+  assert(lazyFault.diagnostics.length === 1 && lazyFault.diagnostics[0].area === "todo"
+    && lazyFault.snapshot.health?.isolated_item_count === 1, "lazy indexes inflated the real fault count");
+  rmSync(resolve(root, badLazyTodo));
+  for (const [ref, source] of originalIndexes) writeFileSync(resolve(root, ref), source);
+
   assert(!first.source.includes("audio-transcriber") && !first.source.includes(".assistant-local"), "component-local or private locator metadata leaked into the snapshot projection");
   assert(snapshot.meta.source_digest === computeSnapshotSourceDigest(root).digest, "source digest did not match an independent deterministic rebuild");
   const repeated = buildSnapshotCandidate(root, { existingSource: first.source, now: new Date("2026-08-24T05:00:00+08:00") });
@@ -465,6 +501,29 @@ unexpected_field = "must-survive-byte-for-byte"
   assert(currentTargetBlocked && readFileSync(resolve(root, brokenTodoRef)).equals(brokenTodoBytes),
     "an invalid current target was isolated instead of being denied with zero source writes");
   rmSync(resolve(root, brokenTodoRef), { force: true });
+
+  // Read failures belong to the same per-item isolation boundary as parse failures.
+  for (const area of ["todo", "governance", "deferred"]) {
+    const ref = `instance/${area}/unreadable-fixture.md`;
+    for (const [label, bytes] of [
+      ["invalid UTF-8", Buffer.from([0xff])],
+      ["oversized source", Buffer.from(`${brokenTodoSource}\n${"a".repeat(128 * 1024)}`)],
+    ]) {
+      writeFileSync(resolve(root, ref), bytes);
+      const isolated = buildSnapshotCandidate(root, { mode: "operational" });
+      assert(isolated.snapshot.health?.isolated_item_count === 1
+        && isolated.diagnostics.some((item) => item.area === area)
+        && isolated.snapshot.sops.length > 0 && isolated.snapshot.skills.items.length > 0
+        && readFileSync(resolve(root, ref)).equals(bytes),
+      `${area} ${label} escaped local isolation or changed preserved source bytes`);
+      for (const options of [{}, { mode: "operational", requiredSourceRefs: [ref] }]) {
+        let blocked = false;
+        try { buildSnapshotCandidate(root, options); } catch { blocked = true; }
+        assert(blocked, `${area} ${label} was accepted in strict mode or as a required target`);
+      }
+      rmSync(resolve(root, ref));
+    }
+  }
 
   // 输出上限不是故障上限：超过 64 个坏项也保留健康内容和全部真源。
   const manyBadRefs = Array.from({ length: 65 }, (_, index) => `instance/todo/broken-${index}.md`);

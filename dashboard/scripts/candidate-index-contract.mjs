@@ -567,7 +567,11 @@ export function projectCandidatesForOperationalSnapshot(repository, {
     const indexRead = readIndexSnapshot(repository);
     const parsed = parseArrayTableDocument(indexRead.text, "candidates", "candidate index");
     index = { ...parsed.root, candidates: parsed.entries };
-    if (!validateCandidateIndexMetadata(index, { expectedInstanceId: identity.instanceId, actualFileBytes: indexRead.fileBytes })) throw new Error("invalid candidate index");
+    const emptyTemplate = !requiredSourceRefs.has(indexRef) && index.instance_id === "template"
+      && index.state === "empty" && index.source_revision === 0 && index.generated_at === "" && index.candidates.length === 0;
+    if (!validateCandidateIndexMetadata(index, {
+      expectedInstanceId: emptyTemplate ? "template" : identity.instanceId, actualFileBytes: indexRead.fileBytes,
+    })) throw new Error("invalid candidate index");
   } catch (error) {
     if (requiredSourceRefs.has(indexRef)) throw error;
     onIssue({ area: "evolution", sourceRef: indexRef, code: "candidate-index-uninitialized-or-invalid" });

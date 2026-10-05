@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from private_data_migration import SECRET_PATTERNS
+from private_data_migration import SECRET_PATTERNS, content_findings
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,7 +18,11 @@ def main() -> int:
     for vector in VECTORS["blocked"]:
         value = "".join(vector["parts"])
         category = vector["category"]
-        if category not in patterns or not patterns[category].search(value):
+        if vector.get("decoded_json") is True:
+            findings = content_findings(value.encode("utf-8"), relative_path="fixture.json")
+            if not any(item["category"] == category and item["location"] == "decoded-json" for item in findings):
+                raise RuntimeError(f"private migration scanner missed decoded JSON category: {category}")
+        elif category not in patterns or not patterns[category].search(value):
             raise RuntimeError(f"private migration scanner missed shared category: {category}")
     for value in VECTORS["allowed"]:
         matches = [category for category, pattern in SECRET_PATTERNS if pattern.search(value)]

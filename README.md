@@ -30,11 +30,11 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**[↓ 下载 AI Carry 完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.7.zip)**　当前版本：`2.1.7`
+**当前版本：`2.1.8`。** [下载完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.8.zip)。
 
-<sub>2.1.7：修复官方升级核验：有效的附注标签也能识别；已核实的正式版本不会因为“最新”查询异常而被误挡住。原助手资料不因本次更新改写。</sub>
+<sub>2.1.8 改进首次创建中断恢复、并发保存、迁移资料保护、秘密检查和看板故障提示。正式内容已保存与显示资料待刷新分别报告，局部故障不扩大为整个助手停用。</sub>
 
-**关于 2.1.3 的旧说明：** 2.1.3 曾公开过这套记忆系统升级方法；2.1.4 起已明确撤回。若你仍自行按 2.1.3 的旧说明安装、改造或接入 RAG／向量数据库，这属于未经 2.1.7 支持的自定义操作。由此产生的兼容、数据、隐私、资源或运行问题，需要你自行评估和承担；AI Carry 2.1.7 不为这条旧路线提供产品支持。普通记忆、学习、SOP 和现有资料不在这条边界内。
+**关于 2.1.3 的旧说明：** 2.1.3 曾公开过这套记忆系统升级方法；2.1.4 起已明确撤回。若你仍自行按 2.1.3 的旧说明安装、改造或接入 RAG／向量数据库，这属于未经当前版本支持的自定义操作。由此产生的兼容、数据、隐私、资源或运行问题，需要你自行评估和承担；AI Carry 当前版本不为这条旧路线提供产品支持。普通记忆、学习、SOP 和现有资料不在这条边界内。
 
 这是 GitHub 的完整源码压缩包，**已带可直接打开的看板**，不是只下载一个网页。下载后，把 ZIP 的本地路径发给 Agent，并说：
 
@@ -56,9 +56,9 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 安装时，Agent 会自动装好 **AI Carry（客户端）** 并在桌面创建入口；网页版留在安装文件夹里的 `dashboard.html`。两者读取同一份助手资料；客户端还能直接选择本地文件夹和 ZIP，右上角也能随时打开网页版。它不会自动连接 Agent，仍由你复制请求、粘贴发送。
 
-[Windows 客户端](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-x64.zip)
+**2.1.8 客户端下载：** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-x64.zip)。包内包含本版页面与读取器，Windows 实际解压程序已完成自动验收；客户端暂不可用时仍可打开安装目录中的网页版。
 
-2.1.7 更新的是助手目录里的升级核验；桌面客户端没有程序变化，因此安装时继续使用已发布的 2.1.6 客户端包。新安装仍会创建一个客户端桌面入口，网页版留在安装目录。迁移页仍默认建立独立副本；只有明确选择共用原目录时才轮流使用同一份积累。
+正式版安装会创建一个客户端桌面入口，网页版留在安装目录。迁移页仍默认建立独立副本；只有明确选择共用原目录时才轮流使用同一份积累。
 
 客户端包不代替完整助手目录。Mac 包未签名、尚未完成 Mac 实机验收；Linux 继续使用网页版。
 
@@ -172,7 +172,7 @@ AI Carry 不把整段聊天都当成永久记忆。它引导 Agent 在真实工�
 
 | 你要做的事 | 怎么开始 | 保留或带走什么 |
 | --- | --- | --- |
-| **同一电脑换 Agent** | 让新 Agent 读取原 AI Carry 文件夹里的 `BOOTSTRAP.md`。不知道目录时，让它检查本地看板快捷入口的目标。 | 沿用同一份积累，不必再导出一遍。新 Agent 需能访问这些本地文件。 |
+| **同一电脑换 Agent** | 在“迁移与安全”选择“换一个 Agent”，把请求发给当前 Agent；默认先建立独立副本，再让新 Agent 从副本的 `BOOTSTRAP.md` 接续。 | 保留已保存的积累，原目录不动；两个副本不会自动同步。只有明确选择轮流共用时才使用原目录。 |
 | **换电脑** | 看板中选择准备换电脑，把复制的请求发给 Agent。 | 生成本地迁移套件，包含助手与登记范围内的资料；在新电脑从 `START-RESTORE.md` 接续。 |
 | **检查与升级 AI Carry** | 对 Agent 说：“检查我的 AI Carry 有没有官方更新。” | 先看升级预览，再确认；更新模板部分，保留实例身份、记忆、SOP、Skill、工作区和本地资料。 |
 | **只导出／恢复私密资料** | 使用看板的本地隐私导出／恢复入口。 | 只处理你登记的私密范围；它不是完整助手迁移。 |

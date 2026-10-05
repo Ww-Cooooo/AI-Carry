@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { parseCurrentSnapshotEnvelope, serializeSnapshotEnvelope } from "./snapshot-envelope.mjs";
 import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
 import { synchronizeSnapshotPair } from "./snapshot-sync-transaction.mjs";
+import { withInstanceWriteLock } from "./instance-write-lock.mjs";
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Snapshot transaction self-test failed: ${message}`); };
 const validateBytes = (bytes, label) => validateSnapshotSemantics(parseCurrentSnapshotEnvelope(bytes.toString("utf8"), label), label);
@@ -62,4 +63,44 @@ await withCase("cleanup-warning", async (root) => {
   assert((await readFile(targets[0])).equals(sourceBytes) && (await readFile(targets[1])).equals(sourceBytes), "cleanup warning rolled back an already committed pair");
 });
 
-console.log("Snapshot pair transaction passed commit, idempotence, first-install rollback, and post-commit cleanup-failure tests.");
+await withCase("concurrent-lock", async (root) => {
+  const targets = [join(root, "dashboard", "public", "snapshot.js"), join(root, "dashboard", "dist", "snapshot.js")];
+  for (const target of targets) await writeTarget(target, Buffer.from("old"));
+  let staged; let release;
+  const stageReached = new Promise((done) => { staged = done; });
+  const wait = new Promise((done) => { release = done; });
+  const first = synchronizeSnapshotPair({ sourceBytes, targets, validateBytes, hooks: { afterStage: async ({ index }) => {
+    if (index === 0) { staged(); await wait; }
+  } } });
+  await stageReached;
+  try {
+    let blocked = false;
+    try { await synchronizeSnapshotPair({ sourceBytes, targets, validateBytes }); }
+    catch (error) { blocked = error.code === "AI_CARRY_INSTANCE_WRITE_BUSY"; }
+    assert(blocked, "independent async snapshot writer bypassed the instance lock");
+    let otherModuleBlocked = false;
+    try { withInstanceWriteLock(root, "other-truth-writer", () => true); }
+    catch (error) { otherModuleBlocked = error.code === "AI_CARRY_INSTANCE_WRITE_BUSY"; }
+    assert(otherModuleBlocked, "formal snapshot pair locked dashboard rather than the shared instance root");
+  } finally { release(); await first; }
+  assert((await readFile(targets[0])).equals(sourceBytes) && (await readFile(targets[1])).equals(sourceBytes), "concurrent rejection damaged committed snapshots");
+  assert(!(await synchronizeSnapshotPair({ sourceBytes, targets, validateBytes })).updated, "retry after lock release was not usable");
+});
+
+await withCase("nested-drift", async (root) => {
+  const targets = [join(root, "public", "snapshot.js"), join(root, "dist", "snapshot.js")];
+  for (const target of targets) await writeTarget(target, Buffer.from("old"));
+  const secondBytes = Buffer.from(serializeSnapshotEnvelope({ ...template, profile: { ...template.profile, mission: "另一份合法快照" } }), "utf8");
+  let second; let failed = false;
+  try {
+    await synchronizeSnapshotPair({ sourceBytes, targets, validateBytes, hooks: { afterInstall: async ({ index }) => {
+      // Same-chain nesting is intentionally supported by the shared lock. A
+      // newer nested commit must still not be destroyed by the outer rollback.
+      if (index === 0) second = await synchronizeSnapshotPair({ sourceBytes: secondBytes, targets, validateBytes });
+    } } });
+  } catch { failed = true; }
+  assert(failed && second?.updated, "nested-drift regression did not reach its competing commit");
+  assert((await readFile(targets[0])).equals(secondBytes) && (await readFile(targets[1])).equals(secondBytes), "outer rollback erased the nested successful pair");
+});
+
+console.log("Snapshot pair transaction passed commit, idempotence, rollback, post-commit cleanup, shared-instance async exclusion, and preservation of a newer nested commit.");

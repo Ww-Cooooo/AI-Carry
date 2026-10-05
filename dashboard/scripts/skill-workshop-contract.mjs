@@ -1,4 +1,4 @@
-import { closeSync, fstatSync, lstatSync, openSync, readSync, readdirSync, realpathSync } from "node:fs";
+import { closeSync, fstatSync, lstatSync, openSync, opendirSync, readSync, realpathSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
 import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
 import { containsForbiddenLocationReference } from "./safe-output-boundary.mjs";
@@ -11,8 +11,32 @@ const skillVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 const allowedRoots = new Set(["SKILL.md", "LICENSE", "LICENSE.md", "agents", "references", "examples", "scripts", "assets"]);
 const textExtensions = new Set([".md", ".txt", ".json", ".toml", ".yaml", ".yml", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".py", ".ps1", ".sh", ".bat", ".cmd", ".css", ".html", ".xml", ".csv", ".tsv", ".svg", ".sql", ".ini", ".cfg"]);
 const forbiddenPrivateMarkers = ["private://", ".assistant-private", ".assistant-local", "maintainer-private", "AGENTS.override.md"];
+export const SKILL_PACKAGE_LIMITS = Object.freeze({ directories: 128, depth: 12 });
 
-function issue(code, message) { return Object.freeze({ code, message }); }
+// Read at most one over the per-directory limit, rather than materializing an
+// arbitrarily large directory before discovering that its budget was exceeded.
+export function readBoundedSkillDirectory(directory) {
+  const handle = opendirSync(directory, { bufferSize: 32 });
+  const entries = [];
+  try {
+    while (entries.length <= 128) {
+      const entry = handle.readSync();
+      if (!entry) break;
+      entries.push(entry);
+    }
+    return entries;
+  } finally { handle.closeSync(); }
+}
+
+function secretSafeText(value, replacement = "") {
+  return locateHighConfidenceSecretCandidates(value).blocked ? replacement : value;
+}
+function safeMetadata(value) {
+  return containsForbiddenLocationReference(value)
+    || forbiddenPrivateMarkers.some((marker) => value.toLowerCase().includes(marker.toLowerCase()))
+    ? "" : secretSafeText(value);
+}
+function issue(code, message) { return Object.freeze({ code, message: secretSafeText(message, "检查信息包含不安全内容，已隐藏原值。") }); }
 function textFile(ref) {
   if (["SKILL.md", "LICENSE", "LICENSE.md"].includes(ref)) return true;
   const dot = basename(ref).lastIndexOf(".");
@@ -77,7 +101,7 @@ function parseSkillHead(source) {
  */
 export function inspectSkillPackage(packageRoot, { mode = "import", sourceAssetId = "", fileSystem = undefined } = {}) {
   const isolated = []; const review = []; const scripts = []; const opaqueFiles = [];
-  const readDirectory = typeof fileSystem?.readdirSync === "function" ? fileSystem.readdirSync : readdirSync;
+  const readDirectory = typeof fileSystem?.readdirSync === "function" ? fileSystem.readdirSync : readBoundedSkillDirectory;
   const readEntry = typeof fileSystem?.lstatSync === "function" ? fileSystem.lstatSync : lstatSync;
   if (!["import", "export"].includes(mode)) isolated.push(issue("mode-invalid", "检查模式无效。"));
   let root;
@@ -89,9 +113,15 @@ export function inspectSkillPackage(packageRoot, { mode = "import", sourceAssetI
     return Object.freeze({ decision: "isolated", name: "", description: "", fileCount: 0, totalBytes: 0, scripts: Object.freeze([]), opaqueFiles: Object.freeze([]), issues: Object.freeze([issue("root-invalid", "Skill 来源不是可安全读取的本地物理目录。")]) });
   }
 
-  const files = []; let walkStopped = false;
-  const walk = (directory) => {
+  const files = []; let walkStopped = false; let directoryCount = 0;
+  const walk = (directory, depth = 0) => {
     if (walkStopped) return;
+    directoryCount += 1;
+    if (directoryCount > SKILL_PACKAGE_LIMITS.directories || depth > SKILL_PACKAGE_LIMITS.depth) {
+      isolated.push(issue("directory-walk-limit", "目录总数或嵌套深度超过 Skill 包的有界检查上限。"));
+      walkStopped = true;
+      return;
+    }
     let entries;
     try { entries = readDirectory(directory, { withFileTypes: true }); }
     catch {
@@ -101,6 +131,7 @@ export function inspectSkillPackage(packageRoot, { mode = "import", sourceAssetI
     }
     if (entries.length > 128) { isolated.push(issue("directory-entry-limit", "单个目录超过 128 项的有界检查上限。")); walkStopped = true; return; }
     for (const entry of entries) {
+      if (walkStopped) break;
       const path = resolve(directory, entry.name);
       const ref = relative(root, path).split(sep).join("/");
       const parts = ref.split("/");
@@ -109,7 +140,7 @@ export function inspectSkillPackage(packageRoot, { mode = "import", sourceAssetI
       try { info = readEntry(path); }
       catch { isolated.push(issue("entry-read-failed", `暂时无法读取 Skill 包条目：${ref}`)); continue; }
       if (info.isSymbolicLink()) { isolated.push(issue("link-rejected", `不跟随链接：${ref}`)); continue; }
-      if (info.isDirectory()) { walk(path); continue; }
+      if (info.isDirectory()) { walk(path, depth + 1); continue; }
       if (!info.isFile()) { isolated.push(issue("special-file", `存在非常规文件：${ref}`)); continue; }
       files.push({ path, ref, size: Number(info.size) });
       if (files.length > 128) { isolated.push(issue("file-count-limit", "文件数量超过 128 项的有界检查上限。")); walkStopped = true; return; }
@@ -127,6 +158,7 @@ export function inspectSkillPackage(packageRoot, { mode = "import", sourceAssetI
     const rootName = file.ref.split("/")[0];
     if (!allowedRoots.has(rootName)) review.push(issue("extra-root-entry", `根目录额外内容需要人工判断：${rootName}`));
     const loweredRef = file.ref.toLowerCase();
+    if (locateHighConfidenceSecretCandidates(file.ref).blocked) isolated.push(issue("secret-path-detected", "包内文件名包含疑似秘密，已隐藏原值。"));
     if (forbiddenPrivateMarkers.some((marker) => loweredRef.includes(marker.toLowerCase()))) isolated.push(issue("private-boundary", `发现 AI Carry 私密或本地维护文件：${file.ref}`));
     if (mode === "export" && sourceAssetId && file.ref.includes(sourceAssetId)) isolated.push(issue("source-id-leak", `共享包文件名泄露了本地来源资产 ID：${file.ref}`));
     if (file.ref.startsWith("scripts/")) scripts.push(file.ref);
@@ -173,14 +205,14 @@ export function inspectSkillPackage(packageRoot, { mode = "import", sourceAssetI
   const issues = isolated.length ? isolated : review;
   return Object.freeze({
     decision: isolated.length ? "isolated" : review.length ? "review" : "ready",
-    name,
-    description,
-    skillId,
-    version,
+    name: safeMetadata(name),
+    description: safeMetadata(description),
+    skillId: safeMetadata(skillId),
+    version: safeMetadata(version),
     fileCount: files.length,
     totalBytes,
-    scripts: Object.freeze([...new Set(scripts)].sort()),
-    opaqueFiles: Object.freeze([...new Set(opaqueFiles)].sort()),
+    scripts: Object.freeze([...new Set(scripts)].sort().map((value) => secretSafeText(value, "[已隐藏不安全文件名]"))),
+    opaqueFiles: Object.freeze([...new Set(opaqueFiles)].sort().map((value) => secretSafeText(value, "[已隐藏不安全文件名]"))),
     issues: Object.freeze(issues),
   });
 }

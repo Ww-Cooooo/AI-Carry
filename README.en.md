@@ -31,11 +31,11 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**[↓ Download the complete AI Carry ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.7.zip)**　Current version: `2.1.7`
+**Current version: `2.1.8`.** [Download the complete ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.8.zip).
 
-<sub>AI Carry 2.1.7 fixes official upgrade verification: valid annotated tags work, and a verified formal release is not rejected solely because the Latest lookup differs or fails. This update does not rewrite your assistant materials.</sub>
+<sub>Version 2.1.8 improves interrupted setup recovery, coordinated saves, migration data protection, secret detection, and dashboard failure feedback. Successful saves are reported separately from pending display refreshes, so a local failure does not disable the whole assistant.</sub>
 
-**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside 2.1.7. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; AI Carry 2.1.7 provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
+**About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside the current version. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; the current AI Carry version provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
 This is GitHub's complete source archive, **including a ready-to-open dashboard**, not a single saved web page. Download it, send your Agent the ZIP's local path, and say:
 
@@ -58,9 +58,9 @@ After installation, the Agent should tell you **where the dashboard is, whether 
 
 The installer automatically installs **AI Carry (desktop)** and creates its Desktop entry; the web view stays in the installation folder as `dashboard.html`. Both use the same saved materials; the desktop app adds a native folder/ZIP picker and a Web fallback in its top bar. It does not bind to an Agent or send requests automatically.
 
-[Windows app](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-win32-x64.zip) · [macOS Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-arm64.zip) · [macOS Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.6/AI-Carry-2.1.6-darwin-x64.zip)
+**Desktop downloads for 2.1.8:** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-win32-x64.zip) · [Mac Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-x64.zip). These bundles contain the updated dashboard and readers. The extracted Windows app passed automated runtime checks; the web view remains available in the assistant folder if the client cannot run.
 
-2.1.7 changes upgrade verification in the assistant folder, not the desktop app. Installation therefore continues to use the published 2.1.6 client bundle. A fresh install still creates one desktop entry, and the migration page still creates an independent copy by default.
+A formal release installation creates one desktop entry and keeps the web view in the installation folder. The migration page continues to create an independent copy by default.
 
 These are app bundles, not substitutes for the full assistant folder. macOS builds are unsigned and have not been tested on a real Mac; Linux keeps the web interface.
 
@@ -174,7 +174,7 @@ The Workshop includes its own creation method; it does not require a particular 
 
 | What you want | How to start | What stays with you |
 | --- | --- | --- |
-| **Change Agents on this computer** | Ask the new Agent to read `BOOTSTRAP.md` in your existing AI Carry folder. If you do not know the location, ask it to inspect the local dashboard shortcut's target. | The same accumulated knowledge, without exporting it again. The new Agent needs local access to those files. |
+| **Change Agents on this computer** | Select “Change Agent” under Migration & safety and send the request to your current Agent. By default, it creates an independent copy; the new Agent resumes from that copy's `BOOTSTRAP.md`. | Saved knowledge is preserved and the original folder stays unchanged. The copies do not sync automatically. Share the original folder only by explicit choice and use it in turns. |
 | **Move to a new computer** | Use the dashboard's computer-migration entry and send its copied request to the Agent. | A local migration kit containing the assistant and registered materials. Resume from `START-RESTORE.md` on the new computer. |
 | **Check and upgrade AI Carry** | Say: “Check whether my AI Carry has an official update.” | Review the preview, then confirm. The template updates while your identity, memories, SOPs, Skills, workspaces, and local materials are preserved. |
 | **Export or restore private materials only** | Use the local-private export or restore entry. | Only the private scope you registered—not a complete assistant migration. |

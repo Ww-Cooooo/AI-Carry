@@ -1,7 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import fs, { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { confirmSkillInstall, prepareSkillInstall } from "./skill-install-cli.mjs";
+import { withInstanceWriteLock } from "./instance-write-lock.mjs";
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Skill install transaction failed: ${message}`); };
 const root = mkdtempSync(resolve(tmpdir(), "ai-carry-skill-install-"));
@@ -162,8 +165,74 @@ try {
     && readFileSync(resolve(root, ".assistant-local/skills/shared-checklist/SKILL.md")).equals(upgradedSkillBytes),
   "a display refresh fault revoked the new Skill or damaged the existing one");
 
+  // Two plans share one map. Same-chain reentry is supported by the shared
+  // lock, so a final preimage comparison must still protect a nested commit.
+  const nestedA = resolve(root, "nested-source-a"); const nestedB = resolve(root, "nested-source-b");
+  skill(nestedA, "nested-first", "Keep the first bounded workflow separate.");
+  skill(nestedB, "nested-second", "Preserve a completed competing registration.");
+  const previewA = prepareSkillInstall(root, nestedA); const previewB = prepareSkillInstall(root, nestedB);
+  const originalWrite = fs.writeFileSync;
+  let nestedResult;
+  let outerResult;
+  try {
+    fs.writeFileSync = (path, ...args) => {
+      const result = originalWrite(path, ...args);
+      if (String(path).endsWith(`${previewA.confirmationRef.split("~")[0]}.requirements.candidate.toml`)) {
+        fs.writeFileSync = originalWrite; syncBuiltinESMExports();
+        nestedResult = confirmSkillInstall(root, previewB.confirmationRef, "安装", { syncSnapshot: snapshotStub });
+      }
+      return result;
+    };
+    syncBuiltinESMExports();
+    outerResult = confirmSkillInstall(root, previewA.confirmationRef, "安装", { syncSnapshot: snapshotStub });
+  } finally { fs.writeFileSync = originalWrite; syncBuiltinESMExports(); }
+  const afterNested = readFileSync(resolve(root, "instance/skills/requirements.toml"), "utf8");
+  assert(nestedResult?.decision === "skill-install-complete" && outerResult?.decision === "skill-install-failed-rolled-back"
+    && afterNested.includes('id = "skill.nested-second"') && !afterNested.includes('id = "skill.nested-first"')
+    && existsSync(resolve(root, ".assistant-local/skills/nested-second/SKILL.md"))
+    && !existsSync(resolve(root, ".assistant-local/skills/nested-first")), "nested registration was overwritten by an older candidate");
+
+  // A separate process must observe the SAME instance lock as other modules.
+  const installerUrl = new URL("./skill-install-cli.mjs", import.meta.url).href;
+  const contender = `import {confirmSkillInstall} from ${JSON.stringify(installerUrl)};try{confirmSkillInstall(${JSON.stringify(root)},${JSON.stringify(previewA.confirmationRef)},"install",{syncSnapshot:()=>({})});process.stdout.write("unexpected-write");}catch(error){process.stdout.write(error.code||"other-error");}`;
+  const blocked = withInstanceWriteLock(root, "another-formal-writer", () => spawnSync(process.execPath, ["--input-type=module", "-e", contender], { encoding: "utf8", windowsHide: true, timeout: 10000 }));
+  assert(blocked.status === 0 && blocked.stdout === "AI_CARRY_INSTANCE_WRITE_BUSY", "Skill confirmation did not honor another process's shared instance lock");
+
+  // The snapshot subprocess runs only after releasing the core write lock.
+  const unlockedSource = resolve(root, "unlocked-source");
+  skill(unlockedSource, "unlocked-snapshot", "Keep derived refresh outside the authoritative write lock.");
+  const unlockedPreview = prepareSkillInstall(root, unlockedSource);
+  const lockUrl = new URL("./instance-write-lock.mjs", import.meta.url).href;
+  const probe = `import {withInstanceWriteLock} from ${JSON.stringify(lockUrl)};withInstanceWriteLock(${JSON.stringify(root)},"snapshot-probe",()=>process.stdout.write("lock-acquired"));`;
+  const unlocked = confirmSkillInstall(root, unlockedPreview.confirmationRef, "install", { syncSnapshot: () => {
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e", probe], { encoding: "utf8", windowsHide: true, timeout: 10000 });
+    assert(child.status === 0 && child.stdout === "lock-acquired", "snapshot subprocess was invoked while the Skill lock was held");
+    return snapshotStub();
+  } });
+  assert(unlocked.decision === "skill-install-complete", "post-lock snapshot probe did not complete");
+
+  // Reject an ancestor link both before preview and when introduced between
+  // preview and confirmation. All linked destinations are synthetic siblings.
+  const linkedRoot = resolve(root, "linked-fixture");
+  write(linkedRoot, "instance/manifest.toml", 'schema_version = 1\ninstance_id = "ac-linked-fixture"\nstate = "active"\n');
+  write(linkedRoot, "instance/skills/requirements.toml", 'schema_version = 1\ninstance_id = "template"\ngenerated_at = ""\nstatus = "scan-after-instantiation"\n');
+  const linkedPreview = prepareSkillInstall(linkedRoot, nestedA);
+  const external = resolve(root, "external-skill-map");
+  renameSync(resolve(linkedRoot, "instance/skills"), external);
+  const externalBefore = readFileSync(resolve(external, "requirements.toml"));
+  let linkCreated = false;
+  try { symlinkSync(external, resolve(linkedRoot, "instance/skills"), process.platform === "win32" ? "junction" : "dir"); linkCreated = true; }
+  catch (error) { if (!["EPERM", "EACCES", "ENOSYS"].includes(error.code)) throw error; console.warn("Skill ancestor-link fixture unavailable on this host; no link containment pass is claimed."); }
+  if (linkCreated) {
+    let previewDenied = false; let confirmationDenied = false;
+    try { prepareSkillInstall(linkedRoot, nestedA); } catch { previewDenied = true; }
+    try { confirmSkillInstall(linkedRoot, linkedPreview.confirmationRef, "install", { syncSnapshot: snapshotStub }); } catch { confirmationDenied = true; }
+    assert(previewDenied && confirmationDenied && readFileSync(resolve(external, "requirements.toml")).equals(externalBefore)
+      && !existsSync(resolve(linkedRoot, ".assistant-local/skills/nested-first")), "Skill ancestor junction allowed an out-of-root write");
+  }
+
   complete = true;
-  console.log("Skill install transaction passed natural host-confirmed install/upgrade, unresolved-reply no-write, idempotence, conflict isolation and rollback without package execution.");
+  console.log("Skill install transaction passed natural install/upgrade, idempotence, local rollback, nested-map drift preservation, cross-process shared exclusion, unlocked snapshot refresh, and available ancestor-link checks.");
 } finally {
   if (complete && !process.argv.includes("--keep-fixture")) rmSync(root, { recursive: true, force: true });
   else if (complete) console.log(`Skill installation test evidence kept at ${root}`);

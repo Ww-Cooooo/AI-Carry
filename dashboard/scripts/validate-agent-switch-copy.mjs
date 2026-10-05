@@ -29,6 +29,19 @@ try {
   writeFileSync(join(source, ".assistant-local", "credentials.json"), JSON.stringify({ marker: "credential-fixture" }));
   writeFileSync(join(source, ".git", "must-not-copy"), "git\n");
   writeFileSync(join(source, "node_modules", "must-not-copy"), "dependency\n");
+  const credential = ['sk', 'syntheticOnly'.repeat(4)].join('-');
+  const secretCases = {
+    'large-notes.txt': Buffer.from('ordinary\n'.repeat(140000) + credential),
+    'nul-notes.txt': Buffer.from('ordinary\0\n' + credential),
+    'wide-notes.txt': Buffer.from('ordinary\n' + credential, 'utf16le'),
+    'boundary-notes.txt': Buffer.from(' '.repeat(65530) + credential),
+  };
+  const bigEndian = Buffer.from('ordinary\n' + credential, 'utf16le');
+  bigEndian.swap16();
+  secretCases['wide-big-endian.txt'] = bigEndian;
+  for (const [name, bytes] of Object.entries(secretCases)) writeFileSync(join(source, name), bytes);
+  const largeSafe = Buffer.from('ordinary safe content\n'.repeat(60000));
+  writeFileSync(join(source, 'large-safe.txt'), largeSafe);
 
   const sourceManifestBefore = readFileSync(join(source, "instance", "manifest.toml"));
   const result = prepareAgentSwitch({ sourceRoot: source, destinationRoot: destination });
@@ -44,6 +57,12 @@ try {
   assert(!existsSync(join(destination, "cache")), "root runtime cache was copied");
   assert(!existsSync(join(destination, ".assistant-local", "credentials.json")), "credential file was copied");
   assert(result.skippedFiles.includes(".assistant-local/credentials.json"), "credential file was not reported as skipped");
+  for (const name of Object.keys(secretCases)) {
+    assert(!existsSync(join(destination, name)), '含凭据的大小文件或 UTF-16 文件被复制');
+    assert(result.skippedFiles.includes(name), '未报告被排除的凭据文件');
+    assert(existsSync(join(source, name)), '迁移删除了源文件');
+  }
+  assert.deepEqual(readFileSync(join(destination, 'large-safe.txt')), largeSafe, '正常大文件未完整保留');
   assert(readFileSync(join(destination, ".assistant-local", "host-switch.toml"), "utf8").includes('mode = "independent"'));
   assert(readFileSync(join(destination, ".assistant-local", "HOST-SWITCH-START.md"), "utf8").includes("不与原目录自动同步"));
 

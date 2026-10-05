@@ -14,13 +14,14 @@ import {
   renameSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArrayTableDocument, parseSectionedToml, stableAssetId } from "./asset-route-contract.mjs";
 import { compareSkillPackages, createSkillDelivery, inspectSkillSource } from "./skill-package.mjs";
 import { withOperationalUserReport } from "./operational-user-report.mjs";
 import { containsForbiddenLocationReference } from "./safe-output-boundary.mjs";
 import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
+import { getInstanceWriteLockCleanup, withInstanceWriteLock } from "./instance-write-lock.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const confirmationPattern = /^(skill-install\.[a-f0-9]{32})~([a-f0-9]{36})$/u;
@@ -32,8 +33,26 @@ function sha256(bytes) {
   return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
-function stableRead(path, maximum, label) {
-  const absolute = realpathSync(resolve(path));
+function physicalPath(root, path, { allowMissing = false } = {}) {
+  const absolute = resolve(path);
+  const ref = relative(root, absolute);
+  if (!ref || isAbsolute(ref) || ref === ".." || ref.startsWith(`..${sep}`)) throw new Error("Skill 路径不属于当前实例");
+  let cursor = root;
+  const parts = ref.split(sep);
+  for (const [index, part] of parts.entries()) {
+    cursor = resolve(cursor, part);
+    let info;
+    try { info = lstatSync(cursor); }
+    catch (error) { if (allowMissing && error.code === "ENOENT") return absolute; throw error; }
+    if (info.isSymbolicLink() || info.isReparsePoint?.() || (index < parts.length - 1 && !info.isDirectory())) {
+      throw new Error("Skill 路径含链接或非物理祖先目录；没有写入该位置");
+    }
+  }
+  return absolute;
+}
+
+function stableRead(path, maximum, label, root) {
+  const absolute = physicalPath(root, path);
   const info = lstatSync(absolute, { bigint: true });
   if (!info.isFile() || info.isSymbolicLink() || info.isReparsePoint?.() || info.size > BigInt(maximum)) {
     throw new Error(`${label}必须是一个可安全回读的本地普通文件`);
@@ -41,6 +60,7 @@ function stableRead(path, maximum, label) {
   const descriptor = openSync(absolute, "r");
   try {
     const before = fstatSync(descriptor, { bigint: true });
+    if (!before.isFile() || before.size > BigInt(maximum) || before.dev !== info.dev || before.ino !== info.ino) throw new Error(`${label}在打开前发生了变化`);
     const bytes = Buffer.alloc(Number(before.size));
     let offset = 0;
     while (offset < bytes.length) {
@@ -49,7 +69,8 @@ function stableRead(path, maximum, label) {
       offset += count;
     }
     const after = fstatSync(descriptor, { bigint: true });
-    if (offset !== bytes.length || before.dev !== after.dev || before.ino !== after.ino
+    const current = lstatSync(physicalPath(root, absolute), { bigint: true });
+    if (current.dev !== before.dev || current.ino !== before.ino || offset !== bytes.length || before.dev !== after.dev || before.ino !== after.ino
       || before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs) {
       throw new Error(`${label}在读取过程中发生了变化`);
     }
@@ -95,7 +116,7 @@ function compareVersions(left, right) {
 }
 
 function loadInstanceState(root) {
-  const manifestRead = stableRead(resolve(root, "instance/manifest.toml"), 2560, "实例清单");
+  const manifestRead = stableRead(resolve(root, "instance/manifest.toml"), 2560, "实例清单", root);
   const manifest = parseSectionedToml(manifestRead.text, "instance manifest");
   const identity = manifest[""] ?? {};
   if (identity.schema_version !== 1 || !stableAssetId.test(identity.instance_id ?? "")
@@ -103,7 +124,7 @@ function loadInstanceState(root) {
     throw new Error("当前目录还不是可登记 Skill 的正式实例；本次只暂停这个 Skill 的安装");
   }
   const requirementsPath = resolve(root, "instance/skills/requirements.toml");
-  const requirementsRead = stableRead(requirementsPath, 32 * 1024, "Skill 小地图");
+  const requirementsRead = stableRead(requirementsPath, 32 * 1024, "Skill 小地图", root);
   if (requirementsRead.text.includes("\r") || requirementsRead.text.startsWith("\uFEFF")
     || locateHighConfidenceSecretCandidates(requirementsRead.text).blocked
     || containsForbiddenLocationReference(requirementsRead.text)) {
@@ -164,7 +185,7 @@ function desiredRequirement(inspection, platform, confirmedAt = "") {
 }
 
 function inspectCurrentTarget(root, desired, sourceDigest) {
-  const target = resolve(root, ...dirname(desired.entry).split("/"));
+  const target = physicalPath(root, resolve(root, ...dirname(desired.entry).split("/")), { allowMissing: true });
   if (!existsSync(target)) return Object.freeze({ target, exists: false, same: false });
   const info = lstatSync(target);
   if (!info.isDirectory() || info.isSymbolicLink() || info.isReparsePoint?.()) {
@@ -297,7 +318,7 @@ function runtimePaths(root, challengeId) {
 
 function readRecord(root, challengeId) {
   const paths = runtimePaths(root, challengeId);
-  const record = JSON.parse(stableRead(paths.record, 32 * 1024, "Skill 安装确认回执").text);
+  const record = JSON.parse(stableRead(paths.record, 32 * 1024, "Skill 安装确认回执", root).text);
   if (record.challenge_id !== challengeId || !digestPattern.test(record.source_digest ?? "")
     || !digestPattern.test(record.requirements_preimage_digest ?? "") || !stableAssetId.test(record.instance_id ?? "")
     || !["install", "upgrade"].includes(record.operation)) {
@@ -440,9 +461,8 @@ function verifyInstalled(root, state, record) {
   return Object.freeze({ refreshed, inspection, target });
 }
 
-export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
+function confirmSkillInstallCore(rootPath, confirmationRef, userReply, {
   choice = "",
-  syncSnapshot = defaultSnapshotSync,
   testFaultAfterTargetCommit = false,
 } = {}) {
   const root = realpathSync(resolve(rootPath));
@@ -528,16 +548,23 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
       const delivery = createSkillDelivery(inspection.packageRoot, { format: "folder", outputPath: paths.candidate });
       if (delivery.sourceDigest !== record.source_digest) throw new Error("候选 Skill 与预览内容摘要不一致");
       if (record.operation === "upgrade") {
+        physicalPath(root, assessment.target.target);
+        if (inspectSkillSource(assessment.target.target).sourceDigest !== record.previous_content_digest) throw new Error("旧 Skill 在提交前发生变化；没有覆盖");
         renameSync(assessment.target.target, paths.previousPackage);
         previousTargetMoved = true;
       }
+      physicalPath(root, assessment.target.target, { allowMissing: true });
+      if (existsSync(assessment.target.target)) throw new Error("Skill 目标在提交前出现；没有覆盖");
       renameSync(paths.candidate, assessment.target.target);
       targetInstalled = true;
     }
     if (testFaultAfterTargetCommit) throw new Error("injected failure after Skill package commit");
     writeFileSync(paths.requirementsCandidate, nextRequirements, { flag: "wx" });
-    if (stableRead(paths.requirementsCandidate, 32 * 1024, "Skill 小地图候选").text !== nextRequirements) {
+    if (stableRead(paths.requirementsCandidate, 32 * 1024, "Skill 小地图候选", root).text !== nextRequirements) {
       throw new Error("Skill 小地图候选没有逐字回读一致");
+    }
+    if (stableRead(state.requirementsPath, 32 * 1024, "Skill 小地图", root).digest !== record.requirements_preimage_digest) {
+      throw new Error("Skill 小地图在提交前发生变化；没有覆盖其他登记");
     }
     renameSync(state.requirementsPath, paths.requirementsPreimage);
     requirementsMoved = true;
@@ -547,10 +574,25 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
   } catch (error) {
     let rollbackComplete = true;
     try {
-      if (requirementsInstalled && existsSync(state.requirementsPath)) renameSync(state.requirementsPath, paths.failedRequirements);
-      if (requirementsMoved && existsSync(paths.requirementsPreimage)) renameSync(paths.requirementsPreimage, state.requirementsPath);
-      if (targetInstalled && existsSync(assessment.target.target)) renameSync(assessment.target.target, paths.failedPackage);
-      if (previousTargetMoved && existsSync(paths.previousPackage)) renameSync(paths.previousPackage, assessment.target.target);
+      if (requirementsInstalled && existsSync(state.requirementsPath)) {
+        if (stableRead(state.requirementsPath, 32 * 1024, "待回退 Skill 小地图", root).digest !== sha256(Buffer.from(nextRequirements))) throw new Error("登记表已有其他变化，保留当前内容和回退前像");
+        renameSync(state.requirementsPath, paths.failedRequirements);
+      }
+      if (requirementsMoved && existsSync(paths.requirementsPreimage)) {
+        physicalPath(root, state.requirementsPath, { allowMissing: true });
+        if (existsSync(state.requirementsPath)) throw new Error("登记表目标已有其他内容，未覆盖");
+        renameSync(paths.requirementsPreimage, state.requirementsPath);
+      }
+      if (targetInstalled && existsSync(assessment.target.target)) {
+        physicalPath(root, assessment.target.target);
+        if (inspectSkillSource(assessment.target.target).sourceDigest !== record.source_digest) throw new Error("已安装包已有其他变化，保留当前内容和回退前像");
+        renameSync(assessment.target.target, paths.failedPackage);
+      }
+      if (previousTargetMoved && existsSync(paths.previousPackage)) {
+        physicalPath(root, assessment.target.target, { allowMissing: true });
+        if (existsSync(assessment.target.target)) throw new Error("Skill 目标已有其他内容，未覆盖");
+        renameSync(paths.previousPackage, assessment.target.target);
+      }
     } catch { rollbackComplete = false; }
     return Object.freeze({
       decision: rollbackComplete ? "skill-install-failed-rolled-back" : "skill-install-recovery-required",
@@ -565,19 +607,6 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
     });
   }
 
-  let snapshot;
-  try {
-    snapshot = syncSnapshot(root);
-  } catch (error) {
-    return Object.freeze({
-      decision: "skill-install-complete-snapshot-refresh-pending", executable: false, updated: true,
-      skillId: record.skill_id, target: record.target_ref, sourceDigest: record.exact_source_digest,
-      scriptsExecuted: false, dependenciesInstalled: false, originalSourcePreserved: true,
-      reason: error.message,
-      userSummary: "Skill 已复制、回读并登记成功；只有看板派生快照暂未刷新，Agent 和已安装 Skill 仍可使用。",
-      nextStep: "让 Agent 只重试快照同步；不要重复安装或覆盖这个 Skill。",
-    });
-  }
   return Object.freeze({
     decision: record.operation === "upgrade" ? "skill-upgrade-complete" : "skill-install-complete", executable: false, updated: true,
     operation: record.operation,
@@ -585,7 +614,7 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
     previousVersion: record.previous_version, version: record.version,
     diff: record.operation === "upgrade" ? record.diff : undefined,
     sourceKind: record.source_kind, sourceDigest: record.exact_source_digest, contentDigest: record.source_digest,
-    requirementsRegistered: true, installedReadback: true, snapshot,
+    requirementsRegistered: true, installedReadback: true,
     scripts: record.scripts, scriptsExecuted: false, dependenciesInstalled: false,
     originalSourcePreserved: true, requirementsPreimage: relative(root, paths.requirementsPreimage).split(sep).join("/"),
     previousPackage: record.operation === "upgrade" ? relative(root, paths.previousPackage).split(sep).join("/") : "",
@@ -594,6 +623,26 @@ export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
       : "这个 Skill 已按预览的相同字节安装、回读并登记；没有执行脚本或安装依赖。",
     nextStep: "可以继续当前任务；真正命中这个 Skill 时先按它的适用边界使用，需要额外软件或权限再单独说明。",
   });
+}
+
+export function confirmSkillInstall(rootPath, confirmationRef, userReply, {
+  syncSnapshot = defaultSnapshotSync, ...options
+} = {}) {
+  const root = realpathSync(resolve(rootPath));
+  const committed = withInstanceWriteLock(root, "skill-install", () => confirmSkillInstallCore(root, confirmationRef, userReply, options));
+  const cleanup = getInstanceWriteLockCleanup(committed);
+  const result = cleanup ? Object.freeze({ ...committed, instanceWriteLockCleanup: cleanup }) : committed;
+  if (!result.updated) return result;
+  // The snapshot subprocess takes the same instance lock. Refresh only after
+  // the authoritative package/map transaction has released it.
+  try { return Object.freeze({ ...result, snapshot: syncSnapshot(root) }); }
+  catch (error) {
+    return Object.freeze({
+      ...result, decision: "skill-install-complete-snapshot-refresh-pending", reason: error.message,
+      userSummary: "Skill 已复制、回读并登记成功；只有看板派生快照暂未刷新，Agent 和已安装 Skill 仍可使用。",
+      nextStep: "让 Agent 只重试快照同步；不要重复安装或覆盖这个 Skill。",
+    });
+  }
 }
 
 function argument(name) {

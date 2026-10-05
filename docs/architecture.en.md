@@ -2,6 +2,8 @@
 
 AI Carry is a local, file-based long-term asset and growth layer used beside a host Agent. It is not a background service and it does not replace the host or model.
 
+The current source uses 2.1.8 as its version baseline. The web dashboard and desktop viewer share `dashboard/src/app/` and the offline build. The desktop app previews and copies requests; it has no persistent Agent connection or task receiver. Supported upgrade sources come from the current release manifest and upgrade contract, not the historical lists below.
+
 Version-specific sections below record historical decisions, not cumulative requirements. Current changes follow `COMPONENT_CHANGE.md`, upgrades follow `core/upgrade/UPGRADE-CONTRACT.md`, and session continuation follows `UPGRADE_SESSION_ACTIVATION.md`: preserve untouched instance content in place and continue in the same conversation where possible. Do not require full resource adoption or a new task for every upgrade.
 
 ## Participants
@@ -51,7 +53,7 @@ Template-owned core files may be replaced or migrated by a versioned release man
 
 First instantiation uses one recoverable three-file core transaction: the manifest, approved profile, and domain map. The user sees one complete preview before those files change. A core failure restores the template preimage. Startup capsule, Dashboard snapshots, and empty validation, candidate, component, host, and Skill registries are initialized or repaired only when the corresponding capability needs them; failure in one derived item is reported for targeted retry and does not undo a usable assistant. A second run over the same confirmed design creates no new records or byte drift.
 
-Blank-template startup, first instantiation, and upgrade of an existing instance are separate proofs. The normal build creates one representative disposable instance from the canonical template, checks the three core sources, zero formal assets, usable startup, second-run idempotence, core rollback, and post-commit derived-state degradation. A complex existing-instance fixture separately checks upgrade preservation. Another first-creation sample is added only when a real logic branch requires it; the build does not turn every change into a regression matrix.
+Blank-template startup, first instantiation, and upgrade of an existing instance are separate proofs. The first-run journey creates a representative disposable instance from the canonical template and checks the three core sources, zero formal assets, usable startup, second-run idempotence, core rollback, and post-commit derived-state degradation. A complex existing-instance fixture separately checks upgrade preservation. Ordinary `npm run build` compiles the frontend and checks its offline artifacts; journeys run explicitly or through the release check, not on every build.
 
 Version 2.0.9 keeps the lean 2.0.5 architecture, aligns the official public repository with the AI Carry product name, and rebuilds the computer-only offline Dashboard Overview as one coherent first-screen stage. It adds no background service, Schema, dependency, mobile promise, or enterprise test matrix. Published 1.4.8, retained local 1.4.9, and 2.0.0 through 2.0.8 are direct sources. Replacement authority still depends on the fixed `v2.0.9` tag, formal Release, matching target tree, and the user's authorization for that exact upgrade.
 

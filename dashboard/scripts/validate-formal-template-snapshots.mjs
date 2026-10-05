@@ -4,6 +4,7 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   parseCurrentSnapshotEnvelope,
   parseSnapshotEnvelope,
@@ -19,7 +20,7 @@ const option = (name) => {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 };
-const root = resolve(option("--root") ?? new URL("../..", import.meta.url).pathname.replace(/^\/(?:[A-Za-z]:)/, (value) => value.slice(1)));
+const root = resolve(option("--root") ?? fileURLToPath(new URL("../..", import.meta.url)));
 const runSelfTest = args.includes("--self-test");
 
 function assert(condition, message) {

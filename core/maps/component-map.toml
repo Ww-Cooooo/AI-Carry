@@ -156,14 +156,21 @@ projects_to = ["learning-signal-runtime", "snapshot-runtime", "dashboard-snapsho
 id = "learning-signal-runtime"
 owner = "dashboard-runtime"
 paths = ["dashboard/scripts/cross-session-signal-transaction.mjs", "dashboard/scripts/cross-session-signal-cli.mjs", "dashboard/scripts/learning-capture-transaction.mjs", "dashboard/scripts/learning-capture-cli.mjs", "dashboard/scripts/learning-save-cli.mjs", "dashboard/scripts/learning-promotion-transaction.mjs", "dashboard/scripts/learning-promotion-cli.mjs", "dashboard/scripts/operational-user-report.mjs", "dashboard/scripts/task-closeout-contract.mjs", "dashboard/scripts/validate-cross-session-signal-transaction.mjs", "dashboard/scripts/validate-learning-capture-journey.mjs", "dashboard/scripts/validate-learning-capture-transaction.mjs", "dashboard/scripts/validate-learning-promotion-transaction.mjs", "dashboard/scripts/validate-operational-user-report.mjs", "dashboard/scripts/validate-proactive-learning-guidance.mjs", "dashboard/scripts/validate-task-closeout-contract.mjs", "dashboard/package.json"]
-depends_on = ["cross-session-signals", "asset-retrieval-runtime", "snapshot-runtime", "result-validation"]
+depends_on = ["cross-session-signals", "asset-retrieval-runtime", "snapshot-runtime", "result-validation", "instance-write-coordination"]
 projects_to = ["instance-signal-projection", "dashboard-snapshot-projection", "upgrade-system", "architecture-documentation"]
+
+[[components]]
+id = "instance-write-coordination"
+owner = "dashboard-runtime"
+paths = ["dashboard/scripts/instance-write-lock.mjs"]
+depends_on = ["external-safety"]
+projects_to = ["first-instantiation-runtime", "learning-signal-runtime", "snapshot-runtime", "dashboard-build-tooling"]
 
 [[components]]
 id = "first-instantiation-runtime"
 owner = "dashboard-runtime"
 paths = ["dashboard/scripts/first-instantiation-transaction.mjs"]
-depends_on = ["identity-lifecycle", "instance-identity", "instance-governance", "instance-components", "instance-validation-evidence", "host-integration", "cross-session-signals", "startup-capsule-runtime", "snapshot-runtime", "dashboard-snapshot-projection", "user-guidance", "external-safety"]
+depends_on = ["identity-lifecycle", "instance-identity", "instance-governance", "instance-components", "instance-validation-evidence", "host-integration", "cross-session-signals", "startup-capsule-runtime", "snapshot-runtime", "dashboard-snapshot-projection", "user-guidance", "external-safety", "instance-write-coordination"]
 projects_to = ["installation-experience", "upgrade-system", "architecture-documentation"]
 
 [[components]]
@@ -191,14 +198,14 @@ projects_to = ["host-integration", "upgrade-system", "installation-experience", 
 id = "snapshot-runtime"
 owner = "dashboard-runtime"
 paths = ["dashboard/scripts/snapshot-envelope.mjs", "dashboard/scripts/snapshot-semantics.mjs", "dashboard/scripts/snapshot-source-builder.mjs", "dashboard/scripts/accumulation-projection.mjs", "dashboard/scripts/validate-accumulation-map.mjs", "dashboard/scripts/snapshot-sync-transaction.mjs", "dashboard/scripts/sync-snapshot.mjs", "dashboard/scripts/validate-formal-template-snapshots.mjs", "dashboard/scripts/validate-snapshot-source-builder.mjs", "dashboard/scripts/validate-snapshot-sync-transaction.mjs"]
-depends_on = ["dashboard-snapshot-contract", "asset-retrieval-runtime", "instance-validation-evidence", "result-validation"]
+depends_on = ["dashboard-snapshot-contract", "asset-retrieval-runtime", "instance-validation-evidence", "result-validation", "instance-write-coordination"]
 projects_to = ["dashboard-ui", "upgrade-system", "architecture-documentation"]
 
 [[components]]
 id = "dashboard-build-tooling"
 owner = "dashboard-runtime"
 paths = ["dashboard/scripts/generate-dashboard-actions.mjs", "dashboard/scripts/generate-third-party-notices.mjs", "dashboard/scripts/make-offline.mjs", "dashboard/scripts/skill-install-cli.mjs", "dashboard/scripts/skill-package.mjs", "dashboard/scripts/skill-workshop-contract.mjs", "dashboard/scripts/validate-action-mirror.mjs", "dashboard/scripts/validate-dashboard-data.mjs", "dashboard/scripts/validate-change-quality-contract.mjs", "dashboard/scripts/validate-first-run-contract.mjs", "dashboard/scripts/validate-offline-assets.mjs", "dashboard/scripts/validate-open-source-compliance.mjs", "dashboard/scripts/validate-problem-report-contract.mjs", "dashboard/scripts/validate-skill-install-transaction.mjs", "dashboard/scripts/validate-skill-workshop-contract.mjs", "dashboard/scripts/validate-startup-budget.mjs"]
-depends_on = ["dashboard-actions", "dashboard-ui", "project-licensing", "identity-lifecycle", "instance-validation-evidence", "instance-components", "instance-governance", "host-integration", "cross-session-signals", "startup-capsule-runtime", "snapshot-runtime", "dashboard-snapshot-projection"]
+depends_on = ["dashboard-actions", "dashboard-ui", "project-licensing", "identity-lifecycle", "instance-validation-evidence", "instance-components", "instance-governance", "host-integration", "cross-session-signals", "startup-capsule-runtime", "snapshot-runtime", "dashboard-snapshot-projection", "instance-write-coordination"]
 projects_to = ["installation-experience", "upgrade-system", "architecture-documentation"]
 
 [[components]]

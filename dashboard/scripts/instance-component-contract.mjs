@@ -561,7 +561,11 @@ function inspectComponentRoot(repositoryReal, entry, manifest, sourceParts, budg
   const unclassified = rootTree.entries
     .filter((value) => value !== rootRef)
     .map((value) => value.slice(rootRef.length + 1))
-    .filter((value) => !declared.some((owner) => value === owner || value.startsWith(`${owner}/`)));
+    .filter((value) => !declared.some((owner) => value === owner || value.startsWith(`${owner}/`))
+      // A declared nested file needs container directories, not ownership of
+      // every sibling. Only actual directories can serve as those ancestors.
+      && !(declared.some((owner) => owner.startsWith(`${value}/`))
+        && lstatSync(resolve(rootPath, ...value.split("/"))).isDirectory()));
   if (unclassified.length) fail(`component ${entry.id} has unclassified paths: ${unclassified.slice(0, 4).join(", ")}`);
   const portableFingerprints = [];
   for (const item of manifest.ownership.portable_paths) {

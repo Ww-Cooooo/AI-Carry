@@ -10,6 +10,7 @@ import { validateCandidateIndex as validateCandidateIndexClosure, validateCandid
 import { containsForbiddenLocationReference, containsForbiddenStructuredLocation } from "./safe-output-boundary.mjs";
 import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
 import { buildSnapshotCandidate, computeSnapshotSourceDigest } from "./snapshot-source-builder.mjs";
+import { withInstanceWriteLock } from "./instance-write-lock.mjs";
 
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 const unsafeText = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u;
@@ -977,7 +978,7 @@ function installDerivedRepairCandidates(repositoryReal, proposal, { testFaultAft
   }
 }
 
-export function repairOperationalDerivedStateOnce(repository, { testFaultAfterInstall = 0 } = {}) {
+function repairOperationalDerivedStateOnceLocked(repository, { testFaultAfterInstall = 0 } = {}) {
   let repositoryReal;
   try { repositoryReal = realpathSync(repository); readStrictDerivedIdentity(repositoryReal); }
   catch {
@@ -1529,7 +1530,7 @@ export function inspectCrossSessionSignalStartup(repository, { now = new Date().
   }
 }
 
-export function buildCrossSessionSignalTransactionPlan(repository, request = {}) {
+function buildCrossSessionSignalTransactionPlanLocked(repository, request = {}) {
   let repositoryReal;
   try { repositoryReal = realpathSync(repository); }
   catch { return deny("repository-unavailable"); }
@@ -1949,7 +1950,19 @@ function absoluteDigest(target, maxBytes) {
 
 function inspectAtomicSwap(repositoryReal, plan, observed) {
   const candidates = [];
-  for (const step of plan.steps) {
+  // Rollback swaps reverse a bound forward step, but their ordinal counts only
+  // the targets restored by that rollback attempt (90..97). Enumerate that
+  // bounded range for each target so interrupted old and new bundles recover
+  // without inventing a write or changing the sealed plan format.
+  const rollbackSteps = plan.rollback.flatMap((item) => {
+    const forward = plan.steps.find((step) => step.target === item.target);
+    const preimage = plan.preimages.find((entry) => entry.target === item.target);
+    return plan.rollback.map((_, index) => ({
+      ordinal: 90 + index, target: item.target, preconditionDigest: forward.proposedDigest,
+      proposedDigest: item.restoreDigest, proposedByteLength: preimage.byteLength,
+    }));
+  });
+  for (const step of [...plan.steps, ...rollbackSteps]) {
     const paths = swapPaths(repositoryReal, plan, step);
     const hasStage = existsSync(paths.stage); const hasBackup = existsSync(paths.backup);
     if (hasStage || hasBackup) candidates.push({ step, paths, hasStage, hasBackup });
@@ -1989,8 +2002,11 @@ function classifyPlanState(repositoryReal, plan) {
     const matches = (expected) => expected.size === swap.observed.size
       && [...expected].every(([target, digest]) => swap.observed.get(target) === digest);
     const checkpoint = checkpoints.findIndex(matches);
-    if (checkpoint < 0) return { state: "drift", checkpoint: -1, reason: "non-prefix-or-external-target-drift", repair: swap.repair };
-    if (!swap.repair || !["restore-backup"].includes(swap.repair.kind)) {
+    if (checkpoint < 0) return { state: "drift", checkpoint: -1, reason: "non-prefix-or-external-target-drift", repair: null };
+    // Known swap carriers are temporary source-tree entries. Their byte-bound
+    // repair comes first; resume/rollback immediately reclassify the clean tree
+    // and verify its merged-truth digest before any further transaction write.
+    if (!swap.repair) {
       const truth = computeSnapshotSourceDigest(repositoryReal, { mode: "operational",
         requiredSourceRefs: plan.steps.map((step) => step.target) }).digest;
       if (truth !== plan.truthDigests[checkpoint]) return { state: "drift", checkpoint, reason: "merged-truth-source-drift", repair: swap.repair };
@@ -2139,7 +2155,7 @@ function verifyFinalDashboard(repositoryReal, plan) {
   }
 }
 
-export function resumePersistentCrossSessionSignalTransaction(repository, { operationId } = {}, { hooks = {} } = {}) {
+function resumePersistentCrossSessionSignalTransactionLocked(repository, { operationId } = {}, { hooks = {} } = {}) {
   let lock; let loaded;
   try {
     const repositoryReal = realpathSync(repository); lock = acquireOperationLock(repositoryReal, operationId);
@@ -2189,7 +2205,7 @@ function awaitMaybe(callback, value) {
   if (result && typeof result.then === "function") fail("cross-session transaction hooks must be synchronous");
 }
 
-export function executeCrossSessionSignalTransaction(repository, plan, { hooks = {} } = {}) {
+function executeCrossSessionSignalTransactionLocked(repository, plan, { hooks = {} } = {}) {
   try {
     const repositoryReal = realpathSync(repository); const payload = trustedTransactionPayloads.get(plan);
     if (!payload || payload.repositoryReal !== repositoryReal || !validateSealedPlan(plan)) fail("same-process trusted sealed plan is required");
@@ -2201,7 +2217,7 @@ export function executeCrossSessionSignalTransaction(repository, plan, { hooks =
   }
 }
 
-export function rollbackPersistentCrossSessionSignalTransaction(repository, { operationId } = {}) {
+function rollbackPersistentCrossSessionSignalTransactionLocked(repository, { operationId } = {}) {
   let lock; let loaded;
   try {
     const repositoryReal = realpathSync(repository); lock = acquireOperationLock(repositoryReal, operationId);
@@ -2236,7 +2252,7 @@ export function rollbackPersistentCrossSessionSignalTransaction(repository, { op
   } finally { releaseOperationLock(lock); }
 }
 
-export function closePersistentCrossSessionSignalTransaction(repository, { operationId } = {}) {
+function closePersistentCrossSessionSignalTransactionLocked(repository, { operationId } = {}) {
   let lock;
   try {
     const repositoryReal = realpathSync(repository); lock = acquireOperationLock(repositoryReal, operationId);
@@ -2254,7 +2270,7 @@ export function closePersistentCrossSessionSignalTransaction(repository, { opera
   } finally { releaseOperationLock(lock); }
 }
 
-export function cleanupExpiredPersistentCrossSessionSignalTransactions(repository, { now = new Date() } = {}) {
+function cleanupExpiredPersistentCrossSessionSignalTransactionsLocked(repository, { now = new Date() } = {}) {
   try {
     const repositoryReal = realpathSync(repository); const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
     if (!Number.isFinite(nowMs)) fail("persistent cleanup time is invalid");
@@ -2295,6 +2311,59 @@ export function cleanupExpiredPersistentCrossSessionSignalTransactions(repositor
   } catch (error) {
     return deepFreeze({ decision: "persistent-cross-session-signal-cleanup-denied", reason: error.message, executable: false });
   }
+}
+
+// Operation IDs identify recovery bundles, not the shared control/index write
+// set. Hold the instance lock across fresh reads, repairs, writes, and cleanup;
+// nested execute -> resume and plan -> repair calls reuse the same lease.
+function withSignalWriteLock(repository, operation, failure, callback) {
+  try { return withInstanceWriteLock(repository, `cross-session-signal-${operation}`, callback); }
+  catch (error) {
+    return deepFreeze({ ...failure, executable: false,
+      reason: error?.code === "AI_CARRY_INSTANCE_WRITE_BUSY" ? "instance-write-busy" : "instance-write-unavailable",
+      detail: String(error?.message ?? error), ordinaryTasksContinue: true, affectedScope: "cross-session-signals-only" });
+  }
+}
+
+export function repairOperationalDerivedStateOnce(repository, options = {}) {
+  return withSignalWriteLock(repository, "derived-repair", {
+    decision: "operational-derived-state-related-capability-paused", attempted: false, repairedTargetCount: 0,
+    pausedCapabilities: ["cross-session-signals"], userReport: derivedStateUserReport("paused"),
+  }, () => repairOperationalDerivedStateOnceLocked(repository, options));
+}
+
+export function buildCrossSessionSignalTransactionPlan(repository, request = {}) {
+  return withSignalWriteLock(repository, "plan", { decision: "transaction-denied" },
+    () => buildCrossSessionSignalTransactionPlanLocked(repository, request));
+}
+
+export function executeCrossSessionSignalTransaction(repository, plan, options = {}) {
+  return withSignalWriteLock(repository, "execute", {
+    decision: "cross-session-signal-execution-denied", operationId: plan?.operationId ?? "",
+  }, () => executeCrossSessionSignalTransactionLocked(repository, plan, options));
+}
+
+export function resumePersistentCrossSessionSignalTransaction(repository, request = {}, options = {}) {
+  return withSignalWriteLock(repository, "resume", {
+    decision: "persistent-cross-session-signal-resume-denied", operationId: request.operationId ?? "",
+  }, () => resumePersistentCrossSessionSignalTransactionLocked(repository, request, options));
+}
+
+export function rollbackPersistentCrossSessionSignalTransaction(repository, request = {}) {
+  return withSignalWriteLock(repository, "rollback", {
+    decision: "persistent-cross-session-signal-rollback-denied", operationId: request.operationId ?? "",
+  }, () => rollbackPersistentCrossSessionSignalTransactionLocked(repository, request));
+}
+
+export function closePersistentCrossSessionSignalTransaction(repository, request = {}) {
+  return withSignalWriteLock(repository, "close", {
+    decision: "persistent-cross-session-signal-close-denied", operationId: request.operationId ?? "",
+  }, () => closePersistentCrossSessionSignalTransactionLocked(repository, request));
+}
+
+export function cleanupExpiredPersistentCrossSessionSignalTransactions(repository, options = {}) {
+  return withSignalWriteLock(repository, "cleanup", { decision: "persistent-cross-session-signal-cleanup-denied" },
+    () => cleanupExpiredPersistentCrossSessionSignalTransactionsLocked(repository, options));
 }
 
 export function inspectCrossSessionSignalRecovery(repository, plan, { strategy = "resume" } = {}) {

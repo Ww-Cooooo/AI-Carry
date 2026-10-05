@@ -77,6 +77,19 @@ try {
   for (const [ref, bytes] of preserved) write(source, ref, bytes);
   for (const ref of ["instance/profile/approved-profile.md", "instance/maps/domain-map.toml", "instance/skills/requirements.toml"])
     preserved.set(ref, read(source, ref));
+  const manifestRef = `core/upgrade/release-manifest-${version}.toml`;
+  const originalRelease = read(repository, manifestRef);
+  // 只在隔离目标中模拟发布状态；开发源码仍可保持未发布。
+  const setFixtureBoundary = (published) => write(target, manifestRef, originalRelease.toString("utf8")
+    .replace(/^status = "(?:published-release|local-unreleased-candidate)"$/mu,
+      `status = "${published ? "published-release" : "local-unreleased-candidate"}"`)
+    .replace(/^(publication_authorized|repository_operation_authorized|instance_replacement_authorized) = (?:true|false)$/gmu,
+      (_line, key) => `${key} = ${published}`));
+  setFixtureBoundary(false);
+  assert.throws(() => prepareUpgrade(source, target, { verifyOfficial: false }),
+    /target release boundary does not authorize published instance replacement/);
+  setFixtureBoundary(true);
+  assert(read(repository, manifestRef).equals(originalRelease), "fixture changed the development release boundary");
   const olderReleaseSource = resolve(scene, "installed-older-official-release");
   cpSync(source, olderReleaseSource, { recursive: true, errorOnExist: true, force: false });
   const unknownLatestPreview = prepareUpgrade(olderReleaseSource, target, { verifyOfficial: false, releaseSelection: "unknown" });

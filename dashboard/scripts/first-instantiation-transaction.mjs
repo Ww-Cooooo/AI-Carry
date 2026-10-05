@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, readSync, realpathSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseSectionedToml, stableAssetId, validateInstanceManifestStructure } from "./asset-route-contract.mjs";
@@ -9,6 +9,10 @@ import { parseCurrentSnapshotEnvelope } from "./snapshot-envelope.mjs";
 import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
 import { inspectStartupCapsule, MAX_MANIFEST_BYTES } from "./startup-capsule-contract.mjs";
 import { syncStartupCapsule } from "./sync-startup-capsule.mjs";
+import { getInstanceWriteLockCleanup, withInstanceWriteLock } from "./instance-write-lock.mjs";
+
+const JOURNAL_REF = ".assistant-local/runtime/first-instantiation.json";
+const coreFileLimitBytes = 128 * 1024;
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRepository = resolve(scriptDirectory, "../..");
@@ -191,7 +195,7 @@ function readRequestFile(path) {
 function canonicalSource(source) { return source.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n"); }
 
 function readManifest(root) {
-  const source = decodeUtf8(readFileSync(resolve(root, "instance/manifest.toml")), "instance manifest");
+  const source = decodeUtf8(boundedPhysicalBytes(root, "instance/manifest.toml", MAX_MANIFEST_BYTES), "instance manifest");
   const canonical = canonicalSource(source);
   return Object.freeze({ source, canonical, parsed: validateInstanceManifestStructure(parseSectionedToml(canonical, "instance manifest")) });
 }
@@ -266,7 +270,7 @@ function domainMapSource(request, identity) {
 
 function buildCoreSources(root, request, identity) {
   return new Map([
-    ["instance/manifest.toml", manifestSource(readFileSync(resolve(root, "instance/manifest.toml"), "utf8"), request, identity)],
+    ["instance/manifest.toml", manifestSource(readManifest(root).source, request, identity)],
     ["instance/profile/approved-profile.md", approvedProfileSource(request, identity)],
     ["instance/maps/domain-map.toml", domainMapSource(request, identity)],
   ]);
@@ -291,63 +295,160 @@ function verifyCoreOnDisk(root, request, identity, sources) {
 
 function physicalTarget(root, ref) {
   const target = resolve(root, ...ref.split("/"));
-  const rootReal = realpathSync(root);
-  const parentReal = realpathSync(dirname(target));
-  const fromRoot = relative(rootReal, parentReal);
-  if (fromRoot === ".." || fromRoot.startsWith(".." + sep)) fail("write target escapes the repository: " + ref);
-  const parentInfo = lstatSync(dirname(target));
-  if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink()) fail("write target parent is unsafe: " + ref);
-  if (existsSync(target)) {
-    const info = lstatSync(target);
-    if (!info.isFile() || info.isSymbolicLink()) fail("write target is not a physical file: " + ref);
+  let cursor = root;
+  for (const part of ref.split("/").slice(0, -1)) {
+    cursor = resolve(cursor, part);
+    const info = lstatSync(cursor);
+    if (!info.isDirectory() || info.isSymbolicLink() || info.isReparsePoint?.()) fail("write target parent is unsafe: " + ref);
+    const fromRoot = relative(root, realpathSync(cursor));
+    if (fromRoot === ".." || fromRoot.startsWith(".." + sep)) fail("write target escapes the repository: " + ref);
   }
+  try {
+    const info = lstatSync(target);
+    if (!info.isFile() || info.isSymbolicLink() || info.isReparsePoint?.()) fail("write target is not a physical file: " + ref);
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
   return target;
 }
 
-function freezeCore(root) {
-  return new Map(firstInstantiationWriteSet.map((ref) => {
-    const target = physicalTarget(root, ref);
-    return [ref, existsSync(target) ? readFileSync(target) : null];
-  }));
+function boundedPhysicalBytes(root, ref, maximum = coreFileLimitBytes, allowMissing = false) {
+  const target = physicalTarget(root, ref);
+  let fd;
+  try { fd = openSync(target, "r"); } catch (error) { if (allowMissing && error.code === "ENOENT") return null; throw error; }
+  try {
+    const before = fstatSync(fd, { bigint: true });
+    if (!before.isFile() || before.size > BigInt(maximum)) fail("bounded physical file required: " + ref);
+    const bytes = Buffer.alloc(Number(before.size)); let offset = 0;
+    while (offset < bytes.length) {
+      const count = readSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (!count) fail("file changed during read: " + ref); offset += count;
+    }
+    const after = fstatSync(fd, { bigint: true });
+    const named = lstatSync(target, { bigint: true });
+    if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size
+      || before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs
+      || named.dev !== before.dev || named.ino !== before.ino || named.isSymbolicLink()) fail("file changed during read: " + ref);
+    return bytes;
+  } finally { closeSync(fd); }
 }
 
+function freezeCore(root) {
+  return new Map(firstInstantiationWriteSet.map((ref) => [ref, boundedPhysicalBytes(root, ref, coreFileLimitBytes, true)]));
+}
+
+function sameBytes(left, right) { return left === null ? right === null : right !== null && left.equals(right); }
 function verifyFrozenCore(root, frozen) {
-  for (const [ref, bytes] of frozen) {
-    const target = resolve(root, ...ref.split("/"));
-    if (bytes === null ? existsSync(target) : (!existsSync(target) || !readFileSync(target).equals(bytes))) fail("core preimage changed: " + ref);
+  for (const [ref, bytes] of frozen) if (!sameBytes(bytes, boundedPhysicalBytes(root, ref, coreFileLimitBytes, true))) fail("core preimage changed: " + ref);
+}
+
+function firstJournal(root, request, sources, frozen, identity) {
+  const journal = {
+    schema_version: 1, operation_id: randomUUID(), repository_binding: hash(root), request_digest: hash(JSON.stringify(request)), identity,
+    files: firstInstantiationWriteSet.map((ref) => ({ ref, before: frozen.get(ref)?.toString("base64") ?? null,
+      after: Buffer.from(sources.get(ref), "utf8").toString("base64") })),
+  };
+  const target = physicalTarget(root, JOURNAL_REF);
+  const stage = `${target}.publish-${journal.operation_id}`;
+  try {
+    writeFileSync(stage, `${JSON.stringify(journal)}\n`, { flag: "wx", mode: 0o600 });
+    const fd = openSync(stage, "r+"); try { fsyncSync(fd); } finally { closeSync(fd); }
+    if (existsSync(target)) fail("first creation journal became occupied");
+    renameSync(stage, target); // Atomically publish under the shared instance lease before any core write.
+  } finally { if (existsSync(stage)) unlinkSync(stage); }
+  return journal;
+}
+
+function readFirstJournal(root, request) {
+  const bytes = boundedPhysicalBytes(root, JOURNAL_REF, 1024 * 1024, true);
+  if (!bytes) return null;
+  let journal;
+  try { journal = JSON.parse(decodeUtf8(bytes, "first creation journal")); } catch { fail("first creation journal is invalid; recovery evidence was preserved"); }
+  if (journal.schema_version !== 1 || !/^[a-f0-9-]{36}$/u.test(journal.operation_id ?? "")
+    || journal.repository_binding !== hash(root) || journal.request_digest !== hash(JSON.stringify(request))
+    || !Array.isArray(journal.files) || journal.files.length !== firstInstantiationWriteSet.length) {
+    fail("interrupted first creation must resume the same request and repository; recovery evidence was preserved");
+  }
+  const identity = identityForRequest(journal.identity);
+  const frozen = new Map(); const sources = new Map();
+  for (const [index, file] of journal.files.entries()) {
+    if (file.ref !== firstInstantiationWriteSet[index]) fail("first creation journal write set is invalid");
+    const decodeBase64 = (value) => {
+      if (typeof value !== "string" || value.length > 4 * coreFileLimitBytes / 3 + 4) fail("first creation journal bytes are invalid");
+      const decoded = Buffer.from(value, "base64");
+      if (decoded.toString("base64") !== value || decoded.length > coreFileLimitBytes) fail("first creation journal bytes are invalid");
+      return decoded;
+    };
+    frozen.set(file.ref, file.before === null ? null : decodeBase64(file.before));
+    sources.set(file.ref, decodeUtf8(decodeBase64(file.after), "first creation proposed source"));
+  }
+  if (frozen.get("instance/manifest.toml") === null || frozen.get("instance/profile/approved-profile.md") !== null
+    || sources.get("instance/manifest.toml") !== manifestSource(decodeUtf8(frozen.get("instance/manifest.toml"), "template preimage"), request, identity)
+    || sources.get("instance/profile/approved-profile.md") !== approvedProfileSource(request, identity)
+    || sources.get("instance/maps/domain-map.toml") !== domainMapSource(request, identity)) fail("first creation journal does not match the confirmed request");
+  verifyCoreInMemory(sources, request, identity);
+  return { journal, sources, frozen, identity };
+}
+
+function verifyJournalState(root, journal, sources, frozen) {
+  // Validate the entire set before changing anything. External edits, including
+  // edits to a not-yet-written target, must survive both resume and rollback.
+  for (const [ref, source] of sources) {
+    const after = Buffer.from(source, "utf8");
+    const current = boundedPhysicalBytes(root, ref, coreFileLimitBytes, true);
+    if (!sameBytes(current, frozen.get(ref)) && !sameBytes(current, after)) fail("first creation source changed externally: " + ref);
+    const stageRef = `${ref}.ai-carry-stage-${journal.operation_id}`;
+    const stage = boundedPhysicalBytes(root, stageRef, coreFileLimitBytes, true);
+    if (stage !== null && !sameBytes(stage, frozen.get(ref)) && !sameBytes(stage, after)) fail("first creation stage changed externally: " + ref);
   }
 }
 
-function installCore(root, sources, frozen, verifyInstalled, testFaultAfterInstall) {
-  const operationId = randomUUID();
-  const records = [];
+function installJournalBytes(root, journal, ref, desired, allowed) {
+  const target = physicalTarget(root, ref);
+  const current = boundedPhysicalBytes(root, ref, coreFileLimitBytes, true);
+  if (!allowed.some((bytes) => sameBytes(bytes, current))) fail("first creation source changed before replacement: " + ref);
+  const stageRef = `${ref}.ai-carry-stage-${journal.operation_id}`;
+  const stage = physicalTarget(root, stageRef);
+  const staged = boundedPhysicalBytes(root, stageRef, coreFileLimitBytes, true);
+  if (staged !== null) {
+    if (!allowed.some((bytes) => sameBytes(bytes, staged))) fail("first creation stage changed before replacement: " + ref);
+    unlinkSync(stage);
+  }
+  if (sameBytes(current, desired)) return false;
+  if (desired === null) { unlinkSync(target); return true; }
+  writeFileSync(stage, desired, { flag: "wx", mode: 0o600 });
+  const fd = openSync(stage, "r+"); try { fsyncSync(fd); } finally { closeSync(fd); }
+  if (!sameBytes(current, boundedPhysicalBytes(root, ref, coreFileLimitBytes, true))) fail("first creation source changed while staging: " + ref);
+  // Replacing a single file is atomic; exact preimages already live in the
+  // durable journal, so there is no manifest-missing rename-to-backup window.
+  renameSync(stage, target);
+  if (!sameBytes(desired, boundedPhysicalBytes(root, ref))) fail("first creation readback changed: " + ref);
+  return true;
+}
+
+function installCore(root, request, sources, frozen, identity, testFaultAfterInstall, existingJournal = null) {
+  if (!existingJournal) verifyFrozenCore(root, frozen);
+  const journal = existingJournal ?? firstJournal(root, request, sources, frozen, identity);
+  verifyJournalState(root, journal, sources, frozen);
   try {
-    verifyFrozenCore(root, frozen);
     let installedCount = 0;
     for (const [ref, source] of sources) {
-      const target = physicalTarget(root, ref);
-      const record = { target, stage: target + ".ai-carry-stage-" + operationId, backup: target + ".ai-carry-preimage-" + operationId,
-        hadTarget: existsSync(target), installed: false, backedUp: false };
-      records.push(record);
-      writeFileSync(record.stage, source, { encoding: "utf8", flag: "wx" });
-      if (record.hadTarget) { renameSync(target, record.backup); record.backedUp = true; }
-      renameSync(record.stage, target); record.installed = true; installedCount += 1;
-      if (testFaultAfterInstall === installedCount) throw new Error("injected-after-core-write-" + installedCount);
+      const after = Buffer.from(source, "utf8");
+      if (installJournalBytes(root, journal, ref, after, [frozen.get(ref), after])) installedCount += 1;
+      if (testFaultAfterInstall === installedCount && installedCount > 0) throw new Error("injected-after-core-write-" + installedCount);
     }
-    const verification = verifyInstalled();
+    const verification = verifyCoreOnDisk(root, request, identity, sources);
     let cleanupWarning = "";
-    for (const record of records) if (record.backedUp && existsSync(record.backup)) {
-      try { unlinkSync(record.backup); } catch { cleanupWarning = "A harmless core preimage file could not be removed automatically."; }
-    }
-    return Object.freeze({ verification, installedCount, cleanupWarning });
+    try { unlinkSync(physicalTarget(root, JOURNAL_REF)); }
+    catch { cleanupWarning = "The committed core is valid; its first-creation recovery receipt remains pending cleanup."; }
+    return Object.freeze({ verification, installedCount, cleanupWarning, recovered: existingJournal !== null });
   } catch (error) {
     try {
-      for (const record of [...records].reverse()) {
-        if (record.installed && existsSync(record.target)) unlinkSync(record.target);
-        if (record.backedUp && existsSync(record.backup)) renameSync(record.backup, record.target);
-        if (existsSync(record.stage)) unlinkSync(record.stage);
+      verifyJournalState(root, journal, sources, frozen);
+      for (const [ref, before] of [...frozen].reverse()) {
+        installJournalBytes(root, journal, ref, before, [before, Buffer.from(sources.get(ref), "utf8")]);
       }
-      verifyFrozenCore(root, frozen); error.templatePreserved = true;
+      verifyFrozenCore(root, frozen);
+      unlinkSync(physicalTarget(root, JOURNAL_REF));
+      error.templatePreserved = true;
     } catch (rollbackError) { error.templatePreserved = false; error.rollbackError = rollbackError.message; }
     throw error;
   }
@@ -429,12 +530,19 @@ function inspectTemplate(root, manifest) {
 
 function previewManifestBytes(root, request) {
   const identity = { instanceId: "ac-00000000-0000-4000-8000-000000000000", createdAt: "2000-01-01T00:00:00.000Z" };
-  return Buffer.byteLength(manifestSource(readFileSync(resolve(root, "instance/manifest.toml"), "utf8"), request, identity), "utf8");
+  return Buffer.byteLength(manifestSource(readManifest(root).source, request, identity), "utf8");
 }
 
 export function inspectFirstInstantiationRequest(repository, input) {
   const root = realpathSync(repository);
   const request = normalizeFirstInstantiationRequest(input);
+  if (existsSync(resolve(root, JOURNAL_REF))) {
+    const pending = readFirstJournal(root, request);
+    verifyJournalState(root, pending.journal, pending.sources, pending.frozen);
+    return Object.freeze({ decision: "first-instantiation-recovery-ready", status: "limited", executable: false,
+      user_report: { summary: "上次首次创建被中断，原确认内容和恢复记录仍在；本次只读检查没有改动文件。",
+        next_step: "复用同一份已确认请求执行首次创建入口，它会只完成这次被中断的核心事务；不要重建或删除现场。" } });
+  }
   const manifest = readManifest(root);
   if (manifest.parsed.root.state !== "template") return Object.freeze({ decision: "first-instantiation-not-applicable", status: "unchanged", reason: "target-is-already-an-instance", executable: false,
     user_report: { summary: "当前 AI Carry 已经是正式实例，本次没有重做首次创建。", next_step: "继续使用当前实例；另一个方向请从干净模板建立独立实例。" } });
@@ -446,9 +554,13 @@ export function inspectFirstInstantiationRequest(repository, input) {
     user_report: { summary: "创建请求已通过本地检查；模板尚未改动。", next_step: "展示完整预览并得到明确确认后，再执行同一请求。" } });
 }
 
-export function executeFirstInstantiation(repository, input, { testIdentity, testFaultAfterCapsule = false, testFaultAfterInstall = 0, testFaultBeforeSnapshot = false } = {}) {
-  const root = realpathSync(repository);
-  const request = normalizeFirstInstantiationRequest(input);
+function commitFirstInstantiationCore(root, request, { testIdentity, testFaultAfterInstall }) {
+  const resumed = readFirstJournal(root, request);
+  if (resumed) {
+    const { sources, frozen, identity, journal } = resumed;
+    const installed = installCore(root, request, sources, frozen, identity, testFaultAfterInstall, journal);
+    return { identity, installed, notices: Object.freeze(["interrupted first creation resumed from its bound exact-byte journal"]) };
+  }
   const manifest = readManifest(root);
   if (manifest.parsed.root.state === "instance") {
     if (!requestMatchesExisting(manifest.parsed, request)) return Object.freeze({ decision: "first-instantiation-not-applicable", status: "unchanged", reason: "existing-instance-does-not-match-request", updated: false, executable: false,
@@ -474,13 +586,31 @@ export function executeFirstInstantiation(repository, input, { testIdentity, tes
   const sources = buildCoreSources(root, request, identity);
   verifyCoreInMemory(sources, request, identity);
   const frozen = freezeCore(root);
-  const installed = installCore(root, sources, frozen, () => verifyCoreOnDisk(root, request, identity, sources), testFaultAfterInstall);
+  const installed = installCore(root, request, sources, frozen, identity, testFaultAfterInstall);
+  return { identity, installed, notices };
+}
 
+export function executeFirstInstantiation(repository, input, { testIdentity, testFaultAfterCapsule = false, testFaultAfterInstall = 0, testFaultBeforeSnapshot = false } = {}) {
+  const root = realpathSync(repository);
+  const request = normalizeFirstInstantiationRequest(input);
+  let core;
+  try {
+    core = withInstanceWriteLock(root, "first-instantiation-core",
+      () => commitFirstInstantiationCore(root, request, { testIdentity, testFaultAfterInstall }));
+  } catch (error) {
+    if (existsSync(resolve(root, JOURNAL_REF)) && error.templatePreserved !== true) error.templatePreserved = false;
+    throw error;
+  }
+  if (core.decision) return core;
+  const { identity, installed, notices } = core;
+
+  // Child-process snapshot synchronization is deliberately outside the core
+  // lease; it acquires the same instance lock in its own process.
   const pending = [];
   let capsuleResult;
   try {
     if (testFaultAfterCapsule) throw new Error("injected-capsule-refresh-failure");
-    capsuleResult = syncStartupCapsule(root, { write: true });
+    capsuleResult = withInstanceWriteLock(root, "first-instantiation-capsule", () => syncStartupCapsule(root, { write: true }));
     if (!["startup-capsule-updated", "startup-capsule-current"].includes(capsuleResult.decision)) throw new Error("unexpected startup capsule result");
   } catch (error) {
     pending.push("startup-capsule");
@@ -501,6 +631,8 @@ export function executeFirstInstantiation(repository, input, { testIdentity, tes
   return Object.freeze({ decision: "first-instantiation-complete", status: pending.length ? "limited" : "passed", updated: true,
     instance_id: identity.instanceId, created_at: identity.createdAt, identity_ref: installed.verification.identityRef,
     write_target_count: firstInstantiationWriteSet.length, notices, warnings: request.warnings, cleanup_warning: installed.cleanupWarning,
+    recovered_interrupted_creation: installed.recovered,
+    ...(getInstanceWriteLockCleanup(core) ? { instanceWriteLockCleanup: getInstanceWriteLockCleanup(core) } : {}),
     auxiliary_pending: Object.freeze(pending), capsuleResult, snapshotResult,
     verification: Object.freeze({ ...installed.verification, capsule: pending.includes("startup-capsule") ? "pending" : "current", snapshot: pending.includes("dashboard-snapshot") ? "pending" : "current" }),
     executable: false,

@@ -3,7 +3,7 @@ import type {ReactNode} from 'react';
 import {normalizeSnapshot} from '../lib/data';
 import {inspectDashboardIdentity,syncDashboardIdentity} from '../lib/identity';
 
-export type AssistantBinding={root:string;instanceId:string;name:string;synthetic:boolean};
+export type AssistantBinding={root:string;instanceId:string;name:string;synthetic:boolean;entryMismatch?:boolean};
 export type Asset={id:string;title:string;summary:string;triggers?:string[];state?:string;maturity?:string;reliability?:string;approval_state?:string;approved_by_user?:boolean;activation_basis?:string;[key:string]:any};
 export type AssistantData={demo?:boolean;binding:AssistantBinding;startup:Record<string,unknown>;snapshot:{profile:{display_name:string;learning_policy:string};meta:{state:string;product_version:string;identity_ref?:string};health?:{summary:string;next_step:string};memories:Asset[];sops:Asset[];capabilities:Asset[];experiences:Asset[];evolution:Asset[];governance:Asset[];todo:Asset[];skills:{items?:Asset[];exports?:Asset[]};accumulation?:unknown}};
 export type AssistantSource=AssistantBinding&{itemId?:string};
@@ -18,14 +18,28 @@ function webData():AssistantData{
   document.title=identity.title;
   // An old bookmark is a local navigation issue, never a whole-assistant stop.
   syncDashboardIdentity(identity);
-  return{snapshot,demo,startup:{},binding:{root:'',instanceId:snapshot.meta.state==='template'?'template':'',name:snapshot.profile.display_name,synthetic:demo}};
+  return{snapshot,demo,startup:{},binding:{root:'',instanceId:snapshot.meta.state==='template'?'template':'',name:snapshot.profile.display_name,synthetic:demo,entryMismatch:identity.mismatch}};
 }
-function reloadWebSnapshot(){return new Promise<void>((resolve,reject)=>{
-  const script=document.createElement('script');script.src=new URL('./snapshot.js?read='+Date.now(),location.href).href;
-  const finish=(error?:Error)=>{clearTimeout(timer);script.remove();error?reject(error):resolve();};
-  const timer=setTimeout(()=>finish(new Error('本次没有读到新资料，原有内容仍可查看。可以重试，或请 Agent 重新生成看板。')),5000);
-  script.onload=()=>finish();script.onerror=()=>finish(new Error('本次重新读取失败。原有内容仍可查看；请确认本地 snapshot.js 仍在。'));document.head.appendChild(script);
-});}
+let webReload:Promise<void>|null=null;
+function reloadWebSnapshot(){
+  if(webReload)return webReload;
+  webReload=new Promise<void>((resolve,reject)=>{
+    const previous=window.AI_CARRY_SNAPSHOT,legacy=window.AGENT_CARRY_SNAPSHOT;
+    const script=document.createElement('script');script.src=new URL('./snapshot.js?read='+Date.now(),location.href).href;
+    let finished=false;
+    const finish=(error?:Error)=>{if(finished)return;finished=true;clearTimeout(timer);script.onload=null;script.onerror=null;script.remove();if(error){window.AI_CARRY_SNAPSHOT=previous;window.AGENT_CARRY_SNAPSHOT=legacy;reject(error);}else resolve();};
+    const timer=setTimeout(()=>finish(new Error('本次没有读到新资料，原有内容仍可查看。可以重试，或请 Agent 重新生成看板。')),5000);
+    script.onload=()=>{
+      const fresh=window.AI_CARRY_SNAPSHOT??window.AGENT_CARRY_SNAPSHOT;
+      if(!fresh?.meta||!fresh?.profile||(window.AI_CARRY_SNAPSHOT===previous&&window.AGENT_CARRY_SNAPSHOT===legacy)){
+        finish(new Error('本次没有读到有效的新资料，仍显示上次读取的内容。请让 Agent 检查看板快照，再重新读取。'));return;
+      }
+      finish();
+    };
+    script.onerror=()=>finish(new Error('本次重新读取失败。原有内容仍可查看；请确认本地 snapshot.js 仍在。'));document.head.appendChild(script);
+  }).finally(()=>{webReload=null;});
+  return webReload;
+}
 export function ClientProvider({children}:{children:ReactNode}){
   const [assistant,setAssistant]=useState<AssistantData|null>(null),[dataLoading,setLoading]=useState(false),[dataError,setError]=useState('');
   const sequence=useRef(0),alive=useRef(true),choosing=useRef(false);
@@ -47,7 +61,7 @@ export function ClientProvider({children}:{children:ReactNode}){
   },[]);
   const load=useCallback(async(action:string)=>{
     const serial=++sequence.current;setLoading(true);
-    try{const value=await act(action);if(alive.current&&serial===sequence.current){if(value?.snapshot)value.snapshot=normalizeSnapshot(value.snapshot);setAssistant(value);setError('');}}
+    try{const value=await act(action);if(alive.current&&serial===sequence.current){if(value?.snapshot)value.snapshot=normalizeSnapshot(value.snapshot);setAssistant(value);setError(value?.binding?.entryMismatch?'入口标识与当前资料不一致。资料仍可查看；执行请求前，请让 Agent 核对助手目录与实例。':'');}}
     catch(e){if(alive.current&&serial===sequence.current)setError((e as Error).message);}
     finally{if(alive.current&&serial===sequence.current)setLoading(false);}
   },[act]);
