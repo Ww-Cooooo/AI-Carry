@@ -30,9 +30,9 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 ### 方式二：直接下载 ZIP，再把文件位置告诉 Agent
 
-**当前版本：`2.1.8`。** [下载完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.8.zip)。
+**当前版本：`2.1.9`。** [下载完整 ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.9.zip)。
 
-<sub>2.1.8 改进首次创建中断恢复、并发保存、迁移资料保护、秘密检查和看板故障提示。正式内容已保存与显示资料待刷新分别报告，局部故障不扩大为整个助手停用。</sub>
+<sub>2.1.9 支持分别在记忆、SOP、能力和经验中批量删除与恢复。点击“删除所选”先核对，再复制请求给 Agent 执行；默认保留原文，之后可以恢复。</sub>
 
 **关于 2.1.3 的旧说明：** 2.1.3 曾公开过这套记忆系统升级方法；2.1.4 起已明确撤回。若你仍自行按 2.1.3 的旧说明安装、改造或接入 RAG／向量数据库，这属于未经当前版本支持的自定义操作。由此产生的兼容、数据、隐私、资源或运行问题，需要你自行评估和承担；AI Carry 当前版本不为这条旧路线提供产品支持。普通记忆、学习、SOP 和现有资料不在这条边界内。
 
@@ -56,7 +56,7 @@ https://github.com/Ww-Cooooo/AI-Carry/blob/main/INSTALL.md
 
 安装时，Agent 会自动装好 **AI Carry（客户端）** 并在桌面创建入口；网页版留在安装文件夹里的 `dashboard.html`。两者读取同一份助手资料；客户端还能直接选择本地文件夹和 ZIP，右上角也能随时打开网页版。它不会自动连接 Agent，仍由你复制请求、粘贴发送。
 
-**2.1.8 客户端下载：** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-x64.zip)。包内包含本版页面与读取器，Windows 实际解压程序已完成自动验收；客户端暂不可用时仍可打开安装目录中的网页版。
+**2.1.9 客户端下载：** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-win32-x64.zip) · [Mac 苹果芯片](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-x64.zip)。包内包含本版页面与读取器，Windows 实际解压程序已完成自动验收；客户端暂不可用时仍可打开安装目录中的网页版。
 
 正式版安装会创建一个客户端桌面入口，网页版留在安装目录。迁移页仍默认建立独立副本；只有明确选择共用原目录时才轮流使用同一份积累。
 

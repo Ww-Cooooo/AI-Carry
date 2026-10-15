@@ -148,7 +148,7 @@ projects_to = ["dashboard-ui", "upgrade-system"]
 [[components]]
 id = "asset-retrieval-runtime"
 owner = "dashboard-runtime"
-paths = ["dashboard/scripts/asset-route-contract.mjs", "dashboard/scripts/bounded-retrieval.mjs", "dashboard/scripts/candidate-index-contract.mjs", "dashboard/scripts/learning-promotion-contract.mjs", "dashboard/scripts/query-assets.mjs", "dashboard/scripts/safe-output-boundary.mjs", "dashboard/scripts/secret-content-boundary.mjs", "dashboard/scripts/validate-learning-promotion-contract.mjs", "dashboard/scripts/validate-learning-recall-contract.mjs", "dashboard/scripts/validate-learning-recall-fixture.mjs", "dashboard/scripts/validate-query-assets-contract.mjs", "dashboard/scripts/validate-secret-content-boundary.mjs"]
+paths = ["dashboard/scripts/asset-route-contract.mjs", "dashboard/scripts/bounded-retrieval.mjs", "dashboard/scripts/candidate-index-contract.mjs", "dashboard/scripts/learning-promotion-contract.mjs", "dashboard/scripts/query-assets.mjs", "dashboard/scripts/safe-output-boundary.mjs", "dashboard/scripts/secret-content-boundary.mjs", "dashboard/scripts/validate-learning-promotion-contract.mjs", "dashboard/scripts/validate-learning-recall-contract.mjs", "dashboard/scripts/validate-learning-recall-fixture.mjs", "dashboard/scripts/validate-query-assets-contract.mjs", "dashboard/scripts/validate-asset-batch.mjs", "dashboard/scripts/validate-secret-content-boundary.mjs"]
 depends_on = ["asset-memory", "instance-validation-evidence", "context-routing", "external-safety", "model-orchestration", "result-validation"]
 projects_to = ["learning-signal-runtime", "snapshot-runtime", "dashboard-snapshot-contract", "dashboard-ui", "upgrade-system", "architecture-documentation"]
 

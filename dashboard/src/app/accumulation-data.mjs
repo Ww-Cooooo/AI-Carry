@@ -1,3 +1,5 @@
+import {assetCollections,isRemovedAsset} from './asset-management.mjs';
+
 export const kinds = {
   memory: {label:'记忆', color:'#7393d4', tint:'#edf2fc'},
   sop: {label:'固定流程（SOP）', color:'#76a89a', tint:'#edf5f0'},
@@ -15,10 +17,11 @@ const labels = {source:'来自', learned:'学到了', used:'用过', related:'�
 
 /** Display adapter only. No body reads, fuzzy links, asset writes or permissions. */
 export function buildAccumulationData(snapshot = {}, localize = value => value) {
-  const nodes = [], byId = Object.create(null); let skipped = 0;
+  const nodes = [], byId = Object.create(null), removedIds = new Set(); let skipped = 0;
   const add = (items, area, kind, prefix) => rows(items).forEach(entry => {
     if (!entry || !text(entry.id) || !text(entry.title)) return;
     const id = `${prefix}:${entry.id}`;
+    if (Object.hasOwn(assetCollections,area) && isRemovedAsset(entry)) { removedIds.add(id); return; }
     if (byId[id]) return;
     const node = {id, kind, area, assetId:entry.id, title:entry.title, summary:text(entry.summary), entry};
     byId[id] = node; nodes.push(node);
@@ -37,6 +40,8 @@ export function buildAccumulationData(snapshot = {}, localize = value => value) 
   }
   const edges = [], seen = new Set();
   for (const edge of rows(accumulation?.links).slice(0, 1024)) {
+    // Intentionally omitted archived assets are not corrupt relationships.
+    if (removedIds.has(edge?.source) || removedIds.has(edge?.target)) continue;
     if (!edge || !byId[edge.source] || !byId[edge.target] || edge.source === edge.target || !Object.hasOwn(labels, edge.kind)) { skipped++; continue; }
     const key = `${edge.source}|${edge.target}|${edge.kind}`;
     if (seen.has(key)) continue; seen.add(key);

@@ -1,7 +1,7 @@
 {
   "name": "ai-carry-dashboard",
   "private": true,
-  "version": "2.1.8",
+  "version": "2.1.9",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -48,6 +48,7 @@
     "check:signal-transaction": "node scripts/validate-cross-session-signal-transaction.mjs",
     "check:fault-tolerance": "node scripts/validate-operational-user-report.mjs",
     "check:asset-query": "node scripts/validate-query-assets-contract.mjs",
+    "check:asset-batch": "node scripts/validate-asset-batch.mjs",
     "check:localization": "node scripts/validate-localization-contract.mjs",
     "check:territory": "node scripts/validate-territory-terminology.mjs",
     "check:territory:dist": "node scripts/validate-territory-terminology.mjs --include-dist",
@@ -60,7 +61,7 @@
     "check:snapshot-sync": "node scripts/validate-snapshot-sync-transaction.mjs",
     "check:journeys": "npm run check:first-run && npm run check:learning-capture && npm run check:skill-install",
     "check:lifelines": "npm run check:journeys",
-    "check:release": "npm run check:journeys && npm run check:dashboard-data && npm run check:proactive-learning && npm run check:skill-workshop && npm run check:upgrade-cli && npm run check:task-closeout && npm run check:problem-report && npm run check:product-identity && npm run check:startup-budget && npm run check:release-authority && npm run check:secret-boundary && npm run check:licenses && npm run check:compliance",
+    "check:release": "npm run check:journeys && npm run check:dashboard-data && npm run check:asset-batch && npm run check:proactive-learning && npm run check:skill-workshop && npm run check:upgrade-cli && npm run check:task-closeout && npm run check:problem-report && npm run check:product-identity && npm run check:startup-budget && npm run check:release-authority && npm run check:secret-boundary && npm run check:licenses && npm run check:compliance",
     "build": "npm run check:actions && tsc -b && vite build && node scripts/make-offline.mjs && npm run check:territory:dist && npm run check:offline",
     "analyze": "vite build --mode analyze",
     "preview": "vite preview"

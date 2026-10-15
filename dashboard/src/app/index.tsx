@@ -35,6 +35,7 @@ function App(){
   const {assistant,demo,source,dataLoading,dataError,act}=useClient();
   const ask:Ask=request=>setRequest({...request,assistant:route==='create'&&assistant?.snapshot.meta.state!=='template'?undefined:source(request.itemId)});
   const [route,setRoute]=useState<Route>(readRoute),[request,setRequest]=useState<Request|null>(null),[paused,setPaused]=useState(false),[webError,setWebError]=useState(''),reduced=useReducedMotion();
+  useEffect(()=>{setRequest(null);},[assistant?.binding.root,assistant?.binding.instanceId,assistant?.snapshot.meta.identity_ref]);
   useEffect(()=>{const update=()=>{setRoute(readRoute());setRequest(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
   const go=(r:Route)=>{if(location.hash===`#${r}`)setRoute(r);else location.hash=r;};
   const homeRoute=route==='home';

@@ -51,9 +51,9 @@ app.whenReady().then(async()=>{
     try{
       const source=new URL(event.senderFrame.url);
       if(event.senderFrame!==event.sender.mainFrame||source.protocol!=='ai-carry:'||source.hostname!=='pages'||source.pathname!=='/index.html')throw new Error('只接受当前客户端窗口的操作。');
-      if(typeof action!=='string'||JSON.stringify(input??{}).length>40000)throw new Error('请求不完整或过长，没有执行。');
+      if(typeof action!=='string'||JSON.stringify(input??{}).length>(action==='copy'?524288:40000))throw new Error('请求不完整或过长，没有执行。');
       if(action==='copy'){
-        if(typeof input?.text!=='string'||input.text.length>32000)throw new Error('没有可以复制的完整请求。');
+        if(typeof input?.text!=='string'||input.text.length>262144)throw new Error('没有可以复制的完整请求。');
         await clipboard.writeText(input.text);return{ok:true,value:true};
       }
       if(action==='choose-skill-source'){

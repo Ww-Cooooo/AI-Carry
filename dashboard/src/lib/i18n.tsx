@@ -79,6 +79,7 @@ function preserveOuterWhitespace(source: string, translated: string): string {
 const ASSET_NOUN_EN: Record<string, string> = {
   "记忆": "memory",
   "流程": "workflow",
+  "SOP": "workflow",
   "能力": "capability",
   "经验": "experience",
 };
@@ -94,6 +95,13 @@ const englishAssetNoun = (value: string) => ASSET_NOUN_EN[value] ?? value;
 const englishAssetOperation = (value: string) => ASSET_OPERATION_EN[value] ?? { imperative: value, passive: value };
 
 const DYNAMIC_TRANSLATIONS: Array<[RegExp, (match: RegExpMatchArray) => string]> = [
+  [/^选择(记忆|SOP|能力|经验)：(.+)$/u, match => `Select ${englishAssetNoun(match[1])}: ${match[2]}`],
+  [/^返回(记忆|SOP|能力|经验)$/u, match => `Back to ${({记忆:'memories',SOP:'workflows',能力:'capabilities',经验:'experiences'} as Record<string,string>)[match[1]]}`],
+  [/^核对要(恢复|删除)的(记忆|SOP|能力|经验)$/u, match => `Review ${englishAssetNoun(match[2])} selection to ${match[1]==='恢复'?'restore':'delete'}`],
+  [/^(删除|恢复)所选(记忆|SOP|能力|经验)$/u, match => `${match[1]==='恢复'?'Restore':'Delete'} selected ${({记忆:'memories',SOP:'workflows',能力:'capabilities',经验:'experiences'} as Record<string,string>)[match[2]]}`],
+  [/^没有已移除的(记忆|SOP|能力|经验)$/u, match => `No removed ${({记忆:'memories',SOP:'workflows',能力:'capabilities',经验:'experiences'} as Record<string,string>)[match[1]]}`],
+  [/^让 Agent 恢复这项(记忆|SOP|能力|经验)$/u, match => `Ask your Agent to restore this ${englishAssetNoun(match[1])}`],
+  [/^取消选择：(.+)$/u, match => `Deselect: ${match[1]}`],
   [/^有\s*(\d+)\s*项内容暂未进入看板，源文件仍(?:原样|然)保留(?:，其他有效内容可以继续使用)?。$/u,
     (match) => `${match[1]} items are temporarily omitted from the dashboard. Their source files are unchanged, and other valid content remains available.`],
   [/^受影响类别：(.+)。这次隔离只影响对应内容，不会让整个助手停止工作。$/u,

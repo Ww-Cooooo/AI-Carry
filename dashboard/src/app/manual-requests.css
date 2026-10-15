@@ -11,4 +11,5 @@
 .manual-request-dialog .reveal>p.copy-feedback{font-size:14px;line-height:1.7;min-height:24px}
 .manual-request-dialog .reveal>p.copy-feedback.copy-success{color:#27614b;background:#eaf6ef;padding:10px 14px;border-radius:10px}
 .manual-request-dialog .reveal>p.copy-feedback.copy-failed{color:#88501c;background:#fff3df;padding:10px 14px;border-radius:10px}
-@media(max-width:1150px){.client-app>.topbar{gap:18px}.client-app>.topbar .preview-label{display:none}.assistant-data-actions{flex-direction:column;gap:0}}
+@media(max-width:1150px){.client-app>.topbar{gap:14px;padding-inline:24px}.client-app>.topbar .top-sections{gap:14px}.client-app>.topbar .preview-label{display:none}.assistant-data-actions{flex-direction:column;gap:0}}
+@media(max-width:1100px){.client-app>.topbar{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:60px 42px;height:102px;flex-basis:102px;column-gap:20px;row-gap:0}.client-app>.topbar .top-sections{grid-column:1/-1;grid-row:2;justify-content:center;min-width:0}.client-app>.topbar .top-tools{grid-column:2;grid-row:1;justify-self:end}}

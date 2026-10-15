@@ -31,9 +31,9 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**Current version: `2.1.8`.** [Download the complete ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.8.zip).
+**Current version: `2.1.9`.** [Download the complete ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.9.zip).
 
-<sub>Version 2.1.8 improves interrupted setup recovery, coordinated saves, migration data protection, secret detection, and dashboard failure feedback. Successful saves are reported separately from pending display refreshes, so a local failure does not disable the whole assistant.</sub>
+<sub>Version 2.1.9 adds batch removal and restoration within each category: memories, SOPs, capabilities, and experiences. Review the selected items, then copy the request to your Agent. Removal preserves the original content so it can be restored later.</sub>
 
 **About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside the current version. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; the current AI Carry version provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
@@ -58,7 +58,7 @@ After installation, the Agent should tell you **where the dashboard is, whether 
 
 The installer automatically installs **AI Carry (desktop)** and creates its Desktop entry; the web view stays in the installation folder as `dashboard.html`. Both use the same saved materials; the desktop app adds a native folder/ZIP picker and a Web fallback in its top bar. It does not bind to an Agent or send requests automatically.
 
-**Desktop downloads for 2.1.8:** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-win32-x64.zip) · [Mac Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.8/AI-Carry-2.1.8-darwin-x64.zip). These bundles contain the updated dashboard and readers. The extracted Windows app passed automated runtime checks; the web view remains available in the assistant folder if the client cannot run.
+**Desktop downloads for 2.1.9:** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-win32-x64.zip) · [Mac Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-x64.zip). These bundles contain the updated dashboard and readers. The extracted Windows app passed automated runtime checks; the web view remains available in the assistant folder if the client cannot run.
 
 A formal release installation creates one desktop entry and keeps the web view in the installation folder. The migration page continues to create an independent copy by default.
 

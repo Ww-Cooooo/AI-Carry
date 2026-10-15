@@ -40,7 +40,7 @@ confirmation = "before-new-permission-sensitive-transfer-or-high-impact-write-as
 [[routes]]
 id = "dashboard-actions"
 summary = "解释看板状态、刷新快照或执行看板复制出的 Agent 请求。"
-triggers = ["看板", "刷新看板", "复制操作请求"]
+triggers = ["看板", "刷新看板", "复制操作请求", "批量删除记忆", "删除所选记忆", "恢复所选记忆", "找回移除的记忆", "批量删除SOP", "恢复所选SOP", "批量删除能力", "恢复所选能力", "批量删除经验", "恢复所选经验"]
 target = "core/protocols/DASHBOARD_ACTIONS.md"
 state = "active"
 minimum_level = 1

@@ -495,7 +495,8 @@ function formalExecutionMetadata(asset, routeIndex = new Map(), currentRouteId =
   const distinctHosts = asset.distinct_host_count ?? 0;
   const validHostRefs = hostRefs.filter((id) => {
     const route = routeIndex.get(id);
-    return route && route.asset_kind === "experience" && route.subtype === "host-execution" && ["active", "provisional"].includes(route.state) && id !== currentRouteId;
+    // A retained historical reference is not permission to load that experience.
+    return route && route.asset_kind === "experience" && route.subtype === "host-execution" && formalStates.has(route.state) && id !== currentRouteId;
   });
   const referencedValidationRecords = validationRefs.map((id) => evidenceRegistry?.byId?.get(id)).filter(Boolean);
   const validationClosureComplete = referencedValidationRecords.length === validationRefs.length
@@ -527,7 +528,7 @@ function formalExecutionMetadata(asset, routeIndex = new Map(), currentRouteId =
       || !stableList(asset.host_profile_refs ?? [], 8)
       || !cleanList(asset.environment_scope ?? [], 8, 120) || !cleanList(asset.validity_signals ?? [], 8, 120)) return null;
     const portableCore = routeIndex.get(asset.portable_core_ref);
-    if (!portableCore || !["capability", "sop"].includes(portableCore.asset_kind) || !["active", "provisional"].includes(portableCore.state)) return null;
+    if (!portableCore || !["capability", "sop"].includes(portableCore.asset_kind) || !formalStates.has(portableCore.state)) return null;
   }
   return Object.freeze({
     maturity,
@@ -540,7 +541,7 @@ function formalExecutionMetadata(asset, routeIndex = new Map(), currentRouteId =
     distinctHostCount: distinctHosts,
     validationRefIds: Object.freeze([...validationRefs]),
     validationReferenceTrust: validationRefs.length ? "closed-result-validation-evidence-index" : "none-declared",
-    hostExperienceRefIds: Object.freeze(validHostRefs),
+    hostExperienceRefIds: Object.freeze(validHostRefs.filter(id => ["active", "provisional"].includes(routeIndex.get(id).state))),
     ignoredInvalidHostExperienceRefCount: hostRefs.length - validHostRefs.length,
     hostExperienceLoadPolicy: "match-current-host-metadata-then-load-at-most-one-separately",
     hasPrivateReferences: privateRefs.length > 0,
@@ -550,7 +551,7 @@ function formalExecutionMetadata(asset, routeIndex = new Map(), currentRouteId =
 }
 
 const proposedFormalFields = new Set([
-  "id", "kind", "subtype", "status", "title", "summary", "triggers", "scope", "excludes", "lifecycle", "expected_next_use",
+  "id", "kind", "subtype", "status", "previous_status", "title", "summary", "triggers", "scope", "excludes", "lifecycle", "expected_next_use",
   "topic_key", "subject_key", "aliases", "conditions", "body_sections", "related_asset_ids", "source_refs", "private_refs", "supersedes",
   "minimum_level", "confirmation", "approval_state", "activation_basis", "risk_tier", "approved_by_user", "updated_at",
   "maturity", "independent_task_count", "successful_use_count", "failed_use_count", "distinct_host_count", "last_validated_at",
@@ -631,7 +632,7 @@ export function validateProposedFormalAsset(repository, envelope, asset, body) {
   }
   for (const id of related) {
     const route = routeIndex.get(id);
-    if (!route || !["active", "provisional"].includes(route.state) || route.asset_kind === "task-family") return { decision: "proposal-invalid", reason: "related-asset-unavailable", executable: false };
+    if (!route || route.asset_kind === "task-family") return { decision: "proposal-invalid", reason: "related-asset-unavailable", executable: false };
   }
   if (!validAuthorization(asset)) return { decision: "proposal-invalid", reason: "authorization-matrix-invalid", executable: false };
   const evidenceRegistry = evidenceRegistryForAsset(repository, trust.expected, asset);
@@ -984,8 +985,10 @@ function validateDomainMapEnvelope(source, parsed, expected, label = "domain map
       if (isolatedRouteIds.has(route.id)) continue;
       for (const relatedId of route.related_asset_ids ?? []) {
         const related = validatedRoutes.get(relatedId);
-        if (!related || isolatedRouteIds.has(relatedId) || related.asset_kind === "task-family"
-          || !["active", "provisional"].includes(related.state)) {
+        // A historical relationship does not authorize loading its target.
+        // Keep a valid archived/paused reference without disabling its owner;
+        // inspectAssetMetadata/inspectAssetRoute still reject inactive bodies.
+        if (!related || isolatedRouteIds.has(relatedId) || related.asset_kind === "task-family") {
           if (!operational) fail(`${label} route ${route.id} has an unavailable related asset ${relatedId}`);
           isolatedRouteIds.add(route.id); relatedChanged = true; break;
         }
