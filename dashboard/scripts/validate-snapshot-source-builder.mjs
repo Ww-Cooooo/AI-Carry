@@ -10,6 +10,7 @@ import { validateSnapshotSemantics } from "./snapshot-semantics.mjs";
 import { buildStartupCapsule } from "./startup-capsule-contract.mjs";
 import { createSkillDelivery } from "./skill-package.mjs";
 import { readAssistantEntry } from "../../desktop/assistant-data.mjs";
+import { loadOperationalDomainEnvelope, queryFormalAssetShortlist } from "./asset-route-contract.mjs";
 
 const assert = (condition, message) => { if (!condition) throw new Error(`Snapshot source builder contract failed: ${message}`); };
 const root = mkdtempSync(join(tmpdir(), "ai-carry-snapshot-builder-"));
@@ -293,6 +294,115 @@ confirmation = "none"
   assert(snapshot.accumulation.records.length === 1 && snapshot.accumulation.links.some(link => link.kind === "source") && !first.source.includes("event.fixture-source"), "source evidence was invented or its raw event identifier leaked");
   const relationProjection = buildSnapshotCandidate(root, {mode: "operational"});
   assert(JSON.stringify(relationProjection.snapshot.accumulation) === JSON.stringify(snapshot.accumulation), "strict and operational relation projection disagree");
+
+  // A legacy task-family route must not disable unrelated snapshot/detail reads.
+  // Preserve all phrases in operational reads; strict maintenance keeps its cap.
+  const domainMapRef = "instance/maps/domain-map.toml";
+  const domainMapBefore = readFileSync(resolve(root, domainMapRef), "utf8");
+  const legacyTriggers = Array.from({length: 9}, (_, i) => `旧任务入口${i + 1}`).concat("陶瓷旋纹检索");
+  const legacyRoute = `\n[[routes]]\nid = "task-family.legacy-profile"\nasset_kind = "task-family"\ntitle = "旧任务入口"\nsummary = "保留已有检索短语。"\ntriggers = ${JSON.stringify(legacyTriggers)}\ntarget = "instance/profile/approved-profile.md"\nstate = "on-demand"\nminimum_level = 1\nconfirmation = "none"\n`;
+  const legacyMap = domainMapBefore + legacyRoute;
+  write(domainMapRef, legacyMap);
+  const compatibleMap = buildSnapshotCandidate(root, {mode: "operational"});
+  const {envelope: compatibleEnvelope} = loadOperationalDomainEnvelope(root);
+  assert(!compatibleMap.snapshot.health && compatibleMap.snapshot.sops.length === 1
+    && JSON.stringify(compatibleEnvelope.routes.find(route => route.id === "task-family.legacy-profile").triggers) === JSON.stringify(legacyTriggers)
+    && queryFormalAssetShortlist(root, {queryText: legacyTriggers.at(-1)}).candidates.some(item => item.id === "task-family.legacy-profile"),
+  "safe legacy task-family phrases were truncated, hidden or blocked unrelated content");
+  assert(readAssistantEntry({root, instanceId: "ac-snapshot-fixture"}, "sop.grade-summary", {localRead: true}).body.includes("先核对输入列"),
+    "desktop exact detail read still used a whole-map strict gate");
+  for (const options of [{}, {mode: "operational", requiredSourceRefs: [domainMapRef]}]) {
+    let blocked = false; try { buildSnapshotCandidate(root, options); } catch { blocked = true; }
+    assert(blocked, "legacy read compatibility weakened the strict map write contract");
+  }
+  assert(readFileSync(resolve(root, domainMapRef), "utf8") === legacyMap, "legacy compatibility rewrote source phrases");
+  // Invalid optional metadata is contained; a required route and map identity
+  // remain hard boundaries. This also covers routes without a usable ID.
+  for (const invalidRoute of [
+    legacyRoute.replace(JSON.stringify(legacyTriggers), '["' + 'x'.repeat(81) + '"]'),
+    legacyRoute.replace(JSON.stringify(legacyTriggers), JSON.stringify(Array(30).fill("x".repeat(80)))),
+    legacyRoute.replace('id = "task-family.legacy-profile"', 'id = "bad id"'),
+    legacyRoute.replace('target = "instance/profile/approved-profile.md"', 'target = "instance/profile/unregistered.md"'),
+  ]) {
+    const invalidMap = domainMapBefore + invalidRoute;
+    write(domainMapRef, invalidMap);
+    const isolated = buildSnapshotCandidate(root, {mode: "operational"});
+    assert(isolated.snapshot.sops.length === 1 && isolated.snapshot.health?.isolated_item_count === 1
+      && isolated.diagnostics.some(item => item.code === "domain-route-isolated")
+      && readAssistantEntry({root, instanceId: "ac-snapshot-fixture"}, "sop.grade-summary", {localRead: true}).body.includes("先核对输入列")
+      && readFileSync(resolve(root, domainMapRef), "utf8") === invalidMap,
+    "invalid optional route escaped isolation, blocked a valid detail or changed source bytes");
+    let requiredBlocked = false;
+    const target = invalidRoute.includes('target = "instance/profile/unregistered.md"')
+      ? "instance/profile/unregistered.md" : "instance/profile/approved-profile.md";
+    try { buildSnapshotCandidate(root, {mode: "operational", requiredSourceRefs: [target]}); } catch { requiredBlocked = true; }
+    assert(requiredBlocked, "required task-family source silently bypassed an isolated route");
+  }
+  write(domainMapRef, legacyMap.replace('instance_id = "ac-snapshot-fixture"', 'instance_id = "ac-foreign"'));
+  let foreignMapBlocked = false;
+  try { buildSnapshotCandidate(root, {mode: "operational"}); } catch { foreignMapBlocked = true; }
+  assert(foreignMapBlocked, "operational compatibility accepted a foreign map identity");
+  write(domainMapRef, domainMapBefore);
+
+  const legacySopRef = "instance/sops/grade-summary.md";
+  const legacySopBefore = readFileSync(resolve(root, legacySopRef), "utf8");
+  for (const state of ["active", "archived"]) {
+    const extendedSop = legacySopBefore.replace(/^triggers = .*$/mu, `triggers = ${JSON.stringify(legacyTriggers)}`)
+      .replace('status = "active"', `status = "${state}"`);
+    const extendedMap = domainMapBefore.replace(/^triggers = .*$/mu, `triggers = ${JSON.stringify(legacyTriggers)}`)
+      .replace('state = "active"', `state = "${state}"`);
+    write(legacySopRef, extendedSop); write(domainMapRef, extendedMap);
+    const compatibleFormal = buildSnapshotCandidate(root, {mode: "operational"});
+    assert(!compatibleFormal.snapshot.health && JSON.stringify(compatibleFormal.snapshot.sops[0].triggers) === JSON.stringify(legacyTriggers)
+      && readAssistantEntry({root, instanceId: "ac-snapshot-fixture"}, "sop.grade-summary", {localRead: true}).body.includes("先核对输入列"),
+    `legacy ${state} formal phrases were lost or exact body access failed`);
+    let requiredFormalBlocked = false;
+    try { buildSnapshotCandidate(root, {mode: "operational", requiredSourceRefs: [legacySopRef]}); } catch { requiredFormalBlocked = true; }
+    assert(requiredFormalBlocked && readFileSync(resolve(root, legacySopRef), "utf8") === extendedSop,
+      "formal write validation was weakened or legacy body changed during reading");
+  }
+  write(legacySopRef, legacySopBefore); write(domainMapRef, domainMapBefore);
+
+  const localSkillMapRef = "instance/skills/requirements.toml";
+  const localSkillMapBefore = readFileSync(resolve(root, localSkillMapRef), "utf8");
+  const localSkillMap = localSkillMapBefore.replace('entry = "skills/grade-review/SKILL.md"',
+    'entry = "C:/Users/example/skills/grade-review/SKILL.md"')
+    .replace(/^triggers = .*$/mu, `triggers = ${JSON.stringify(legacyTriggers)}`)
+    .replace('platform = "fixture"', `platform = "${"legacy platform ".repeat(12)}"`);
+  assert(localSkillMap !== localSkillMapBefore, "local Skill locator fixture was not applied");
+  write(localSkillMapRef, localSkillMap);
+  const localSkills = buildSnapshotCandidate(root, {mode: "operational"});
+  assert(!localSkills.snapshot.health && localSkills.snapshot.skills.items.length === 1
+    && localSkills.snapshot.skills.items[0].triggers.length === 10 && localSkills.snapshot.skills.items[0].platform.length === 192
+    && !localSkills.source.includes("C:/Users/") && readFileSync(resolve(root, localSkillMapRef), "utf8") === localSkillMap,
+  "a non-projected local Skill locator hid usable metadata, leaked or was rewritten");
+  for (const options of [{}, {mode: "operational", requiredSourceRefs: [localSkillMapRef]}]) {
+    let blocked = false; try { buildSnapshotCandidate(root, options); } catch { blocked = true; }
+    assert(blocked, "local Skill read compatibility bypassed strict/required source validation");
+  }
+  write(localSkillMapRef, localSkillMap.replace('summary = "', 'summary = "C:/Users/example/private.txt '));
+  const unsafeSkillDisplay = buildSnapshotCandidate(root, {mode: "operational"});
+  assert(unsafeSkillDisplay.snapshot.skills.items.length === 0 && unsafeSkillDisplay.snapshot.health
+    && !unsafeSkillDisplay.source.includes("C:/Users/"), "a private location entered displayed Skill metadata");
+  write(localSkillMapRef, localSkillMapBefore);
+
+  // Local Skill package payload is not dashboard metadata or executable code.
+  // Keep it in the source digest, without false UTF-8/location faults or leaks.
+  const packageRef = "instance/skills/local-fixture/assets/carrier.bin";
+  const packageBytes = Buffer.from([0xff, 0xfe, 0x00, 0x01]);
+  const packageTextRef = "instance/skills/local-fixture/examples/local.txt";
+  const packageText = "private-payload-sentinel C:/Users/example/private.txt";
+  write(packageRef, packageBytes); write(packageTextRef, packageText);
+  const opaquePackage = buildSnapshotCandidate(root, {mode: "operational"});
+  assert(!opaquePackage.snapshot.health && opaquePackage.sourceDigest !== relationProjection.sourceDigest
+    && opaquePackage.snapshot.sops.length === 1 && !opaquePackage.source.includes("private-payload-sentinel")
+    && readFileSync(resolve(root, packageRef)).equals(packageBytes)
+    && readFileSync(resolve(root, packageTextRef), "utf8") === packageText,
+  "unprojected local Skill payload was misread, leaked, omitted from the digest or rewritten");
+  let requiredPayloadBlocked = false;
+  try { buildSnapshotCandidate(root, {mode: "operational", requiredSourceRefs: [packageRef]}); } catch { requiredPayloadBlocked = true; }
+  assert(requiredPayloadBlocked, "an explicitly required unreadable Skill source was silently skipped");
+  rmSync(resolve(root, packageRef)); rmSync(resolve(root, packageTextRef));
   if (process.argv.includes("--keep-preview")) {
     const preview = mkdtempSync(join(tmpdir(), "ai-carry-accumulation-preview-"));
     cpSync(root, preview, {recursive: true});

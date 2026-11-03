@@ -370,6 +370,13 @@ function resolveTaskFamilyTarget(repository, route, expected) {
 
 function clean(value, max, allowEmpty = true) { return typeof value === "string" && (allowEmpty || value.length > 0) && [...value].length <= max && value.normalize("NFC") === value && !unsafeText.test(value); }
 function cleanList(value, maxItems, maxChars) { return Array.isArray(value) && value.length <= maxItems && value.every((item) => clean(item, maxChars, false)); }
+function cleanRetrievalTriggers(value, { operational = false } = {}) {
+  // A nonempty JSON string costs at least four bytes including its separator;
+  // the legacy read ceiling follows the route byte budget. New/changed formal
+  // assets still use the eight-item rule; no reader truncates existing phrases.
+  return cleanList(value, operational ? 512 : 8, 80) && value.length > 0
+    && (!operational || Buffer.byteLength(JSON.stringify(value), "utf8") <= 2048);
+}
 function subtypeCompatibility(asset) {
   if (asset.kind === "memory" && ["general", "habit"].includes(asset.subtype)) return { valid: true, subtype: asset.subtype, migrationRequired: false };
   if (asset.kind === "experience" && ["task", "host-execution"].includes(asset.subtype)) return { valid: true, subtype: asset.subtype, migrationRequired: false };
@@ -571,7 +578,7 @@ function formalSourceHasExactSafeFrontmatter(asset, { operational = false } = {}
     "approval_state", "activation_basis", "risk_tier", "approved_by_user", "updated_at"];
   if (requiredCommon.some((field) => !(operational && field === "updated_at") && !Object.hasOwn(asset, field)) || !stableAssetId.test(asset.id ?? "")
     || !["memory", "capability", "sop", "experience"].includes(asset.kind) || !formalStates.has(asset.status) || !subtype.valid
-    || !clean(asset.title, 80, false) || !clean(asset.summary, 240, false) || !cleanList(asset.triggers, 8, 80) || asset.triggers.length === 0
+    || !clean(asset.title, 80, false) || !clean(asset.summary, 240, false) || !cleanRetrievalTriggers(asset.triggers, { operational })
     || !cleanList(asset.scope, 8, 120) || !cleanList(asset.excludes, 6, 120) || !clean(asset.lifecycle, 40, false)
     || !clean(asset.expected_next_use, 120) || !clean(asset.topic_key, 120) || !clean(asset.subject_key, 120)
     || !cleanList(asset.aliases, 8, 80) || !cleanList(asset.conditions, 6, 120)
@@ -933,8 +940,11 @@ function validateDomainMapEnvelope(source, parsed, expected, label = "domain map
     if (locateHighConfidenceSecretCandidates(JSON.stringify(route)).blocked) fail(`${label} route contains a secret candidate`);
     if (!stableAssetId.test(route.id ?? "") || routeIds.has(route.id)) fail(`${label} contains an invalid or duplicate route ID`);
     if (!operational && Object.keys(route).some((field) => !domainRouteFields.has(field))) fail(`${label} route ${route.id} contains an unknown field`);
+    // Older entries may have more retrieval phrases. In a read-only
+    // operational envelope retain every safe phrase within the already checked
+    // 2048-byte route bound; strict maintenance/writes still enforce eight.
     if (!clean(route.title, 80, false) || !clean(route.summary, 240, false)
-      || !cleanList(route.triggers, 8, 80) || route.triggers.length === 0
+      || !cleanRetrievalTriggers(route.triggers, { operational })
       || !cleanList(route.aliases ?? [], 8, 80) || !clean(route.topic_key ?? "", 120)
       || !clean(route.subject_key ?? "", 120) || !cleanList(route.scope ?? [], 8, 120)
       || !cleanList(route.conditions ?? [], 6, 120) || !cleanList(route.excludes ?? [], 6, 120)
@@ -1020,6 +1030,7 @@ function validateDomainMapEnvelope(source, parsed, expected, label = "domain map
       }
     }
   }
+  const isolatedRoutes = routes.filter((route) => !validatedRoutes.has(route.id) || isolatedRouteIds.has(route.id));
   const softExceeded = bytes > budget.soft_max_bytes || routes.length > budget.soft_max_routes;
   const explicitRoute = explicitRequestedId
     ? [...safeRoutes, ...reviewRoutes].find((route) => route.id === explicitRequestedId && !isolatedRouteIds.has(route.id)) ?? null
@@ -1029,7 +1040,7 @@ function validateDomainMapEnvelope(source, parsed, expected, label = "domain map
   const envelope = Object.freeze({
     bytes,
     routeCount: routes.length,
-    isolatedRouteCount: isolatedRouteIds.size,
+    isolatedRouteCount: isolatedRoutes.length,
     softExceeded,
     ordinaryMatchingAllowed: budget.overflow_state === "ok",
     blockReason: budget.overflow_state === "ok" ? "" : "rebuild-required",
@@ -1048,6 +1059,7 @@ function validateDomainMapEnvelope(source, parsed, expected, label = "domain map
     mapDigest,
     routeConfirmationMigrations,
     blockedRouteIds,
+    isolatedRoutes: Object.freeze(isolatedRoutes.map((route) => Object.freeze({ ...route }))),
     maintenanceRoutes: Object.freeze([...validatedRoutes.values()].filter((route) => !isolatedRouteIds.has(route.id))
       .map((route) => Object.freeze({ ...route }))),
   }));
@@ -1062,12 +1074,12 @@ export function loadTrustedDomainEnvelope(repository, { explicitRequestedId = un
   return Object.freeze({ context, envelope });
 }
 
-function loadOperationalDomainEnvelope(repository) {
+export function loadOperationalDomainEnvelope(repository, { explicitRequestedId = undefined } = {}) {
   const context = loadTrustedInstanceContext(repository);
   const mapRead = readPhysicalRelativeFile(context.repository, context.domainMapRef, "instance domain map", [".toml"], 49152);
   const parsed = parseRouteMap(mapRead.text, "instance domain map");
   const envelope = validateDomainMapEnvelope(mapRead.text, parsed, context, "instance domain map", {
-    mapDigest: mapRead.sha256, mode: "operational",
+    mapDigest: mapRead.sha256, mode: "operational", explicitRequestedId,
   });
   return Object.freeze({ context, envelope });
 }
@@ -1183,9 +1195,19 @@ export function projectFormalAssetsForOperationalSnapshot(repository, {
   requiredSourceRefs = new Set(), onIssue = undefined, onSource,
 } = {}) {
   if (!(requiredSourceRefs instanceof Set) || typeof onIssue !== "function") fail("operational formal projection requires bounded isolation controls");
-  const { envelope } = loadTrustedDomainEnvelope(repository);
+  const loaded = loadOperationalDomainEnvelope(repository);
+  // Transactions that require the map itself retain the strict write contract.
+  const { envelope } = requiredSourceRefs.has(loaded.context.domainMapRef)
+    ? loadTrustedDomainEnvelope(repository) : loaded;
   const trust = trustedEnvelopes.get(envelope);
   if (!trust || !envelopeFresh(trust)) fail("operational formal projection lacks a fresh trusted maintenance envelope");
+  for (const [index, route] of trust.isolatedRoutes.entries()) {
+    if (requiredSourceRefs.has(route.target)) fail("required source has an isolated domain route");
+    const formal = Object.hasOwn(roots, route.asset_kind) && route.asset_kind !== "evolution";
+    onIssue({ area: formal ? formalSnapshotArea(route.asset_kind) : "routes",
+      sourceRef: formal && typeof route.target === "string" ? route.target : `${trust.context.domainMapRef}#${index}`,
+      code: "domain-route-isolated" });
+  }
   let evidenceRegistry = loadResultValidationEvidence(repository, trust.expected, {
     allowEmptyTemplate: !requiredSourceRefs.has(trust.expected.validationEvidenceIndexRef),
   });
@@ -1521,7 +1543,7 @@ function inspectAssetRouteInternal(repository, envelope, routeId, { requestedSel
   const selection = trustedRoute(repository, envelope, routeId, ["active", "provisional"]);
   if (!selection) return { decision: "deny-untrusted-envelope", executable: false };
   const { route, trust } = selection;
-  if (!clean(route.title, 80, false) || !clean(route.summary, 240, false) || !cleanList(route.triggers, 8, 80) || route.triggers.length === 0
+  if (!clean(route.title, 80, false) || !clean(route.summary, 240, false) || !cleanRetrievalTriggers(route.triggers, { operational: true })
     || !cleanList(route.aliases ?? [], 8, 80) || !clean(route.topic_key ?? "", 120) || !clean(route.subject_key ?? "", 120)
     || !cleanList(route.scope ?? [], 8, 120) || !cleanList(route.conditions ?? [], 6, 120) || !cleanList(route.excludes ?? [], 6, 120)
     || !cleanList(route.related_asset_ids ?? [], 8, 160) || !cleanList(route.body_sections ?? [], 8, 80)
@@ -1586,7 +1608,7 @@ function inspectAssetForReviewInternal(repository, envelope, routeId, { explicit
   const selection = trustedRoute(repository, envelope, routeId, ["review", "paused", "history", "archived"]);
   if (!selection) return { decision: "deny-untrusted-envelope", executable: false };
   const { route, trust } = selection;
-  if (!clean(route.title, 80, false) || !clean(route.summary, 240, false) || !cleanList(route.triggers, 8, 80) || route.triggers.length === 0
+  if (!clean(route.title, 80, false) || !clean(route.summary, 240, false) || !cleanRetrievalTriggers(route.triggers, { operational: true })
     || !cleanList(route.aliases ?? [], 8, 80) || !clean(route.topic_key ?? "", 120) || !clean(route.subject_key ?? "", 120)
     || !cleanList(route.scope ?? [], 8, 120) || !cleanList(route.conditions ?? [], 6, 120) || !cleanList(route.excludes ?? [], 6, 120)
     || !cleanList(route.related_asset_ids ?? [], 8, 160) || !cleanList(route.body_sections ?? [], 8, 80)
@@ -1600,7 +1622,7 @@ function inspectAssetForReviewInternal(repository, envelope, routeId, { explicit
   let reviewHead;
   try { reviewHead = parseMarkdownFrontmatterHead(readPhysicalRelativeHead(repository, route.target, `review asset ${route.id}`, [".md"], 128 * 1024).head, route.id).values; }
   catch { return { decision: "deny-frontmatter", executable: false, fileBytes }; }
-  if (!formalSourceHasExactSafeFrontmatter(reviewHead)) return { decision: "deny-frontmatter-contract", executable: false, fileBytes };
+  if (!formalSourceHasExactSafeFrontmatter(reviewHead, { operational: true })) return { decision: "deny-frontmatter-contract", executable: false, fileBytes };
   if (route.id !== reviewHead.id || route.asset_kind !== reviewHead.kind || route.title !== reviewHead.title || route.state !== reviewHead.status) return { decision: "deny-identity", executable: false, fileBytes };
   for (const field of projectionFields) {
     const fallback = listFields.has(field) ? [] : "";
@@ -1613,7 +1635,7 @@ function inspectAssetForReviewInternal(repository, envelope, routeId, { explicit
     readConfirmationGates: reviewExecution.readConfirmationGates, actionConfirmationGates: reviewExecution.actionConfirmationGates,
   }, () => inspectAssetForReviewInternal(repository, envelope, routeId, { explicitRequestedId, requestedSelector }, true));
   let read;
-  try { read = readFormalAsset(repository, route); }
+  try { read = readFormalAsset(repository, route, 128 * 1024, { operational: true }); }
   catch { return { decision: "deny-frontmatter", executable: false, fileBytes }; }
   const asset = read.asset;
   if (route.id !== asset.id || route.asset_kind !== asset.kind || route.title !== asset.title || route.state !== asset.status) return { decision: "deny-identity", executable: false, fileBytes };

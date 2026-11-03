@@ -10,9 +10,9 @@
 
 ## 2. 视觉与导航
 
-首页使用知识袋插画与四张积累卡片，卡片指向记忆、SOP、能力和经验。它承担品牌表达和导航，不代表资产数量、关系强度或任务执行状态。左侧说明用途并突出创建／查看积累的主操作，底部提供常用入口。保留现有插画、MiSans 字体、浅色背景、蓝色主操作及分类配色，不因修改可靠性而顺带替换视觉体系。
+界面采用固定侧栏与单一工作区。实例首次进入时默认打开“我的积累”的列表；模板使用简短欢迎页引导创建。沿用 MiSans 字体、浅色背景、蓝色主操作与分类配色；按钮的主次、选中和禁用状态必须可辨认，不依赖用户猜测。原首页插画文件保留为历史实现，不再挂载于当前入口。
 
-主要导航是“总览、我的积累、Skill 工坊、待办与成长、迁移与安全”。右上角另有语言、助手设置和使用说明；首页提供动效暂停，并尊重系统减少动态的选择。实例名来自实际档案，通过总览、资料提示与设置页显示，不用产品名或模型名代替。
+主要导航是“我的积累、待办、导入与分享、备份与迁移”。设置与帮助位于侧栏底部，语言和重新读取位于右上角。实例名来自实际档案；切换助手会清除上一份助手的选项和条目上下文。离开积累页再返回时保留列表／地图位置，仍尊重系统减少动态的选择。
 
 首次创建使用专门页面：选择使用经验、选择助手方向、核对后生成请求。这些选择只在当前页面中，既不直接实例化，也不是正式保存成功。Agent 仍需收集必要信息、给出完整预览，并按用户确认调用确定性入口。已创建助手不应因显示故障被引导重复创建。
 
@@ -29,11 +29,11 @@
 
 ## 4. 信息与请求
 
-默认层说明用途、当前状态和主操作；详情承载当前需要的信息，解释与少见边界按需展开。错误、风险、资料是否保留、下一步不能只藏在悬浮提示中。
+默认层显示短摘要、必要输入和明确下一步。备份、迁移与分享的额外选项按需展开，修改后的值保留在摘要；导入接受一个文件夹、ZIP 或网页链接输入，客户端另提供原生选择入口。请求预览先显示助手、范围与影响，完整请求和补充要求分别展开，复制操作始终可达。错误、风险、资料是否保留、下一步不能只藏在提示中；问号说明通过点击打开并可明确关闭。
 
 记忆、SOP、能力、经验分别表达：记忆保存事实／习惯，SOP描述可复用步骤，能力描述可做的事及边界，经验记录真实任务中的发现。批准保存不等于效果已验证，候选不等于正式积累；未知授权不能冒充可自动使用。
 
-请求的预览与复制必须使用同一完整内容。复制到剪贴板的成功、失败、尚未确认，与 Agent 是否执行任务是不同状态。复制失败或超时保留全文并提供手动路径；过期异步回执不能把已编辑的新请求标成成功。用户已发给 Agent 时，应先在原对话核对结果，不因看板没变化重复提交。
+请求的完整预览与复制必须使用同一内容。复制到剪贴板的成功、失败、尚未确认，与 Agent 是否执行任务是不同状态。复制失败或超时展开全文并提供手动复制；过期异步回执不能把已编辑的新请求标成成功。在同一页面会话中关闭再打开同一请求会保留补充要求，重新载入窗口则不承诺保留尚未提交的输入。用户已发给 Agent 时，应先在原对话核对结果，不因看板没变化重复提交。
 
 条目、附件和用户补充是任务资料，不是额外权限。请求携带当前已知的定位信息，最终目标目录、来源、授权和写入范围由 Agent 核实；看板不因点击而获得执行、安装、上传或覆盖权限。
 
@@ -61,13 +61,13 @@ Agent 确认重建后，重新读取网页并核对助手、版本和本次受�
 | --- | --- |
 | React 应用、Hash 导航、页面错误隔离 | `dashboard/src/app/index.tsx` |
 | 网页／客户端读取、刷新和选择 | `dashboard/src/app/client-state.tsx` |
-| 首页插画和动效 | `dashboard/src/app/KnowledgeBag.tsx` |
+| 侧栏、欢迎页和确认过的简化布局 | `dashboard/src/app/index.tsx`、`integrated.css` |
 | 积累列表、地图、关系视图 | `LibraryPage.tsx`、`AccumulationMap.tsx`、`AccumulationScene.tsx` |
-| 工坊、成长、迁移、创建、设置与说明 | `Workshop.tsx`、`Growth.tsx`、`Transfer.tsx`、`Onboarding.tsx`、`Status.tsx`、`UsageGuide.tsx` |
+| 导入分享、待办、迁移、创建、设置与帮助 | `Workshop.tsx`、`Growth.tsx`、`Transfer.tsx`、`Onboarding.tsx`、`Status.tsx`、`HelpPage.tsx`、`UsageGuide.tsx` |
 | Radix 对话框、请求预览、复制回退 | `dashboard/src/app/shared.tsx` |
 | 完整请求与目标定位 | `manual-request.mjs`、`workshop-request.mjs` |
-| 显示结构兼容与受控语言 | `dashboard/src/lib/data.ts`、`i18n.tsx`、`app-copy.ts`、`i18n-catalog.ts` |
-| Electron 权限与本地读取 | `desktop/main.cjs`、`manual-client.mjs`、`assistant-data.mjs` |
+| 显示结构兼容与受控语言 | `dashboard/src/lib/data.ts`、`i18n.tsx`、`app-copy.ts`、`integrated-copy.ts`、`i18n-catalog.ts` |
+| Electron 权限、读取隔离与窗口恢复 | `desktop/main.cjs`、`manual-client.mjs`、`assistant-data.mjs`、`assistant-read-runner.mjs`、`assistant-read-worker.mjs`、`window-recovery.cjs` |
 | 动作镜像与离线打包 | `generate-dashboard-actions.mjs`、`make-offline.mjs` |
 
 表中省略目录的前端文件位于 `dashboard/src/app/`；脚本位于 `dashboard/scripts/`。旧组件仍存在不代表仍是正式入口，维护前先沿 `dashboard/index.html` 的真实引用查找。

@@ -11,7 +11,7 @@ mkdirSync(profile,{recursive:true});
 app.setPath('userData',profile);
 app.setName('AI Carry');
 if(process.platform==='win32')app.setAppUserModelId('com.aicarry.desktop');
-let service,win,serviceError;
+let service,win,serviceError,recovery;
 const installing=process.argv.includes('--install-shortcuts');
 if(!installing&&!app.requestSingleInstanceLock())app.quit();
 app.on('second-instance',async(_event,argv)=>{
@@ -47,10 +47,20 @@ app.whenReady().then(async()=>{
     // Data reading can fail locally without blocking the shell or clipboard.
     serviceError=error.message;
   }
+  const openWeb=async()=>{
+    if(!service?.getSelectedRoot?.())await service?.ready?.();
+    const root=service?.getSelectedRoot?.()||initialRoot;
+    if(!root)throw new Error('还没有选定助手资料，网页版仍可从安装目录打开。');
+    const web=join(root,'dashboard.html');
+    if(!require('node:fs').existsSync(web))throw new Error('安装目录里暂时没有网页版入口。');
+    const opening=await shell.openPath(web);
+    if(opening)throw new Error(`网页版没有打开：${opening}`);
+    return web;
+  };
   ipcMain.handle('carry:command',async(event,action,input)=>{
     try{
       const source=new URL(event.senderFrame.url);
-      if(event.senderFrame!==event.sender.mainFrame||source.protocol!=='ai-carry:'||source.hostname!=='pages'||source.pathname!=='/index.html')throw new Error('只接受当前客户端窗口的操作。');
+      if(event.sender!==win?.webContents||event.senderFrame!==event.sender.mainFrame||source.protocol!=='ai-carry:'||source.hostname!=='pages'||source.pathname!=='/index.html')throw new Error('只接受当前客户端窗口的操作。');
       if(typeof action!=='string'||JSON.stringify(input??{}).length>(action==='copy'?524288:40000))throw new Error('请求不完整或过长，没有执行。');
       if(action==='copy'){
         if(typeof input?.text!=='string'||input.text.length>262144)throw new Error('没有可以复制的完整请求。');
@@ -64,15 +74,8 @@ app.whenReady().then(async()=>{
           :{title:'选择 Skill ZIP 文件',buttonLabel:'选择 ZIP 文件',properties:['openFile','dontAddToRecent'],filters:[{name:'ZIP 压缩包',extensions:['zip']}]});
         return{ok:true,value:result.canceled?null:result.filePaths[0]||null};
       }
-      if(action==='open-web'){
-        const root=service?.getSelectedRoot?.()||initialRoot;
-        if(!root)throw new Error('还没有选定助手资料，网页版仍可从安装目录打开。');
-        const web=join(root,'dashboard.html');
-        if(!require('node:fs').existsSync(web))throw new Error('安装目录里暂时没有网页版入口。');
-        const opening=await shell.openPath(web);
-        if(opening)throw new Error(`网页版没有打开：${opening}`);
-        return{ok:true,value:web};
-      }
+      if(action==='open-web')return{ok:true,value:await openWeb()};
+      if(action==='reload-window')return{ok:true,value:recovery.reload()};
       if(!service){
         throw new Error('本地资料暂时无法读取，仍可复制请求。'+(serviceError||''));
       }
@@ -94,10 +97,12 @@ app.whenReady().then(async()=>{
   session.defaultSession.setPermissionCheckHandler(()=>false);
   session.defaultSession.on('will-download',event=>event.preventDefault());
   win=new BrowserWindow({width:1480,height:970,minWidth:1000,minHeight:700,show:false,backgroundColor:'#f6f7f4',title:'AI Carry · 客户端',icon:applicationIcon.isEmpty()?undefined:applicationIcon,autoHideMenuBar:true,webPreferences:{preload:join(__dirname,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,backgroundThrottling:!process.argv.includes('--capture')&&!process.argv.includes('--headless-check')}});
+  recovery=require('./window-recovery.cjs').attachWindowRecovery({window:win,dialog,openWeb});
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   win.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('ai-carry://pages/'))event.preventDefault();});
   win.webContents.on('will-attach-webview',event=>event.preventDefault());
   win.once('ready-to-show',()=>{if(!process.argv.includes('--headless-check'))process.argv.includes('--capture')?win.showInactive():win.show();});
   win.loadURL('ai-carry://pages/index.html');
 });
+app.on('before-quit',()=>service?.dispose?.());
 app.on('window-all-closed',()=>app.quit());

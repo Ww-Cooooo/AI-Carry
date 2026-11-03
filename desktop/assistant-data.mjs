@@ -2,7 +2,7 @@ import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { buildSnapshotCandidate } from '../dashboard/scripts/snapshot-source-builder.mjs';
 import { buildVerifiedStartupProjection } from '../dashboard/scripts/query-startup-capsule.mjs';
-import { parseSectionedToml, validateInstanceManifestStructure, loadTrustedDomainEnvelope, inspectAssetRoute, inspectAssetForReview } from '../dashboard/scripts/asset-route-contract.mjs';
+import { parseSectionedToml, validateInstanceManifestStructure, loadOperationalDomainEnvelope, inspectAssetRoute, inspectAssetForReview } from '../dashboard/scripts/asset-route-contract.mjs';
 
 // Use trusted product readers, never execute scripts/snapshot JS from the bound folder.
 export function checkAssistant(binding, { localRead = false } = {}) {
@@ -33,7 +33,7 @@ export function readAssistantEntry(binding, id, options) {
   // The person selected this exact, projected item; do not replace that choice
   // with a fuzzy top-three recall query. The formal reader still verifies its
   // registered path, identity, content and read boundary, and grants no actions.
-  const { envelope } = loadTrustedDomainEnvelope(binding.root, { explicitRequestedId: id });
+  const { envelope } = loadOperationalDomainEnvelope(binding.root, { explicitRequestedId: id });
   const detail = ['review', 'paused', 'history', 'archived'].includes(entry.status)
     ? inspectAssetForReview(binding.root, envelope, id, { explicitRequestedId: id, selectionConfirmed: true })
     : inspectAssetRoute(binding.root, envelope, id, { selectionConfirmed: true });

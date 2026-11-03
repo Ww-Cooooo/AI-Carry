@@ -51,6 +51,11 @@ function textList(value, label, path, { maxItems = 16, maxText = 1000, allowEmpt
   return value;
 }
 
+function retrievalTriggers(value, label, path) {
+  textList(value, label, path, { maxItems: 512, maxText: 80, allowEmpty: false });
+  if (new TextEncoder().encode(JSON.stringify(value)).length > 2048) fail(label, `${path} exceeds the retrieval byte bound`);
+}
+
 function validateAllProjectedData(value, label, path = "$", depth = 0, budget = { nodes: 0 }) {
   budget.nodes += 1;
   if (budget.nodes > 10000 || depth > 12) fail(label, `${path} exceeds the bounded projection structure`);
@@ -91,7 +96,7 @@ function validateFormalItem(item, kind, label, path, requireMaturity) {
     const allowed = kind === "memory" ? memorySubtypes : kind === "experiences" ? experienceSubtypes : null;
     if (allowed && !allowed.has(item.subtype)) fail(label, `${path}.subtype is invalid for ${kind}`);
   }
-  if (Object.hasOwn(item, "triggers")) textList(item.triggers, label, `${path}.triggers`, { maxItems: 8, maxText: 80, allowEmpty: false });
+  if (Object.hasOwn(item, "triggers")) retrievalTriggers(item.triggers, label, `${path}.triggers`);
   for (const field of ["scope_summary", "source_summary", "evidence_summary", "reliability"]) {
     if (Object.hasOwn(item, field)) text(item[field], label, `${path}.${field}`, { max: field === "reliability" ? 80 : 1000 });
   }
@@ -292,8 +297,8 @@ export function validateSnapshotSemantics(snapshot, label = "snapshot") {
       skillIds.add(item.id);
       text(item.title, label, `${path}.title`, { max: 160 });
       text(item.summary, label, `${path}.summary`, { max: 240 });
-      textList(item.triggers, label, `${path}.triggers`, { maxItems: 8, maxText: 80, allowEmpty: false });
-      text(item.platform, label, `${path}.platform`, { max: 80, allowEmpty: true });
+      retrievalTriggers(item.triggers, label, `${path}.triggers`);
+      text(item.platform, label, `${path}.platform`, { max: 240, allowEmpty: true });
       text(item.state, label, `${path}.state`, { max: 32 });
       if (!["available", "review", "unavailable"].includes(item.state)) fail(label, `${path}.state is invalid`);
     });

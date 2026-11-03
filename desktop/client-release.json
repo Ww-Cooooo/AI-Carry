@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "product": "AI Carry",
-  "release_tag": "v2.1.9",
-  "reason": "The 2.1.9 client bundles include category-scoped batch removal and restoration. The client prepares a request for the user's Agent; it never deletes assets itself. macOS bundles remain unsigned; keep the web fallback available.",
+  "release_tag": "v2.2.0",
+  "reason": "The 2.2.0 client includes the simplified dashboard, compatible local readers, bounded background reads and native page recovery. Requests are previewed and copied for the user to send to an Agent. macOS bundles remain unsigned and untested on a real Mac; the web fallback remains available.",
   "assets": {
-    "win32-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-win32-x64.zip",
-    "darwin-arm64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-arm64.zip",
-    "darwin-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-x64.zip"
+    "win32-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.2.0/AI-Carry-2.2.0-win32-x64.zip",
+    "darwin-arm64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.2.0/AI-Carry-2.2.0-darwin-arm64.zip",
+    "darwin-x64": "https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.2.0/AI-Carry-2.2.0-darwin-x64.zip"
   }
 }

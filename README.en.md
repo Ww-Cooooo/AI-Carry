@@ -31,9 +31,9 @@ If AI Carry is already installed, tell me first; do not reinstall it.
 
 ### Option 2: download the ZIP and give your Agent its local path
 
-**Current version: `2.1.9`.** [Download the complete ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.1.9.zip).
+**Current version: `2.2.0`.** [Download the complete ZIP](https://github.com/Ww-Cooooo/AI-Carry/archive/refs/tags/v2.2.0.zip).
 
-<sub>Version 2.1.9 adds batch removal and restoration within each category: memories, SOPs, capabilities, and experiences. Review the selected items, then copy the request to your Agent. Removal preserves the original content so it can be restored later.</sub>
+<sub>Version 2.2.0 reorganizes the dashboard around concise summaries and details you can open when needed. Desktop reads now have timeouts, and an unresponsive or crashed page has a recovery path.</sub>
 
 **About the old 2.1.3 instructions:** 2.1.3 publicly described this memory-system upgrade route; it has been explicitly withdrawn since 2.1.4. If you independently continue to install, modify, or connect RAG/vector storage using those old instructions, that is an unsupported custom operation outside the current version. You must assess and accept the resulting compatibility, data, privacy, resource, and runtime risks; the current AI Carry version provides no product support for that old route. Ordinary memory, learning, SOPs, and existing materials are outside this boundary.
 
@@ -52,13 +52,13 @@ dashboard, and guide me to create my assistant. Do not overwrite anything.
 
 After installation, the Agent should tell you **where the dashboard is, whether your assistant has been created, and what to do next**, not merely that files were downloaded. Already have an assistant? Use [check and upgrade](#move), not a whole-folder ZIP overwrite.
 
-**How do you continue later?** Point a new conversation at the same AI Carry folder. If the host does not load its entry automatically, ask it to read `BOOTSTRAP.md` there. To use it alongside another work project, first have the Agent check access to both; you do not need to move all your work into AI Carry. Reopen the dashboard and check your assistant's direction under “Current status.” If it still shows an empty template, ask the Agent to check the saved setup or refresh the display instead of creating another assistant. When switching Agents on the same computer, the Move & safety page now creates an independent copy by default: the original folder stays unchanged and the copies do not sync automatically. Choose the shared-folder route only when you intend to use the folder in turns and re-read affected files before writing.
+**How do you continue later?** Point a new conversation at the same AI Carry folder. If the host does not load its entry automatically, ask it to read `BOOTSTRAP.md` there. To use it alongside another work project, first have the Agent check access to both; you do not need to move all your work into AI Carry. Reopen the dashboard and check your assistant's direction under “Settings.” If it still shows an empty template, ask the Agent to check the saved setup or refresh the display instead of creating another assistant. When switching Agents on the same computer, the Backup & transfer page now creates an independent copy by default: the original folder stays unchanged and the copies do not sync automatically. Choose the shared-folder route only when you intend to use the folder in turns and re-read affected files before writing.
 
 ### Two ways to open the same assistant
 
-The installer automatically installs **AI Carry (desktop)** and creates its Desktop entry; the web view stays in the installation folder as `dashboard.html`. Both use the same saved materials; the desktop app adds a native folder/ZIP picker and a Web fallback in its top bar. It does not bind to an Agent or send requests automatically.
+The installer automatically installs **AI Carry (desktop)** and creates its Desktop entry; the web view stays in the installation folder as `dashboard.html`. Both use the same saved materials; the desktop app adds a native folder/ZIP picker and a web fallback on its Help page. It does not bind to an Agent or send requests automatically.
 
-**Desktop downloads for 2.1.9:** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-win32-x64.zip) · [Mac Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.1.9/AI-Carry-2.1.9-darwin-x64.zip). These bundles contain the updated dashboard and readers. The extracted Windows app passed automated runtime checks; the web view remains available in the assistant folder if the client cannot run.
+**Desktop downloads for 2.2.0:** [Windows x64](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.2.0/AI-Carry-2.2.0-win32-x64.zip) · [Mac Apple silicon](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.2.0/AI-Carry-2.2.0-darwin-arm64.zip) · [Mac Intel](https://github.com/Ww-Cooooo/AI-Carry/releases/download/v2.2.0/AI-Carry-2.2.0-darwin-x64.zip). These bundles contain the updated dashboard and readers. The extracted Windows app passed automated runtime checks; the web view remains available in the assistant folder if the client cannot run.
 
 A formal release installation creates one desktop entry and keeps the web view in the installation folder. The migration page continues to create an independent copy by default.
 
@@ -138,23 +138,26 @@ See [learning and assets (Chinese)](docs/asset-evolution.md). Actual recall also
 
 [![AI Carry English local dashboard: no assistant created and zero portable items](docs/readme-assets/dashboard-empty.en.png)](https://ww-cooooo.github.io/AI-Carry/index.en.html?ac_lang=en)
 
-<sub>Actual 2.0.9 empty-template screenshot illustrating the interface; see above for the current download version. Click to try the online demo; its sample data is not included in your installation.</sub>
+<sub>Actual 2.2.0 empty-template screenshot. Click to try the online demo; its sample data is not included in your installation.</sub>
 
 **[Open the interactive demo →](https://ww-cooooo.github.io/AI-Carry/index.en.html?ac_lang=en)**
 
 | In the dashboard | What you can do |
 | --- | --- |
-| **Creation and current state** | Create an assistant, see its direction and state, and change your collaboration style. |
-| **Your accumulated knowledge** | See saved knowledge, task records, and existing relationships on a map; open a summary, then read or use the full item in the categorized list. |
-| **Skill Workshop** | Turn your methods into something others can use, or bring their methods into your assistant. |
-| **Growth and governance** | Review learning suggestions, to-dos, and longer-term improvement tasks; choose what to work on next. |
-| **Migration and safety** | Move computers, back up, import or export local materials, or create a problem report. |
+| **Creation and settings** | Create an assistant, see its direction and state, and change your collaboration style. |
+| **Your accumulated knowledge** | Start with the list, open details or full content, or switch to the map for recorded relationships. Category-specific batch removal and restore remain available. |
+| **Import & share** | Turn your methods into something others can use, or bring their methods into your assistant. |
+| **To-dos** | Review learning suggestions, to-dos, and longer-term improvement tasks; choose what to work on next. |
+| **Backup & transfer** | Choose a move, backup or restore task, review a short summary, and expand options when needed. |
+| **Help** | Find recovery steps, prepare a problem report, or reload the desktop window and open the web fallback. |
 
 The map uses relationships supported by your saved materials, not guessed connections. Older items without source records remain available in the list; no rewrite is needed to use the map.
 
-**Summary first, details on click, explanations when needed.** Action buttons generally copy a request. Send that text to your current Agent, which explains and performs the work; the web page does not directly change your files.
+**Summary first, details on click, explanations when needed.** Review the request, optionally expand its full text or add requirements, then copy it to your Agent. Copying is separate from execution.
 
-The included dashboard opens offline and supports Chinese and English. The online demo uses fictional data. Downloads start from an empty template, not somebody else's identity or memories.
+If a desktop read times out or a refresh fails, retry while continuing to view available cached data. An unresponsive or crashed page can reload its own window without restarting the Agent; unsent input may need to be entered again.
+
+The included dashboard opens offline, with Chinese and English for everyday flows. Some native recovery prompts and dynamic errors remain in Chinese. The online demo uses fictional data. Downloads start from an empty template, not somebody else's identity or memories.
 
 ## Skill Workshop: share a good method, or bring one home
 
@@ -163,7 +166,7 @@ A **Skill** is a method package for an Agent, usually a folder containing `SKILL
 | Your goal | Your part | The Agent's work and the result |
 | --- | --- | --- |
 | **Share your method** | Choose a recommendation or describe your method; select ZIP, folder, link delivery, or local-only. | It automatically sanitizes a copy, removes personal paths, generalizes the method, and checks it, then gives you the actual file location. Link delivery also needs an approved upload destination and permission. |
-| **Receive a Skill** | Click the Workshop's inspection-request copy button, send the text to your Agent, and provide a ZIP/folder path or exact link. | It first inspects purpose, scripts, dependencies, and permissions in isolation, explains the proposed installation, and connects it after your confirmation. Inspection does not run package code. |
+| **Receive a Skill** | Enter a ZIP/folder path or exact link under Import & share, preview the import request, and copy it to your Agent. | It first inspects purpose, scripts, dependencies, and permissions in isolation, explains the proposed installation, and connects it after your confirmation. Inspection does not run package code. |
 | **Receive a newer version** | Give the Agent the new package or link you received. | It compares identity, version, and differences. With local edits or conflicts, it preserves the current Skill and explains your options instead of guessing a merge. Upgrade follows your approval, with an older-version recovery path. |
 | **Fix an unavailable Skill** | Open its details and copy the inspection or recovery request. | It diagnoses that Skill and tries a local repair; other Skills and the assistant remain available. |
 
@@ -174,10 +177,10 @@ The Workshop includes its own creation method; it does not require a particular 
 
 | What you want | How to start | What stays with you |
 | --- | --- | --- |
-| **Change Agents on this computer** | Select “Change Agent” under Migration & safety and send the request to your current Agent. By default, it creates an independent copy; the new Agent resumes from that copy's `BOOTSTRAP.md`. | Saved knowledge is preserved and the original folder stays unchanged. The copies do not sync automatically. Share the original folder only by explicit choice and use it in turns. |
+| **Change Agents on this computer** | Select “Change Agent” under Backup & transfer and send the request to your current Agent. By default, it creates an independent copy; the new Agent resumes from that copy's `BOOTSTRAP.md`. | Saved knowledge is preserved and the original folder stays unchanged. The copies do not sync automatically. Share the original folder only by explicit choice and use it in turns. |
 | **Move to a new computer** | Use the dashboard's computer-migration entry and send its copied request to the Agent. | A local migration kit containing the assistant and registered materials. Resume from `START-RESTORE.md` on the new computer. |
 | **Check and upgrade AI Carry** | Say: “Check whether my AI Carry has an official update.” | Review the preview, then confirm. The template updates while your identity, memories, SOPs, Skills, workspaces, and local materials are preserved. |
-| **Export or restore private materials only** | Use the local-private export or restore entry. | Only the private scope you registered—not a complete assistant migration. |
+| **Export or restore private materials only** | Choose the private-only scope in the backup or restore options. | Only the private scope you registered—not a complete assistant migration. |
 | **Optional remote backup** | Use the private GitHub backup entry and confirm what will be sent. | Only material approved for remote storage. A private repository is not local storage or end-to-end encryption. |
 
 Changing Agents carries **what has already been saved in AI Carry**. It cannot automatically extract inaccessible hidden memory from another host. An export you provide can be inspected first, then included only if you choose.

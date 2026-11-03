@@ -2,7 +2,7 @@ import { closeSync, existsSync, fstatSync, lstatSync, openSync, readSync, readdi
 import { createHash } from "node:crypto";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseArrayTableDocument, parseMarkdownFrontmatterHead, parseSectionedToml, projectFormalAssetsForSnapshot, projectFormalAssetsForOperationalSnapshot, loadTrustedDomainEnvelope, stableAssetId, validateInstanceManifestStructure } from "./asset-route-contract.mjs";
+import { parseArrayTableDocument, parseMarkdownFrontmatterHead, parseSectionedToml, projectFormalAssetsForSnapshot, projectFormalAssetsForOperationalSnapshot, loadTrustedDomainEnvelope, loadOperationalDomainEnvelope, stableAssetId, validateInstanceManifestStructure } from "./asset-route-contract.mjs";
 import { projectCandidatesForSnapshot, projectCandidatesForOperationalSnapshot } from "./candidate-index-contract.mjs";
 import { locateHighConfidenceSecretCandidates } from "./secret-content-boundary.mjs";
 import { containsForbiddenLocationReference, containsForbiddenStructuredLocation } from "./safe-output-boundary.mjs";
@@ -101,8 +101,16 @@ function validStructuredPrivateReference(ref) {
     && !relativeRef.includes("?") && !relativeRef.includes("#") && relativeRef.split("/").every(portablePrivatePathSegment);
 }
 
-function containsForbiddenSnapshotSourceLocation(ref, text) {
+function containsForbiddenSnapshotSourceLocation(ref, text, mode = "strict") {
   const normalized = text.replaceAll("\r\n", "\n");
+  if (mode === "operational" && ref === "instance/skills/requirements.toml") {
+    let parsed;
+    try { parsed = parseArrayTableDocument(normalized, "skills", "skill requirements"); } catch { return true; }
+    // Local Skill locators are preserved but never exposed or followed by the
+    // dashboard. All other metadata retains the location/secret boundary.
+    const entries = parsed.entries.map(({ entry, source, ...metadata }) => metadata);
+    return containsForbiddenStructuredLocation({ root: parsed.root, entries });
+  }
   if (structuredPrivateRefSource.test(ref)) {
     let parsed;
     try { parsed = parseMarkdownFrontmatterHead(normalized, ref); } catch { return true; }
@@ -163,8 +171,10 @@ function enumerateInstanceSources(repository) {
   return files.sort((left, right) => compareOrdinal(left.ref, right.ref));
 }
 
-function isOpaqueSkillPayload(ref) {
-  return ref.startsWith("instance/skills/exports/") || ref.startsWith("instance/skills/shares/");
+function isOpaqueSkillPayload(ref, mode) {
+  if (["instance/skills/requirements.toml", "instance/skills/exports/index.toml"].includes(ref)) return false;
+  return ref.startsWith("instance/skills/exports/") || ref.startsWith("instance/skills/shares/")
+    || (mode === "operational" && ref.startsWith("instance/skills/"));
 }
 
 function computeSnapshotSourceDigestWithMode(repository, { mode = "strict", requiredSourceRefs = new Set(), issues = [] } = {}) {
@@ -175,19 +185,20 @@ function computeSnapshotSourceDigestWithMode(repository, { mode = "strict", requ
     totalBytes += bytes.length;
     if (totalBytes > 512 * 1024 * 1024) fail("instance source bytes exceed the 512 MiB snapshot-maintenance bound");
     lines.push(`${file.ref}\t${hash(bytes)}\n`);
-    // Editable Skill payloads and their delivery carriers may legitimately
-    // contain images or archives. They affect the byte digest, while their
-    // content is inspected only through the bounded Skill-package route and is
-    // never projected into the dashboard. A binary carrier must not stop the
-    // whole snapshot or unrelated assistant capabilities.
-    if (isOpaqueSkillPayload(file.ref)) continue;
+    // Skill packages, including older local/recovery packages, may contain
+    // images, archives and machine-specific examples. Count their original
+    // bytes without interpreting or projecting them. The two displayed indexes
+    // and any transaction's required source still undergo content validation;
+    // package inspection belongs to the separate bounded Skill-package reader.
+    if (isOpaqueSkillPayload(file.ref, mode) && !requiredSourceRefs.has(file.ref)) continue;
     let text;
     try { text = utf8Decoder.decode(bytes); }
     catch {
       isolateOrFail(mode, requiredSourceRefs, issues, file.ref, "source-not-utf8", `source ${file.ref} is not UTF-8`);
       continue;
     }
-    if (locateHighConfidenceSecretCandidates(text).blocked || containsForbiddenSnapshotSourceLocation(file.ref, text)) {
+    if (locateHighConfidenceSecretCandidates(text).blocked || containsForbiddenSnapshotSourceLocation(file.ref, text,
+      requiredSourceRefs.has(file.ref) ? "strict" : mode)) {
       isolateOrFail(mode, requiredSourceRefs, issues, file.ref, "source-unsafe-or-nonportable",
         `source ${file.ref} contains a secret candidate or non-portable absolute location`);
     }
@@ -396,7 +407,8 @@ function projectSkills(repository, instanceId, { mode = "strict", requiredSource
   let status = "尚未登记 Skill";
   try {
     const source = readStructured(repository, ref, 32 * 1024);
-    if (locateHighConfidenceSecretCandidates(source).blocked || containsForbiddenLocationReference(source)) fail("skill requirements contain unsafe content");
+    if (locateHighConfidenceSecretCandidates(source).blocked
+      || containsForbiddenSnapshotSourceLocation(ref, source, requiredSourceRefs.has(ref) ? "strict" : mode)) fail("skill requirements contain unsafe content");
     const parsed = parseArrayTableDocument(source, "skills", "skill requirements");
     const emptyTemplate = mode === "operational" && !requiredSourceRefs.has(ref)
       && parsed.root.instance_id === "template" && parsed.entries.length === 0
@@ -405,11 +417,13 @@ function projectSkills(repository, instanceId, { mode = "strict", requiredSource
     if (parsed.root.schema_version !== 1 || (!emptyTemplate && parsed.root.instance_id !== instanceId) || parsed.entries.length > 256) fail("skill requirements identity or count is invalid");
     const counts = new Map();
     for (const item of parsed.entries) counts.set(item.id, (counts.get(item.id) ?? 0) + 1);
+    const compatibleRead = mode === "operational" && !requiredSourceRefs.has(ref);
     for (const item of parsed.entries) {
       if (!stableAssetId.test(item.id ?? "") || counts.get(item.id) !== 1 || !clean(item.summary, 240) || !["available", "review", "unavailable"].includes(item.state)
         || (Object.hasOwn(item, "title") && !clean(item.title, 160))
-        || (Object.hasOwn(item, "platform") && !clean(item.platform, 80, true))
-        || (Object.hasOwn(item, "triggers") && (!Array.isArray(item.triggers) || item.triggers.length > 8 || item.triggers.some((trigger) => !clean(trigger, 80))))) {
+        || (Object.hasOwn(item, "platform") && !clean(item.platform, compatibleRead ? 240 : 80, true))
+        || (Object.hasOwn(item, "triggers") && (!Array.isArray(item.triggers) || item.triggers.length > (compatibleRead ? 512 : 8)
+          || item.triggers.some((trigger) => !clean(trigger, 80)) || Buffer.byteLength(JSON.stringify(item.triggers), "utf8") > 2048))) {
         isolateOrFail(mode, requiredSourceRefs, issues, ref, "skill-entry-invalid", "skill requirement entry is invalid");
         continue;
       }
@@ -499,7 +513,7 @@ export function buildSnapshotCandidate(repository, {
   const generatedAt = now instanceof Date && Number.isFinite(now.getTime()) ? now.toISOString() : "";
   if (!generatedAt) fail("snapshot generation time is invalid");
   const sources = computeSnapshotSourceDigestWithMode(root, { mode, requiredSourceRefs: requiredSourceRefSet, issues });
-  const { context } = loadTrustedDomainEnvelope(root);
+  const { context } = mode === "operational" ? loadOperationalDomainEnvelope(root) : loadTrustedDomainEnvelope(root);
   const onProjectionIssue = ({ area, sourceRef, code }) => recordOperationalIssue(issues, { area, sourceRef, code });
   const accumulationSources = [];
   const onSource = source => accumulationSources.push(source);

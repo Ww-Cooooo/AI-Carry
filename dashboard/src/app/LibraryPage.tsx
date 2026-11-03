@@ -1,8 +1,8 @@
 import {SourceText} from './SourceText';
 import React,{useEffect,useRef,useState,useMemo} from 'react';
 
-import {Tabs,Popover} from 'radix-ui';
-import {ArrowUpRight,ArrowRight,ChevronDown,Brain,Route,Lightbulb,Compass,Search,HelpCircle,X,BookOpen,LayoutGrid,Network,List} from 'lucide-react';
+import {Tabs,Popover,Dialog} from 'radix-ui';
+import {ArrowUpRight,ArrowRight,ChevronDown,Brain,Route,Lightbulb,Compass,Search,HelpCircle,X,BookOpen,LayoutGrid,Network,List,RefreshCw,Share2} from 'lucide-react';
 import gsap from 'gsap';
 import {useGSAP} from '@gsap/react';
 import Lenis from 'lenis';
@@ -15,6 +15,7 @@ import {assetCollections,isRemovedAsset,buildAssetBatchRequest} from './asset-ma
 import {buildAccumulationData} from './accumulation-data.mjs';
 import {localizeText,useDashboardLocale} from '../lib/i18n';
 import {buildDashboardAction,buildHabitCorrectionAction,buildHabitForgetAction} from '../lib/data';
+const requestLabel=(label:string)=>label==='需要时手动指定'?'使用这条记忆':label==='手动指定本次使用'?'本次使用这项习惯':label;
 const actionTarget=(entry:Asset)=>({...entry,status:entry.state||entry.status,reliability:entry.maturity||entry.reliability,approvalState:entry.approval_state,activationBasis:entry.activation_basis,approvedByUser:entry.approved_by_user,riskTier:entry.risk_tier});
 
 gsap.registerPlugin(useGSAP);
@@ -27,7 +28,7 @@ const kinds:{id:Kind|'all';label:string;Icon:typeof Brain}[]=[
 function readCollectionKind():Kind|'all'{
   const [route,query]=location.hash.slice(1).split('?');
   const value=route==='library'?new URLSearchParams(query||'').get('kind'):null;
-  return kinds.find(item=>item.id===value)?.id||'memories';
+  return kinds.find(item=>item.id===value)?.id||'all';
 }
 
 export function useReducedMotion(){
@@ -36,11 +37,7 @@ export function useReducedMotion(){
   return reduced;
 }
 export function Help({label,children}:{label:string;children:React.ReactNode}){
-  const [open,setOpen]=useState(false),timer=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const enter=()=>{if(timer.current)clearTimeout(timer.current);setOpen(true);};
-  const leave=()=>{timer.current=setTimeout(()=>setOpen(false),180);};
-  useEffect(()=>()=>{if(timer.current)clearTimeout(timer.current);},[]);
-  return <Popover.Root open={open} onOpenChange={setOpen}><Popover.Trigger asChild><button className="help-button" aria-label={label} onPointerEnter={enter} onPointerLeave={leave} onFocus={enter}><HelpCircle size={18}/></button></Popover.Trigger><Popover.Portal><Popover.Content className="help-bubble" sideOffset={10} collisionPadding={20} onPointerEnter={enter} onPointerLeave={leave} onOpenAutoFocus={e=>e.preventDefault()} onCloseAutoFocus={e=>e.preventDefault()}><strong>{label}</strong><p>{children}</p><Popover.Arrow className="help-arrow"/></Popover.Content></Popover.Portal></Popover.Root>;
+  return <Popover.Root><Popover.Trigger asChild><button className="help-button" aria-label={label}><HelpCircle size={18}/></button></Popover.Trigger><Popover.Portal><Popover.Content className="help-bubble" sideOffset={10} collisionPadding={20}><div className="help-bubble-heading"><strong>{label}</strong><Popover.Close className="icon-control" aria-label="关闭说明"><X size={16}/></Popover.Close></div><p>{children}</p><Popover.Arrow className="help-arrow"/></Popover.Content></Popover.Portal></Popover.Root>;
 }
 export function BrandStroke({reduced}:{reduced:boolean}){
   const canvas=useRef<HTMLCanvasElement>(null);
@@ -64,34 +61,33 @@ export function BrandStroke({reduced}:{reduced:boolean}){
   return <canvas ref={canvas} className="brand-stroke" aria-hidden="true"/>;
 }
 function EntryDetail({entry,reduced,onRequest,onExplore,ask}:{entry:Entry;reduced:boolean;onRequest:()=>void;onExplore:()=>void;ask?:Ask}){
-  const root=useRef<HTMLDivElement>(null);
-  const {act,assistant,demo}=useClient();
-  const removed=isRemovedAsset(entry);
-  const [body,setBody]=useState(''),[error,setError]=useState('');
-  useEffect(()=>{let current=true;setBody('');setError('');void act('assistant-entry',{id:entry.id}).then(value=>{if(current)setBody(value.body);}).catch(e=>{if(current)setError(e.message);});return()=>{current=false;};},[act,entry.id,assistant]);
-  useGSAP(()=>{
-    if(reduced)return;
-    gsap.timeline().from(root.current,{height:0,opacity:0,duration:.46,ease:'power3.inOut',clearProps:'height,opacity'})
-      .from('.asset-body',{x:-14,opacity:0,stagger:.065,duration:.4,ease:'power2.out'},.18)
-      .from('.detail-context,.detail-actions',{y:12,opacity:0,duration:.35,stagger:.08},.24);
-  },{scope:root,dependencies:[entry.id,reduced],revertOnUpdate:true});
-  return <div ref={root} className="entry-detail" id={`detail-${entry.id}`}>
-    <div className="detail-inner">
-      <section className="detail-method"><h3>{entry.kind==='sops'?'这套流程怎么做':entry.kind==='capabilities'?'这项能力怎么用':entry.kind==='experiences'?'记录了什么经验':'记住了什么'}</h3><div className="asset-body">{error||<SourceText>{body||'正在读取这一条的正文…'}</SourceText>}</div></section>
-      <section className="detail-context">{!removed&&<button className="text-button ac-map-back" onClick={onExplore}><Network size={16}/>在地图中看关联<ArrowUpRight size={16}/></button>}<h3>{removed?'已停止日常调用':'什么时候用'}{!removed&&<Help label="一定要说这句话吗？">不用。Agent 会根据你正在做的事，查找相关记忆和方法。你也可以点“让 Agent 用这条”，明确告诉它参考哪一条。</Help>}</h3><p>{removed?'这项内容已移除，原文保留供你查看或恢复。':entry.when||'这条记录还没写明使用场景，可以让 Agent 结合当前任务判断。'}</p>{entry.maturity&&<p>{({unvalidated:'还没有实际使用记录',practiced:'已在实际任务中使用',reliable:'已通过多次任务验证',portable:'已在不同 Agent 或环境中验证'} as Record<string,string>)[entry.maturity]||'实践情况待确认'}</p>}</section>
-      <div className="detail-actions"><details className="source-detail"><summary>查看来源与补充<ChevronDown size={16}/></summary><p>{entry.source_summary||'来自你选择的助手文件夹。'}</p><p>条目：<SourceText>{entry.id}</SourceText></p>{!removed&&entry.kind==="memories"&&entry.subtype==="habit"&&ask&&<div>{[buildHabitCorrectionAction(actionTarget(entry)),buildHabitForgetAction(actionTarget(entry))].map(a=><button key={a.buttonLabel} className="text-button" onClick={()=>ask({title:a.buttonLabel,itemId:entry.id,body:a.text})}>{a.buttonLabel}</button>)}</div>}<p>{demo?'这里是演示正文，不是你的真实记录。':(window.carryClient?'这里显示已保存的原始内容。':'网页显示保存的摘要；完整正文由 Agent 从原文件读取。')}</p></details><button className="primary-button" onClick={onRequest}>{removed?`让 Agent 恢复这项${assetCollections[entry.kind].label}`:buildDashboardAction(entry.kind,actionTarget(entry)).buttonLabel}<ArrowUpRight size={19}/></button></div>
-    </div>
+  const root=useRef<HTMLDivElement>(null),{act,assistant,demo}=useClient(),removed=isRemovedAsset(entry);
+  const [body,setBody]=useState(''),[error,setError]=useState(''),[retry,setRetry]=useState(0),[reading,setReading]=useState(false),[loading,setLoading]=useState(true),restoreFocus=useRef<HTMLElement|null>(null);
+  useEffect(()=>{let current=true;setBody('');setError('');setLoading(true);void act('assistant-entry',{id:entry.id}).then(value=>{if(current)setBody(value.body||'这条记录暂时没有正文。');}).catch(e=>{if(current)setError(e.message);}).finally(()=>{if(current)setLoading(false);});return()=>{current=false;};},[act,entry.id,assistant,retry]);
+  useGSAP(()=>{if(reduced)return;gsap.timeline().from(root.current,{height:0,opacity:0,duration:.34,ease:'power3.inOut',clearProps:'height,opacity'}).from('.detail-context,.detail-actions',{y:10,opacity:0,duration:.24,stagger:.05,clearProps:'transform,opacity'},.12);},{scope:root,dependencies:[entry.id,reduced],revertOnUpdate:true});
+  return <div ref={root} className="entry-detail" id={'detail-'+entry.id}><div className="detail-inner">
+    <section className="detail-method"><h3>{removed?'已停止日常调用':'这项内容有什么用'}</h3><p>{entry.summary?<SourceText>{entry.summary}</SourceText>:'请让 Agent 回读原资料，核对用途。'}</p></section>
+    <section className="detail-context"><h3>什么时候用</h3><p>{removed?'原文保留供查看或恢复。':entry.when?<SourceText>{entry.when}</SourceText>:'使用场景尚未写明，可以让 Agent 结合当前任务判断。'}</p>{entry.maturity&&<small>{({unvalidated:'还没有实际使用记录',practiced:'已在实际任务中使用',reliable:'已通过多次任务验证',portable:'已在不同 Agent 或环境中验证'} as Record<string,string>)[entry.maturity]||'实践情况待确认'}</small>}</section>
+    {error&&<div className="entry-read-error" role="status"><p>这条正文暂时没能打开。<span>{error}</span></p><button className="secondary-button" onClick={()=>setRetry(v=>v+1)}><RefreshCw size={16}/>重试这一条</button><Help label="这条内容打不开怎么办？">先重试这一条。仍打不开时，复制本条请求，让 Agent 按记录编号检查原文件；其他内容可以继续查看。</Help></div>}
+    <div className="detail-actions"><button className="primary-button" onClick={onRequest}>{removed?'预览恢复请求':requestLabel(buildDashboardAction(entry.kind,actionTarget(entry)).buttonLabel)}<ArrowRight size={17}/></button>
+    <button className="secondary-button" onClick={()=>setReading(true)}><BookOpen size={17}/>{loading?'正在读取正文…':'阅读正文'}</button>
+    {!removed&&(entry.kind==='sops'||entry.kind==='capabilities')&&<a className="secondary-button" href={'#workshop?'+new URLSearchParams({tab:'share',item:entry.id})}><Share2 size={17}/>分享这项方法</a>}
+    {!removed&&<button className="text-button" onClick={onExplore}><Network size={16}/>在地图中查看</button>}</div>
+    <details className="source-detail"><summary>查看来源与补充<ChevronDown size={16}/></summary><p>{entry.source_summary?<SourceText>{entry.source_summary}</SourceText>:'来自当前助手的正式资料。'}</p><p>条目：<SourceText>{entry.id}</SourceText></p>{!removed&&entry.kind==='memories'&&entry.subtype==='habit'&&ask&&<div className="field-help">{[buildHabitCorrectionAction(actionTarget(entry)),buildHabitForgetAction(actionTarget(entry))].map(a=><button key={a.buttonLabel} className="secondary-button" onClick={()=>ask({title:a.buttonLabel,itemId:entry.id,body:a.text,summary:[{label:'所选记忆',value:entry.title,source:true}]})}>{a.buttonLabel}</button>)}</div>}<p>{demo?'这里是演示正文，不是你的真实记录。':window.carryClient?'这里显示已保存的原始内容。':'网页显示保存的摘要；完整正文由 Agent 从原文件读取。'}</p></details>
+  </div>
+  <Dialog.Root open={reading} onOpenChange={setReading}><Dialog.Portal><Dialog.Overlay className="dialog-overlay"/><Dialog.Content className="request-dialog reading-dialog" data-lenis-prevent onOpenAutoFocus={()=>{restoreFocus.current=document.activeElement as HTMLElement;}} onCloseAutoFocus={e=>{if(restoreFocus.current?.isConnected){e.preventDefault();restoreFocus.current.focus();}}}><header className="request-head"><div><Dialog.Title><SourceText>{entry.title}</SourceText></Dialog.Title><Dialog.Description>{demo?'示例正文':window.carryClient?'已保存的正文':'网页保存的内容；完整原文请交给 Agent 读取。'}</Dialog.Description></div><Dialog.Close className="icon-control" aria-label="关闭正文"><X size={20}/></Dialog.Close></header><div className="request-body reading-body">{error?<><p role="status">{error}</p><button className="secondary-button" onClick={()=>setRetry(v=>v+1)}>重试这一条</button></>:loading?'正在读取这一条的正文…':<SourceText>{body}</SourceText>}</div></Dialog.Content></Dialog.Portal></Dialog.Root>
   </div>;
 }
+function readMapNode(){return new URLSearchParams(location.hash.split('?')[1]||'').get('node');}
 function readView():'map'|'list' {
   const query=new URLSearchParams(location.hash.split('?')[1]||'');
-  return query.get('view')==='list'||(!query.has('view')&&query.has('kind'))?'list':'map';
+  return query.get('view')==='map'||(!query.has('view')&&query.has('node'))?'map':'list';
 }
 export default function LibraryPage({ask,paused=false}:{ask?:Ask;paused?:boolean}={}) {
   const [view,setView]=useState(readView),[kind,setKind]=useState<Kind|'all'>(readCollectionKind),[query,setQuery]=useState('');
-  const [selected,setSelected]=useState<string|null>(null),[mapSelected,setMapSelected]=useState<string|null>(null),[request,setRequest]=useState<Request|null>(null);
+  const [selected,setSelected]=useState<string|null>(null),[mapSelected,setMapSelected]=useState<string|null>(readMapNode),[request,setRequest]=useState<Request|null>(null);
   const [removed,setRemoved]=useState(false),[batch,setBatch]=useState(false),[checked,setChecked]=useState<string[]>([]);
-  const {assistant,source}=useClient(),reduced=useReducedMotion(),{locale}=useDashboardLocale();
+  const {assistant,source,dataLoading,dataError}=useClient(),reduced=useReducedMotion(),{locale}=useDashboardLocale();
   const scroll=useRef<HTMLElement>(null),content=useRef<HTMLDivElement>(null),root=useRef<HTMLDivElement>(null);
   const allEntries:Entry[]=(['memories','sops','capabilities','experiences'] as Kind[]).flatMap(kind=>(assistant?.snapshot[kind]||[]).map(item=>({...item,kind,when:(item.triggers||[]).join('、')})));
   const entries=allEntries.filter(entry=>!isRemovedAsset(entry));
@@ -103,24 +99,30 @@ export default function LibraryPage({ask,paused=false}:{ask?:Ask;paused?:boolean
   const dataKey=JSON.stringify([assistant?.binding, snapshot?.memories,snapshot?.sops,snapshot?.capabilities,snapshot?.experiences,snapshot?.evolution,snapshot?.skills,snapshot?.accumulation]);
   const data=useMemo(()=>buildAccumulationData(snapshot||{},localizeText),[dataKey,locale]);
   const identity=JSON.stringify([assistant?.binding.root,assistant?.binding.instanceId,snapshot?.meta.identity_ref]);
-  useEffect(()=>{setSelected(null);setMapSelected(null);setQuery('');setBatch(false);setChecked([]);setRemoved(false);setRequest(null);},[identity]);
+  const boundIdentity=useRef<string|null>(null);
+  useEffect(()=>{if(!assistant)return;const switched=boundIdentity.current!==null&&boundIdentity.current!==identity;boundIdentity.current=identity;
+    const params=new URLSearchParams(location.hash.split('?')[1]||'');setSelected(switched?null:params.get('item'));setMapSelected(switched?null:params.get('node'));
+    if(switched){params.delete('node');params.delete('item');history.replaceState(null,'','#library?'+params);}
+    setQuery('');setBatch(false);setChecked([]);setRemoved(false);setRequest(null);
+  },[identity]);
   useEffect(()=>{if(mapSelected&&!data.byId[mapSelected])setMapSelected(null);if(selected&&!available.some(e=>e.id===selected))setSelected(null);setChecked(ids=>ids.filter(id=>available.some(e=>e.kind===kind&&e.id===id)));},[data,removed,kind]);
   // A category owns its selection, including navigation via URL/back/forward.
   useEffect(()=>{setBatch(false);setChecked([]);setRemoved(false);setRequest(null);},[view,kind]);
   const navigate=(next:'map'|'list',nextKind=kind,id:string|null=selected)=>{
-    const query=new URLSearchParams({view:next,kind:nextKind});if(id)query.set('item',id);
+    const query=new URLSearchParams({view:next,kind:nextKind});if(id)query.set('item',id);if(next==='map'&&mapSelected)query.set('node',mapSelected);
     location.hash='library?'+query.toString();
     setView(next);setKind(nextKind);setSelected(id);
   };
   useEffect(()=>{const sync=()=>{
     const params=new URLSearchParams(location.hash.split('?')[1]||'');
-    setView(readView());setKind(readCollectionKind());setSelected(params.get('item'));
+    setView(readView());setKind(readCollectionKind());setSelected(params.get('item'));setMapSelected(params.get('node'));
   };addEventListener('hashchange',sync);return()=>removeEventListener('hashchange',sync);},[]);
   const openList=(node:{area?:string;assetId?:string})=>{if(!node.area||!node.assetId)return;setQuery('');navigate('list',node.area as Kind,node.assetId);};
-  const explore=(entry:Entry)=>{setMapSelected('asset:'+entry.id);navigate('map',entry.kind,entry.id);};
+  const explore=(entry:Entry)=>{setMapSelected('asset:'+entry.id);location.hash='library?'+new URLSearchParams({view:'map',kind:entry.kind,node:'asset:'+entry.id});};
+  const selectMap=(id:string|null)=>{setMapSelected(id);const url=new URL(location.href),params=new URLSearchParams(url.hash.split('?')[1]||'');params.set('view','map');if(id)params.set('node',id);else params.delete('node');url.hash='library?'+params;history.replaceState(null,'',url);};
   const chooseKind=(value:Kind|'all')=>{setQuery('');navigate('list',value,null);};
   const requestAction:Ask=request=>ask?ask(request):setRequest({...request,assistant:source(request.itemId)});
-  const prepare=(entry:Entry)=>{if(isRemovedAsset(entry)){requestAction(buildAssetBatchRequest([entry],entry.kind,'restore'));return;}const action=buildDashboardAction(entry.kind,actionTarget(entry));requestAction({title:action.buttonLabel,itemId:entry.id,body:action.text});};
+  const prepare=(entry:Entry)=>{if(isRemovedAsset(entry)){requestAction({...buildAssetBatchRequest([entry],entry.kind,'restore'),summary:[{label:'所选内容',value:entry.title,source:true}],impact:'恢复前核对归属；保留原有的暂停或待复核状态。'});return;}const action=buildDashboardAction(entry.kind,actionTarget(entry));requestAction({title:requestLabel(action.buttonLabel),itemId:entry.id,body:action.text,summary:[{label:'所选内容',value:entry.title,source:true},{label:'类别',value:assetCollections[entry.kind].label}],impact:'先核对当前内容、适用条件与授权，再按实际状态处理。'});};
   const filtered=available.filter(entry=>(kind==='all'||entry.kind===kind)&&`${entry.title} ${entry.summary} ${entry.when}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const toggleEntry=(id:string)=>setChecked(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);
   const toggleVisible=()=>setChecked(ids=>{const visible=filtered.filter(e=>e.kind===kind).map(e=>e.id),all=visible.every(id=>ids.includes(id));return all?ids.filter(id=>!visible.includes(id)):[...new Set([...ids,...visible])];});
@@ -129,11 +131,11 @@ export default function LibraryPage({ask,paused=false}:{ask?:Ask;paused?:boolean
   useEffect(()=>{if(view!=='list'||reduced||!scroll.current||!content.current)return;const lenis=new Lenis({wrapper:scroll.current,content:content.current,smoothWheel:true,duration:.6});const tick=(time:number)=>lenis.raf(time*1000);gsap.ticker.add(tick);return()=>{gsap.ticker.remove(tick);lenis.destroy();};},[view,reduced]);
   useGSAP(()=>{if(reduced||view!=='list')return;const rows=root.current?.querySelectorAll('.entry-row');if(!rows?.length)return;gsap.from(rows,{y:16,opacity:0,stagger:{each:.035,amount:.25},duration:.4,clearProps:'transform,opacity'});},{scope:root,dependencies:[kind,view,reduced,entries.length],revertOnUpdate:true});
   useEffect(()=>{if(view==='list'&&selected)requestAnimationFrame(()=>document.getElementById('entry-'+selected)?.scrollIntoView({block:'nearest',behavior:reduced?'instant':'smooth'}));},[view,selected,reduced]);
-  return <div className="app accumulation-page" ref={root}>
-    <main className="page-scroll" ref={scroll}><div className="page-content" ref={content}>
-      <div className="page-heading"><div><h1><span className="marked-word">{view==='map'?'积累地图':'我的积累'}<BrandStroke reduced={reduced}/></span></h1><p className="page-purpose">{view==='map'?'看看每一份积累，从哪里来、用到了哪里。':'记住的习惯、做熟的方法，都在这里。'}</p></div><Tabs.Root value={view} onValueChange={value=>navigate(value as 'map'|'list')}><Tabs.List className="ac-view-switch" aria-label="选择查看方式"><Tabs.Trigger value="map"><Network size={18}/>积累地图</Tabs.Trigger><Tabs.Trigger value="list"><List size={18}/>列表</Tabs.Trigger></Tabs.List></Tabs.Root></div>
+  return <div className={"app accumulation-page"+(view==='map'?' refined-map-page':'')} ref={root}>
+    <main id="main-content" tabIndex={-1} className="page-scroll" ref={scroll}><div className="page-content" ref={content}>
+      <div className="page-heading"><div><h1>我的积累</h1><p className="page-purpose">{view==='map'?'看看每一份积累，从哪里来、用到了哪里。':'记住的习惯、做熟的方法，都在这里。'}</p></div><Tabs.Root value={view} onValueChange={value=>navigate(value as 'map'|'list')}><Tabs.List className="ac-view-switch" aria-label="选择查看方式"><Tabs.Trigger value="map"><Network size={18}/>积累地图</Tabs.Trigger><Tabs.Trigger value="list"><List size={18}/>列表</Tabs.Trigger></Tabs.List></Tabs.Root></div>
       <AssistantNotice/>
-      {view==='map'?<AccumulationMap key={identity} data={data} selected={mapSelected} onSelect={setMapSelected} onOpenList={openList} reduced={reduced} paused={paused}/>:<section className="collection" aria-label="助手积累列表"><div className="collection-toolbar"><Tabs.Root value={kind} onValueChange={value=>chooseKind(value as Kind|'all')}><Tabs.List className="category-tabs" aria-label="按类型查看积累">{kinds.map(item=><Tabs.Trigger className={item.id==='all'?'all-accumulation':''} value={item.id} key={item.id}><item.Icon size={17}/><span>{item.label}</span><small>{item.id==='all'?entries.length:entries.filter(e=>e.kind===item.id).length}</small></Tabs.Trigger>)}</Tabs.List></Tabs.Root><label className="search"><Search size={18}/><span className="sr-only">搜索积累</span><input value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}} placeholder="搜索名称或内容"/>{query&&<button aria-label="清空搜索" onClick={()=>setQuery('')}><X size={16}/></button>}</label></div>
+      {view==='map'?<AccumulationMap key={identity} sessionKey={identity} data={data} selected={mapSelected} onSelect={selectMap} onOpenList={openList} reduced={reduced} paused={paused}/>:<section className="collection" aria-label="助手积累列表"><div className="collection-toolbar"><Tabs.Root value={kind} onValueChange={value=>chooseKind(value as Kind|'all')}><Tabs.List className="category-tabs" aria-label="按类型查看积累">{kinds.map(item=><Tabs.Trigger className={item.id==='all'?'all-accumulation':''} value={item.id} key={item.id}><item.Icon size={17}/><span>{item.label}</span><small>{item.id==='all'?entries.length:entries.filter(e=>e.kind===item.id).length}</small></Tabs.Trigger>)}</Tabs.List></Tabs.Root><label className="search"><Search size={18}/><span className="sr-only">搜索积累</span><input value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}} placeholder="搜索名称、摘要或使用场景"/>{query&&<button aria-label="清空搜索" onClick={()=>setQuery('')}><X size={16}/></button>}</label></div>
       {assetView&&<AssetBatchTools key={identity+kind} collection={kind} removed={removed} removedCount={removedEntries.length} batch={batch} visible={filtered} selected={selectedEntries} onRemoved={changeRemoved} onBatch={changeBatch} onToggle={toggleEntry} onToggleVisible={toggleVisible} onClear={()=>setChecked([])} ask={requestAction}/>}
       <div className="entry-list">{filtered.map(entry=>{const type=kinds.find(k=>k.id===entry.kind)!,open=selected===entry.id;return <article className={`entry ${open?'is-open':''} ${assetView&&batch&&checked.includes(entry.id)?'memory-selected':''}`} key={entry.id} id={'entry-'+entry.id}>
         <div className="entry-overview">{assetView&&batch&&<AssetCheck checked={checked.includes(entry.id)} label={`选择${assetCollections[entry.kind].label}：${entry.title}`} onChange={()=>toggleEntry(entry.id)}/>}
@@ -141,8 +143,8 @@ export default function LibraryPage({ask,paused=false}:{ask?:Ask;paused?:boolean
         </div>
         {open&&<EntryDetail entry={entry} reduced={reduced} ask={requestAction} onExplore={()=>explore(entry)} onRequest={()=>prepare(entry)}/>}
       </article>;})}</div>
-      {!filtered.length&&<div className="empty-state"><BookOpen size={30}/><h2>{!assistant?'先选择助手文件夹':query.trim()?'没有找到匹配的内容':removed&&assetView?`没有已移除的${assetCollections[kind].label}`:entries.length?'没有找到匹配的内容':'这里还没有积累'}</h2><p>{!assistant?'点上方“选择助手文件夹”，查看已有的记忆和方法。':query.trim()?'换个词试试，或清空筛选再找。':removed&&assetView?'Agent 完成移除后，重新读取看板，可在这里找回。':entries.length?'换个词试试，或清空筛选再找。':'以后保存的记忆、方法和经验，会显示在这里。'}</p>{query&&<button className="secondary-button" onClick={()=>setQuery('')}>清空搜索<ArrowRight size={17}/></button>}</div>}
-      <footer className="collection-footer"><span>执行任务：复制请求，发给 Agent</span><span>字体：MiSans · Xiaomi</span></footer></section>}
+      {!filtered.length&&!dataLoading&&!dataError&&<div className="empty-state"><BookOpen size={30}/><h2>{!assistant?'先选择助手文件夹':query.trim()?'没有找到匹配的内容':removed&&assetView?`没有已移除的${assetCollections[kind].label}`:entries.length?'没有找到匹配的内容':'这里还没有积累'}</h2><p>{!assistant?(window.carryClient?'先选择助手文件夹，查看已有的记忆和方法。':'请打开这份助手自己的网页入口。'):query.trim()?'换个词试试，或清空筛选再找。':removed&&assetView?'Agent 完成移除后，重新读取看板，可在这里找回。':entries.length?'换个词试试，或清空筛选再找。':'以后保存的记忆、方法和经验，会显示在这里。'}</p>{query&&<button className="secondary-button" onClick={()=>setQuery('')}>清空搜索<ArrowRight size={17}/></button>}</div>}
+      </section>}
     </div></main>
     <RequestDialog request={request} onClose={()=>setRequest(null)}/>
   </div>;

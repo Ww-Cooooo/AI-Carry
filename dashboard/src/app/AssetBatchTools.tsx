@@ -22,7 +22,7 @@ export default function AssetBatchTools({collection,removed,removedCount,batch,v
   const hiddenSelected=selected.length-visibleSelected;
   useEffect(()=>{if(!batch)setReview(false);},[batch]);
   const prepare=()=>{
-    try{const request=buildAssetBatchRequest(selected,collection,removed?'restore':'remove');setError('');setReview(false);ask(request);}
+    try{const request=buildAssetBatchRequest(selected,collection,removed?'restore':'remove');setError('');setReview(false);ask({...request,summary:[{label:'分类',value:label},{label:'数量',value:String(selected.length)},{label:'所选内容',value:selected.map(item=>item.title).join('、'),source:true}],impact:removed?'恢复后保持原来的暂停或待复核状态。':'仅移除所选内容，原文与历史保留，可从“已移除”找回；这不是永久擦除。'});}
     catch(e){setError((e as Error).message);}
   };
   return <>

@@ -1,60 +1,49 @@
 import React,{Component,useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {ArrowUpRight,ArrowRight,ExternalLink,HelpCircle,Pause,Play,Settings} from 'lucide-react';
-import gsap from 'gsap';
-import {useGSAP} from '@gsap/react';
+import {ArrowRight,Archive,Backpack,CheckSquare2,ChevronRight,Download,HelpCircle,Layers,RefreshCw,Settings} from 'lucide-react';
 import LibraryPage from './LibraryPage';
 import Workshop from './Workshop';
 import Growth from './Growth';
 import Transfer from './Transfer';
 import Onboarding from './Onboarding';
 import Status from './Status';
-import UsageGuide from './UsageGuide';
+import HelpPage from './HelpPage';
+import {SourceText} from './SourceText';
 import {LocaleRoot,useDashboardLocale} from '../lib/i18n';
-import {type Ask,type Request,RequestDialog,useReducedMotion} from './shared';
-import KnowledgeBag from './KnowledgeBag';
-
-import './pages.css';
+import {type Ask,type Request,RequestDialog,AssistantNotice} from './shared';
 import {ClientProvider,useClient} from './client-state';
-import blueTvIcon from './assets/ai-carry-tv-blue.png';
-gsap.registerPlugin(useGSAP);
-const routes=[{id:'home',label:'总览'},{id:'library',label:'我的积累'},{id:'workshop',label:'Skill 工坊'},{id:'growth',label:'待办与成长'},{id:'transfer',label:'迁移与安全'}];
+import './pages.css';
+import './integrated.css';
 type Route='home'|'library'|'workshop'|'growth'|'transfer'|'system'|'create'|'status';
-function readRoute():Route{const name=location.hash.slice(1).split('?')[0];return [...routes.map(r=>r.id),'system','create','status'].includes(name)?name as Route:'home';}
-function Home({go,active}:{go:(r:Route)=>void;active:boolean}){
-  const {assistant,dataError}=useClient();
-  const root=useRef<HTMLDivElement>(null),timeline=useRef<gsap.core.Timeline|null>(null),enabled=useRef(active),reduced=useReducedMotion();
-  enabled.current=active;
-  useEffect(()=>{const sync=()=>timeline.current?.paused(!enabled.current||document.hidden);sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync);},[active]);
-  useGSAP(()=>{if(reduced)return;const tl=gsap.timeline({paused:!enabled.current||document.hidden});timeline.current=tl;tl.from('.ribbon-heading .line',{yPercent:105,rotation:3,stagger:.12,duration:1.2,ease:'power4.out'},.1).from('.ribbon-lead,.ribbon-create',{y:25,autoAlpha:0,duration:.7,stagger:.1},.7).from('.ribbon-links button',{x:-28,autoAlpha:0,duration:.7,stagger:.12},1.4);return()=>{tl.kill();timeline.current=null;};},{scope:root,dependencies:[reduced],revertOnUpdate:true});
-  return <main className="home-scroll"><div ref={root} className="home-composition home-composition--carry"><KnowledgeBag active={active}/><section className="ribbon-intro"><p className="ribbon-eyebrow"><span/>AI Carry · 随身助手</p><h1 className="ribbon-heading"><span className="line-mask"><span className="line">让你的积累</span></span><span className="line-mask"><span className="line"><span className="you">一直待在你身边。</span></span></span></h1><p className="ribbon-lead">AI Carry 保存你的习惯、记忆和常用方法。<br/>换用其他 Agent，这些积累也能带过去。</p><button className="ribbon-create" onClick={()=>go(dataError?'status':assistant?.snapshot.meta.state==='instance'?'library':'create')}>{dataError?'查看资料提示':assistant?.snapshot.meta.state==='instance'?'查看我的积累':'创建我的助手'}<span><ArrowUpRight size={23}/></span></button><p className="ribbon-start-note">{assistant?.snapshot.meta.state==='instance'?assistant.snapshot.profile.display_name:!assistant&&dataError?'资料暂未读取，其他入口仍可使用。':'先选使用经验，再选助手方向。'}</p></section><nav className="ribbon-links" aria-label="从总览进入功能"><button onClick={()=>go('library')}>我的积累<ArrowUpRight size={17}/></button><button onClick={()=>go('workshop')}>Skill 工坊<ArrowUpRight size={17}/></button><button onClick={()=>go('transfer')}>换一个 Agent<ArrowUpRight size={17}/></button></nav><footer className="ribbon-footer"><span>属于你的方法，跟着你走。</span><span>字体：MiSans · Xiaomi</span></footer></div></main>;
+const routes=[{id:'library',label:'我的积累',Icon:Layers},{id:'growth',label:'待办',Icon:CheckSquare2},{id:'workshop',label:'导入与分享',Icon:Download},{id:'transfer',label:'备份与迁移',Icon:Archive}] as const;
+const names:Record<Route,string>={home:'欢迎使用',library:'我的积累',workshop:'导入与分享',growth:'待办',transfer:'备份与迁移',system:'帮助',create:'创建助手',status:'设置'};
+function readRoute():Route{const name=location.hash.slice(1).split('?')[0];return name in names?name as Route:'home';}
+function Home({go}:{go:(r:Route)=>void}){
+  const {assistant,dataError,dataLoading,chooseAssistant}=useClient();
+  return <main id="main-content" className="welcome-page" tabIndex={-1}><div className="welcome-mark"><Backpack size={45} strokeWidth={1.5}/></div><h1>{dataLoading&&!assistant?'正在读取助手资料':dataError?'先找回你的助手资料':assistant?.snapshot.meta.state==='instance'?'接着用你的积累':'让积累，跟着你走。'}</h1><p>{assistant?.snapshot.meta.state==='instance'?'你的习惯、记忆和常用方法，都可以继续使用。':'保存你的习惯和常用方法，换 Agent 也能接着用。'}</p>{dataError?<AssistantNotice/>:<div className="welcome-actions">{!dataLoading&&<button className="primary-button" onClick={()=>go(assistant?.snapshot.meta.state==='instance'?'library':'create')}>{assistant?.snapshot.meta.state==='instance'?'查看我的积累':'开始设置'}<ArrowRight size={18}/></button>}{window.carryClient&&<button className="secondary-button" onClick={()=>void chooseAssistant()}>打开已有助手</button>}</div>}<button className="text-button" onClick={()=>go('system')}><HelpCircle size={16}/>了解怎样使用</button></main>;
 }
-class PageBoundary extends Component<{children:React.ReactNode;go:()=>void},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return{failed:true};}render(){return this.state.failed?<div className="local-page-error"><h1>这一页没能打开</h1><p>助手资料还在。可以先用其他页面，再回来重试。</p><button className="primary-button" onClick={this.props.go}>返回总览<ArrowRight size={18}/></button></div>:this.props.children;}}
+class PageBoundary extends Component<{children:React.ReactNode;go:()=>void;help:()=>void},{failed:boolean}>{
+  state={failed:false};static getDerivedStateFromError(){return{failed:true};}
+  render(){return this.state.failed?<main id="main-content" className="empty-state"><h1>这一页暂时没能打开</h1><p>可以重试这一页，或先查看其他内容。</p><div className="empty-actions"><button className="primary-button" onClick={()=>this.setState({failed:false})}>重试本页<RefreshCw size={17}/></button><button className="secondary-button" onClick={this.props.go}>返回我的积累</button><button className="text-button" onClick={this.props.help}>查看处理方法<HelpCircle size={17}/></button></div></main>:this.props.children;}
+}
 function App(){
-  const {locale,setLocale}=useDashboardLocale();
-  const {assistant,demo,source,dataLoading,dataError,act}=useClient();
-  const ask:Ask=request=>setRequest({...request,assistant:route==='create'&&assistant?.snapshot.meta.state!=='template'?undefined:source(request.itemId)});
-  const [route,setRoute]=useState<Route>(readRoute),[request,setRequest]=useState<Request|null>(null),[paused,setPaused]=useState(false),[webError,setWebError]=useState(''),reduced=useReducedMotion();
-  useEffect(()=>{setRequest(null);},[assistant?.binding.root,assistant?.binding.instanceId,assistant?.snapshot.meta.identity_ref]);
-  useEffect(()=>{const update=()=>{setRoute(readRoute());setRequest(null);};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
-  const go=(r:Route)=>{if(location.hash===`#${r}`)setRoute(r);else location.hash=r;};
-  const homeRoute=route==='home';
-  return <div className="client-app">
-    <header className="topbar">
-      <a className="wordmark" href="#home" aria-label="AI Carry 总览"><img className="brand-icon" src={blueTvIcon} width={40} height={40} alt="" draggable={false}/><span>AI Carry<span className="brand-dot">.</span></span></a>
-      <nav className="top-sections" aria-label="主要页面">{routes.map(r=>{const current=route===r.id||(r.id==='home'&&homeRoute);return <a href={`#${r.id}`} key={r.id} className={current?'current':''} aria-current={current?'page':undefined}>{r.label}</a>;})}</nav>
-      <div className="top-tools"><button className="top-icon" onClick={()=>setLocale(locale==='en'?'zh-Hans':'en')} title="中文 / English">{locale==='en'?'中':'EN'}</button>
-        {demo?<span className="demo-badge" title="当前窗口展示虚构示例，不会修改你的助手">演示数据</span>:<span className="preview-label">{dataLoading?'正在读取资料':assistant?'本地资料 · 只读查看':(window.carryClient?'本地客户端':'本地网页版')}</span>}
-        {homeRoute&&<button className="top-icon" onClick={()=>setPaused(!paused)} disabled={reduced} aria-label={reduced?'系统已减少动态':paused?'播放首屏动效':'暂停首屏动效'} title={reduced?'系统已减少动态':paused?'播放首屏动效':'暂停首屏动效'}>{paused||reduced?<Play size={17}/>:<Pause size={17}/>}</button>}
-        <button className="top-icon" onClick={()=>go('status')} aria-label="助手设置" title="助手设置"><Settings size={18}/></button>{window.carryClient&&<button className="manual-help web-fallback" onClick={()=>void act('open-web').catch(error=>setWebError(error instanceof Error?error.message:'网页版暂时没有打开'))} title={locale==='en'?'If the app is inconvenient, open the web view':'客户端不好用时，打开安装文件夹里的网页版'}><ExternalLink size={17}/><span>{locale==='en'?'Web':'网页版'}</span></button>}<button className="manual-help" onClick={()=>go('system')} title="查看如何使用客户端"><HelpCircle size={18}/><span>使用说明</span></button>
-      </div>
-    </header>
-    {webError&&<p className="web-fallback-error" role="status">{webError}。网页版文件仍在安装目录里。</p>}
-    {homeRoute&&dataError&&<p className="web-fallback-error" role="status">{dataError}</p>}
-    <div className="client-body"><PageBoundary key={route} go={()=>go('home')}>
-      {route==='home'?<Home go={go} active={!paused&&!reduced}/>:route==='library'?<div className="library-embed"><LibraryPage ask={ask} paused={paused}/></div>:route==='workshop'?<Workshop ask={ask}/>:route==='growth'?<Growth ask={ask}/>:route==='transfer'?<Transfer ask={ask}/>:route==='create'?<Onboarding ask={ask} home={()=>go('home')}/>:route==='status'?<Status ask={ask}/>:<UsageGuide home={()=>go('home')}/>}
-    </PageBoundary></div>
-    <RequestDialog request={request} onClose={()=>setRequest(null)}/>
+  const {locale,setLocale}=useDashboardLocale(),{assistant,demo,source,dataLoading,dataError,refreshData}=useClient();
+  const [route,setRoute]=useState<Route>(readRoute),[request,setRequest]=useState<Request|null>(null);
+  const lastLibrary=useRef('#library'),identity=JSON.stringify([assistant?.binding.root,assistant?.binding.instanceId,assistant?.snapshot.meta.identity_ref]),bound=useRef(identity);
+  const ask:Ask=value=>setRequest({...value,assistant:route==='create'&&assistant?.snapshot.meta.state!=='template'?undefined:source(value.itemId)});
+  useEffect(()=>{if(window.carryClient)document.title=assistant?.snapshot.profile.display_name?assistant.snapshot.profile.display_name+' · AI Carry':'AI Carry';},[assistant?.snapshot.profile.display_name]);
+  useEffect(()=>{setRequest(null);if(bound.current!==identity){lastLibrary.current='#library';bound.current=identity;}},[identity]);
+  useEffect(()=>{if(!location.hash&&!dataLoading&&assistant)setRoute(assistant.snapshot.meta.state==='instance'?'library':'home');},[assistant,dataLoading]);
+  useEffect(()=>{const update=()=>{setRoute(readRoute());setRequest(null);if(location.hash.startsWith('#library'))lastLibrary.current=location.hash;};addEventListener('hashchange',update);return()=>removeEventListener('hashchange',update);},[]);
+  const go=(r:Route)=>{const hash=r==='library'?lastLibrary.current:'#'+r;if(location.hash===hash)setRoute(r);else location.hash=hash;};
+  return <div className="client-app integrated-app"><a className="skip-link" href="#main-content" onClick={e=>{e.preventDefault();document.getElementById('main-content')?.focus();}}>跳到主要内容</a>
+    <aside className="carry-sidebar"><button className="carry-brand" onClick={()=>go(assistant?.snapshot.meta.state==='instance'?'library':'home')} aria-label="AI Carry 首页"><span><Backpack size={25}/></span>AI Carry</button>
+      <nav aria-label="主要导航">{routes.map(r=><button key={r.id} className={route===r.id?'current':''} aria-current={route===r.id?'page':undefined} onClick={()=>go(r.id)}><r.Icon size={20}/><span>{r.label}</span>{r.id==='growth'&&!!assistant?.snapshot.todo.length&&<small>{assistant.snapshot.todo.length}</small>}</button>)}</nav>
+      <div className="sidebar-bottom"><button className="assistant-identity" onClick={()=>go('status')}><Backpack size={26}/><span><strong><SourceText>{assistant?.snapshot.profile.display_name||'AI Carry 助手'}</SourceText></strong><small>{demo?'示例资料':assistant?.snapshot.meta.state==='template'?'尚未创建助手':assistant?'本机资料':'尚未读取资料'}</small></span></button><div className="sidebar-tools"><button onClick={()=>go('status')} aria-current={route==='status'?'page':undefined}><Settings size={17}/>设置</button><button onClick={()=>go('system')} aria-current={route==='system'?'page':undefined}><HelpCircle size={17}/>帮助</button></div></div>
+    </aside><div className="carry-workspace"><header className="carry-topbar"><div className="breadcrumbs"><SourceText>{assistant?.snapshot.profile.display_name||'AI Carry'}</SourceText><ChevronRight size={14}/><strong>{names[route]}</strong></div><div className="carry-top-actions"><span className={'read-status'+(dataError?' has-error':'')}>{demo?'示例资料':dataLoading?'正在读取…':dataError?'资料待检查':'只读查看'}</span><button className="icon-control" onClick={()=>void refreshData()} disabled={dataLoading} aria-label="重新读取资料" title="重新读取资料"><RefreshCw size={17} className={dataLoading?'spin':''}/></button><button className="language-button" onClick={()=>setLocale(locale==='en'?'zh-Hans':'en')} aria-label="中文 / English">{locale==='en'?'中':'EN'}</button></div></header>
+      <div className="client-body"><PageBoundary key={route+'|'+identity} go={()=>go('library')} help={()=>go('system')}>{route==='home'?<Home go={go}/>:route==='library'?<div className="library-embed"><LibraryPage ask={ask}/></div>:route==='workshop'?<Workshop ask={ask}/>:route==='growth'?<Growth ask={ask}/>:route==='transfer'?<Transfer ask={ask}/>:route==='create'?<Onboarding ask={ask} home={()=>go('home')}/>:route==='status'?<Status ask={ask}/>:<HelpPage ask={ask}/>}</PageBoundary></div>
+      <footer className="carry-footer"><span>{demo?'当前使用示例资料，操作不会修改真实助手。':'这里查看已保存的资料；操作请求交给 Agent 执行。'}</span><button onClick={()=>go('system')}>使用说明<ChevronRight size={12}/></button></footer>
+    </div><RequestDialog request={request} onClose={()=>setRequest(null)}/>
   </div>;
 }
 createRoot(document.getElementById('root')!).render(<LocaleRoot>{locale=><ClientProvider key={locale}><App/></ClientProvider>}</LocaleRoot>);
